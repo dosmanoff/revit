@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>SmartViews</Name>
+    <Assembly>SmartViews.dll</Assembly>
+    <FullClassName>SmartViews.App</FullClassName>
+    <ClientId>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</ClientId>
+    <VendorId>SmartViews</VendorId>
+    <VendorDescription>SmartViews Plugin for Revit 2025</VendorDescription>
+  </AddIn>
+</RevitAddIns>
