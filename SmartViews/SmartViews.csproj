@@ -34,6 +34,12 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
+  <!-- Ribbon icons embedded in the assembly (accessed via GetManifestResourceStream) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\icon_16.png"/>
+    <EmbeddedResource Include="Resources\icon_32.png"/>
+  </ItemGroup>
+
   <!-- Copy the .addin manifest next to the DLL so Revit can discover it -->
   <ItemGroup>
     <None Include="SmartViews.addin" CopyToOutputDirectory="PreserveNewest" />

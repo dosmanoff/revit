@@ -79,11 +79,16 @@ public sealed class ViewCreationEngine
             if (viewName is null)
                 continue;
 
-            if (!ResolveUniqueName(ref viewName, existingNames, _config.DuplicateHandling, result))
+            if (!ResolveUniqueName(ref viewName, existingNames, _config.DuplicateHandling, result,
+                    out ElementId? viewToDelete))
                 continue;
 
             using var tx = new Transaction(_doc, $"SmartViews: {viewName}");
             tx.Start();
+
+            // Overwrite: delete the existing view before creating the replacement.
+            if (viewToDelete is not null)
+                _doc.Delete(viewToDelete);
 
             View? view = kindConfig.Kind switch
             {
@@ -326,14 +331,18 @@ public sealed class ViewCreationEngine
     /// <summary>
     /// Checks <paramref name="name"/> against existing and in-run names.
     /// Returns true if the caller should proceed; may modify <paramref name="name"/>
-    /// (AppendSuffix case).
+    /// (AppendSuffix case). Sets <paramref name="viewToDelete"/> when the caller must
+    /// delete an existing view inside its Transaction before creating the replacement.
     /// </summary>
     private bool ResolveUniqueName(
         ref string name,
         HashSet<string> existingNames,
         DuplicateHandling handling,
-        ViewCreationResult result)
+        ViewCreationResult result,
+        out ElementId? viewToDelete)
     {
+        viewToDelete = null;
+
         if (!IsDuplicate(name, existingNames))
             return true;
 
@@ -344,7 +353,7 @@ public sealed class ViewCreationEngine
                 return false;
 
             case DuplicateHandling.Overwrite:
-                // The caller's Transaction will rename/overwrite; proceed with original name.
+                viewToDelete = FindViewIdByName(name);
                 return true;
 
             case DuplicateHandling.AppendSuffix:
@@ -368,6 +377,14 @@ public sealed class ViewCreationEngine
 
     private bool IsDuplicate(string name, HashSet<string> existingNames)
         => existingNames.Contains(name) || _usedNames.Contains(name);
+
+    private ElementId? FindViewIdByName(string name) =>
+        new FilteredElementCollector(_doc)
+            .OfClass(typeof(View))
+            .Cast<View>()
+            .Where(v => !v.IsTemplate)
+            .FirstOrDefault(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
 
     // -----------------------------------------------------------------------
     // Helpers
