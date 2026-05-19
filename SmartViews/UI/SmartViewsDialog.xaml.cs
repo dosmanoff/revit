@@ -27,15 +27,20 @@ public partial class SmartViewsDialog : Window
         GridViewKinds.ItemsSource = config.ViewKinds
             .Select(k => new ViewKindConfig
             {
-                Kind = k.Kind,
-                NameTemplate = k.NameTemplate,
+                Kind              = k.Kind,
+                SectionDirection  = k.SectionDirection,
+                NameTemplate      = k.NameTemplate,
                 ViewFamilyTypeName = k.ViewFamilyTypeName,
             })
             .ToList();
 
-        // Populate the Kind column's combo items.
+        // Populate each combo column with the appropriate enum values.
         foreach (DataGridComboBoxColumn col in GridViewKinds.Columns.OfType<DataGridComboBoxColumn>())
-            col.ItemsSource = Enum.GetValues<ViewKind>();
+        {
+            col.ItemsSource = col.Header?.ToString() == "Direction"
+                ? (System.Collections.IEnumerable)Enum.GetValues<SectionDirection>()
+                : Enum.GetValues<ViewKind>();
+        }
     }
 
     private void BrowseFolder_Click(object sender, RoutedEventArgs e)

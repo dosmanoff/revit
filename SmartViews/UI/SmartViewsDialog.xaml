@@ -83,13 +83,16 @@
             <DataGrid.Columns>
                 <DataGridComboBoxColumn Header="Kind"
                                         SelectedItemBinding="{Binding Kind}"
-                                        Width="110"/>
+                                        Width="90"/>
+                <DataGridComboBoxColumn Header="Direction"
+                                        SelectedItemBinding="{Binding SectionDirection}"
+                                        Width="72"/>
                 <DataGridTextColumn Header="Name template"
                                     Binding="{Binding NameTemplate}"
                                     Width="*"/>
-                <DataGridTextColumn Header="View family type (optional)"
+                <DataGridTextColumn Header="View family type"
                                     Binding="{Binding ViewFamilyTypeName}"
-                                    Width="160"/>
+                                    Width="140"/>
             </DataGrid.Columns>
         </DataGrid>
 

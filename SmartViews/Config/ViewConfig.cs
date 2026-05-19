@@ -45,6 +45,15 @@ public sealed class ViewKindConfig
 
     /// <summary>Optional: pin the view to this ViewFamilyType name. Null = first match.</summary>
     public string? ViewFamilyTypeName { get; set; }
+
+    /// <summary>
+    /// Direction the viewer stands when looking at the element.
+    /// Only applies when Kind = Section.
+    /// South = viewer on -Y side looking north; North = viewer on +Y side looking south;
+    /// East = viewer on +X side looking west; West = viewer on -X side looking east.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public SectionDirection SectionDirection { get; set; } = SectionDirection.South;
 }
 
 public enum ViewKind
@@ -52,6 +61,15 @@ public enum ViewKind
     Section,
     Plan,
     Isometric3D,
+}
+
+/// <summary>Which side the viewer stands on when the section/elevation is created.</summary>
+public enum SectionDirection
+{
+    South,  // viewer on -Y side, looking in +Y
+    North,  // viewer on +Y side, looking in -Y
+    East,   // viewer on +X side, looking in -X
+    West,   // viewer on -X side, looking in +X
 }
 
 public enum DuplicateHandling

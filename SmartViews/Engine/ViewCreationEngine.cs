@@ -5,15 +5,18 @@ namespace SmartViews.Engine;
 
 /// <summary>
 /// Orchestrates batch view creation for a set of elements.
-/// Each public method maps to one view kind; Run() dispatches based on config.
+/// Must be called inside an open TransactionGroup.
 /// </summary>
 public sealed class ViewCreationEngine
 {
     private readonly Document _doc;
     private readonly ViewConfig _config;
 
-    // Tracks names already created in this run to detect within-run duplicates.
+    // Tracks names committed in this run (within-run dedup).
     private readonly HashSet<string> _usedNames = new(StringComparer.OrdinalIgnoreCase);
+
+    // Per name-template sequence counter for {Index} token.
+    private readonly Dictionary<string, int> _templateCounters = new();
 
     public ViewCreationEngine(Document doc, ViewConfig config)
     {
@@ -21,16 +24,14 @@ public sealed class ViewCreationEngine
         _config = config;
     }
 
-    /// <summary>
-    /// Entry point — iterates selected elements and creates the requested view kinds.
-    /// Must be called inside an open TransactionGroup.
-    /// </summary>
+    // -----------------------------------------------------------------------
+    // Public entry point
+    // -----------------------------------------------------------------------
+
     public ViewCreationResult Run(IList<ElementId> elementIds)
     {
         var result = new ViewCreationResult();
-
-        // Pre-load existing view names so we can detect duplicates against the model.
-        var existingNames = CollectExistingViewNames();
+        HashSet<string> existingNames = CollectExistingViewNames();
 
         foreach (ElementId id in elementIds)
         {
@@ -54,38 +55,42 @@ public sealed class ViewCreationEngine
         return result;
     }
 
+    // -----------------------------------------------------------------------
+    // Per-element dispatch
+    // -----------------------------------------------------------------------
+
     private void ProcessElement(
         Element element,
         HashSet<string> existingNames,
         ViewCreationResult result)
     {
-        BoundingBoxXYZ? bbox = element.get_BoundingBox(null);
-        if (bbox is null)
+        BoundingBoxXYZ? rawBbox = element.get_BoundingBox(null);
+        if (rawBbox is null)
         {
             result.RecordError($"Element {element.Id.Value} has no bounding box — skipped.");
             return;
         }
 
-        BoundingBoxXYZ paddedBbox = ApplyOffset(bbox, _config.CropOffset);
+        BoundingBoxXYZ paddedBbox = ApplyOffset(rawBbox, _config.CropOffset);
 
         foreach (ViewKindConfig kindConfig in _config.ViewKinds)
         {
-            string viewName = ResolveViewName(element, kindConfig.NameTemplate, result);
-            if (viewName is null!)
+            string? viewName = ResolveViewName(element, kindConfig, result);
+            if (viewName is null)
                 continue;
 
-            if (!EnsureUniqueName(viewName, existingNames, _config.DuplicateHandling, result))
+            if (!ResolveUniqueName(ref viewName, existingNames, _config.DuplicateHandling, result))
                 continue;
 
-            using var tx = new Transaction(_doc, $"Create view: {viewName}");
+            using var tx = new Transaction(_doc, $"SmartViews: {viewName}");
             tx.Start();
 
             View? view = kindConfig.Kind switch
             {
-                ViewKind.Section => CreateSection(paddedBbox, kindConfig),
-                ViewKind.Plan => CreatePlan(element, kindConfig),
-                ViewKind.Isometric3D => CreateIsometric(kindConfig),
-                _ => throw new NotSupportedException($"View kind '{kindConfig.Kind}' is not supported."),
+                ViewKind.Section     => CreateSection(paddedBbox, kindConfig),
+                ViewKind.Plan        => CreatePlan(element, kindConfig),
+                ViewKind.Isometric3D => CreateIsometric(paddedBbox, kindConfig),
+                _ => throw new NotSupportedException($"ViewKind '{kindConfig.Kind}' is not supported."),
             };
 
             if (view is not null)
@@ -100,52 +105,196 @@ public sealed class ViewCreationEngine
         }
     }
 
-    // -------------------------------------------------------------------------
-    // View factories — stubs to be completed in later phases
-    // -------------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // Section
+    // -----------------------------------------------------------------------
 
-    private View? CreateSection(BoundingBoxXYZ bbox, ViewKindConfig kindConfig)
+    private View? CreateSection(BoundingBoxXYZ paddedBbox, ViewKindConfig kindConfig)
     {
-        // TODO: build a Transform oriented along the element's dominant face or
-        // a user-selected direction, then call ViewSection.CreateSection().
-        throw new NotImplementedException("Section creation is not yet implemented.");
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.Section, kindConfig.ViewFamilyTypeName);
+        BoundingBoxXYZ sectionBox = BuildSectionBox(paddedBbox, kindConfig.SectionDirection);
+        return ViewSection.CreateSection(_doc, vft.Id, sectionBox);
     }
+
+    /// <summary>
+    /// Builds a BoundingBoxXYZ whose Transform expresses the section's coordinate frame.
+    ///
+    /// Convention (confirmed against Revit API examples):
+    ///   BasisX = right direction in the view
+    ///   BasisY = up direction in the view (+Z for vertical sections)
+    ///   BasisZ = BasisX × BasisY (right-handed); points toward the viewer
+    ///   Origin = centre of the element bbox
+    ///   Min/Max in local space cover the full element extent
+    ///
+    /// Local axis → world axis mapping per direction:
+    ///   South (viewer -Y): localX=+X, localY=+Z, localZ=-Y
+    ///   North (viewer +Y): localX=-X, localY=+Z, localZ=+Y
+    ///   East  (viewer +X): localX=+Y, localY=+Z, localZ=+X
+    ///   West  (viewer -X): localX=-Y, localY=+Z, localZ=-X
+    /// </summary>
+    private static BoundingBoxXYZ BuildSectionBox(BoundingBoxXYZ bbox, SectionDirection dir)
+    {
+        double midX = (bbox.Min.X + bbox.Max.X) / 2;
+        double midY = (bbox.Min.Y + bbox.Max.Y) / 2;
+        double midZ = (bbox.Min.Z + bbox.Max.Z) / 2;
+        double extX = bbox.Max.X - bbox.Min.X;
+        double extY = bbox.Max.Y - bbox.Min.Y;
+        double extZ = bbox.Max.Z - bbox.Min.Z;
+
+        XYZ basisX, basisY, basisZ;
+        // Half-extents in local X, Y, Z
+        double hLocal, vLocal, dLocal;
+
+        switch (dir)
+        {
+            case SectionDirection.South: // viewer on -Y, looks +Y; localZ = -worldY
+                basisX = XYZ.BasisX;
+                basisY = XYZ.BasisZ;
+                basisZ = new XYZ(0, -1, 0);
+                hLocal = extX / 2; vLocal = extZ / 2; dLocal = extY / 2;
+                break;
+
+            case SectionDirection.North: // viewer on +Y, looks -Y; localZ = +worldY
+                basisX = new XYZ(-1, 0, 0);
+                basisY = XYZ.BasisZ;
+                basisZ = XYZ.BasisY;
+                hLocal = extX / 2; vLocal = extZ / 2; dLocal = extY / 2;
+                break;
+
+            case SectionDirection.East: // viewer on +X, looks -X; localZ = +worldX
+                basisX = XYZ.BasisY;
+                basisY = XYZ.BasisZ;
+                basisZ = XYZ.BasisX;
+                hLocal = extY / 2; vLocal = extZ / 2; dLocal = extX / 2;
+                break;
+
+            default: // West: viewer on -X, looks +X; localZ = -worldX
+                basisX = new XYZ(0, -1, 0);
+                basisY = XYZ.BasisZ;
+                basisZ = new XYZ(-1, 0, 0);
+                hLocal = extY / 2; vLocal = extZ / 2; dLocal = extX / 2;
+                break;
+        }
+
+        var transform = new Transform(Transform.Identity)
+        {
+            Origin = new XYZ(midX, midY, midZ),
+            BasisX = basisX,
+            BasisY = basisY,
+            BasisZ = basisZ,
+        };
+
+        return new BoundingBoxXYZ
+        {
+            Transform = transform,
+            Min = new XYZ(-hLocal, -vLocal, -dLocal),
+            Max = new XYZ( hLocal,  vLocal,  dLocal),
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan
+    // -----------------------------------------------------------------------
 
     private View? CreatePlan(Element element, ViewKindConfig kindConfig)
     {
-        // TODO: resolve the host Level, find a matching FloorPlan ViewFamilyType,
-        // then call ViewPlan.Create().
-        throw new NotImplementedException("Plan creation is not yet implemented.");
-    }
+        Level level = GetHostLevel(element)
+            ?? throw new InvalidOperationException(
+                $"Cannot determine Level for element {element.Id.Value}.");
 
-    private View? CreateIsometric(ViewKindConfig kindConfig)
-    {
-        // TODO: find a suitable ViewFamilyType for 3D views, then call
-        // View3D.CreateIsometric().
-        throw new NotImplementedException("3-D isometric creation is not yet implemented.");
-    }
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, kindConfig.ViewFamilyTypeName);
+        ViewPlan planView = ViewPlan.Create(_doc, vft.Id, level.Id);
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+        // Crop to the element's padded bounding box projected onto the plan.
+        // For unrotated plans the view CS matches world CS in X and Y; Z is the view range depth.
+        BoundingBoxXYZ paddedBbox = ApplyOffset(element.get_BoundingBox(null)!, _config.CropOffset);
+        BoundingBoxXYZ existingCrop = planView.CropBox;
 
-    private static BoundingBoxXYZ ApplyOffset(BoundingBoxXYZ bbox, double offset)
-    {
-        var result = new BoundingBoxXYZ
+        planView.CropBoxActive = true;
+        planView.CropBoxVisible = true;
+        planView.CropBox = new BoundingBoxXYZ
         {
-            Min = new XYZ(bbox.Min.X - offset, bbox.Min.Y - offset, bbox.Min.Z - offset),
-            Max = new XYZ(bbox.Max.X + offset, bbox.Max.Y + offset, bbox.Max.Z + offset),
+            Min = new XYZ(paddedBbox.Min.X, paddedBbox.Min.Y, existingCrop.Min.Z),
+            Max = new XYZ(paddedBbox.Max.X, paddedBbox.Max.Y, existingCrop.Max.Z),
         };
-        return result;
+
+        return planView;
     }
 
-    private static string ResolveViewName(
+    private Level? GetHostLevel(Element element)
+    {
+        if (element.LevelId != ElementId.InvalidElementId)
+            return _doc.GetElement(element.LevelId) as Level;
+
+        // Hosted elements (doors, windows, …) — walk up to the host's level.
+        Parameter? hostParam = element.get_Parameter(BuiltInParameter.HOST_ID_PARAM);
+        if (hostParam?.AsElementId() is { } hostId
+            && hostId != ElementId.InvalidElementId)
+        {
+            Element? host = _doc.GetElement(hostId);
+            if (host?.LevelId != ElementId.InvalidElementId)
+                return _doc.GetElement(host.LevelId) as Level;
+        }
+
+        return null;
+    }
+
+    // -----------------------------------------------------------------------
+    // 3-D Isometric
+    // -----------------------------------------------------------------------
+
+    private View? CreateIsometric(BoundingBoxXYZ paddedBbox, ViewKindConfig kindConfig)
+    {
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.ThreeDimensional, kindConfig.ViewFamilyTypeName);
+        View3D view3d = View3D.CreateIsometric(_doc, vft.Id);
+        view3d.SetSectionBox(paddedBbox);
+        view3d.IsSectionBoxActive = true;
+        return view3d;
+    }
+
+    // -----------------------------------------------------------------------
+    // ViewFamilyType lookup
+    // -----------------------------------------------------------------------
+
+    private ViewFamilyType FindViewFamilyType(ViewFamily family, string? preferredName)
+    {
+        List<ViewFamilyType> candidates = new FilteredElementCollector(_doc)
+            .OfClass(typeof(ViewFamilyType))
+            .Cast<ViewFamilyType>()
+            .Where(t => t.ViewFamily == family)
+            .ToList();
+
+        if (candidates.Count == 0)
+            throw new InvalidOperationException(
+                $"No ViewFamilyType found for ViewFamily.{family}. " +
+                "Ensure the project template includes one.");
+
+        if (preferredName is not null)
+        {
+            ViewFamilyType? preferred = candidates.FirstOrDefault(t =>
+                string.Equals(t.Name, preferredName, StringComparison.OrdinalIgnoreCase));
+            if (preferred is not null)
+                return preferred;
+
+            // Preferred name specified but not found — fall through to first match rather than throw.
+        }
+
+        return candidates[0];
+    }
+
+    // -----------------------------------------------------------------------
+    // Name resolution
+    // -----------------------------------------------------------------------
+
+    private string? ResolveViewName(
         Element element,
-        string template,
+        ViewKindConfig kindConfig,
         ViewCreationResult result)
     {
-        // Token substitution: {Mark}, {Level}, {Type}, {Index}
-        string name = template;
+        // Increment per-template counter before substitution so {Index} is never 0.
+        string template = kindConfig.NameTemplate;
+        _templateCounters.TryGetValue(template, out int idx);
+        _templateCounters[template] = ++idx;
 
         string mark = element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? string.Empty;
         string typeName = element.Document.GetElement(element.GetTypeId())?.Name ?? string.Empty;
@@ -153,54 +302,89 @@ public sealed class ViewCreationEngine
             ? (element.Document.GetElement(element.LevelId)?.Name ?? string.Empty)
             : string.Empty;
 
-        name = name
-            .Replace("{Mark}", mark)
-            .Replace("{Type}", typeName)
-            .Replace("{Level}", levelName);
+        string name = template
+            .Replace("{Mark}",  mark)
+            .Replace("{Type}",  typeName)
+            .Replace("{Level}", levelName)
+            .Replace("{Index}", idx.ToString())
+            .Trim();
 
-        // {Index} is resolved later when we know the sequence; strip for now.
-        name = name.Replace("{Index}", string.Empty);
-
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrEmpty(name))
         {
-            result.RecordError($"Element {element.Id.Value}: name template resolved to empty string.");
-            return null!;
+            result.RecordError(
+                $"Element {element.Id.Value}: name template \"{template}\" resolved to an empty string.");
+            return null;
         }
 
-        return name.Trim();
+        return name;
     }
 
-    private bool EnsureUniqueName(
-        string name,
+    // -----------------------------------------------------------------------
+    // Duplicate handling
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Checks <paramref name="name"/> against existing and in-run names.
+    /// Returns true if the caller should proceed; may modify <paramref name="name"/>
+    /// (AppendSuffix case).
+    /// </summary>
+    private bool ResolveUniqueName(
+        ref string name,
         HashSet<string> existingNames,
         DuplicateHandling handling,
         ViewCreationResult result)
     {
-        if (!existingNames.Contains(name) && !_usedNames.Contains(name))
+        if (!IsDuplicate(name, existingNames))
             return true;
 
-        return handling switch
+        switch (handling)
         {
-            DuplicateHandling.Skip => Skip(name, result),
-            DuplicateHandling.Overwrite => true,   // caller deletes or renames existing view — TODO
-            DuplicateHandling.AppendSuffix => true, // suffix logic — TODO
-            _ => Skip(name, result),
-        };
+            case DuplicateHandling.Skip:
+                result.RecordSkipped();
+                return false;
 
-        static bool Skip(string n, ViewCreationResult r)
-        {
-            r.RecordSkipped();
-            return false;
+            case DuplicateHandling.Overwrite:
+                // The caller's Transaction will rename/overwrite; proceed with original name.
+                return true;
+
+            case DuplicateHandling.AppendSuffix:
+                for (int i = 1; i <= 999; i++)
+                {
+                    string candidate = $"{name}_{i}";
+                    if (!IsDuplicate(candidate, existingNames))
+                    {
+                        name = candidate;
+                        return true;
+                    }
+                }
+                result.RecordError($"Could not find a unique suffix for \"{name}\" after 999 attempts.");
+                return false;
+
+            default:
+                result.RecordSkipped();
+                return false;
         }
     }
 
-    private HashSet<string> CollectExistingViewNames()
-    {
-        return new FilteredElementCollector(_doc)
+    private bool IsDuplicate(string name, HashSet<string> existingNames)
+        => existingNames.Contains(name) || _usedNames.Contains(name);
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private static BoundingBoxXYZ ApplyOffset(BoundingBoxXYZ bbox, double offset) =>
+        new()
+        {
+            Min = new XYZ(bbox.Min.X - offset, bbox.Min.Y - offset, bbox.Min.Z - offset),
+            Max = new XYZ(bbox.Max.X + offset, bbox.Max.Y + offset, bbox.Max.Z + offset),
+        };
+
+    private HashSet<string> CollectExistingViewNames() =>
+        new FilteredElementCollector(_doc)
             .OfClass(typeof(View))
             .Cast<View>()
             .Where(v => !v.IsTemplate)
             .Select(v => v.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
 }
