@@ -50,6 +50,61 @@ public static class ConfigLoader
     }
 
     // -----------------------------------------------------------------------
+    // File-based preset API
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns preset names (without the .json extension) found in <paramref name="folderPath"/>.
+    /// Returns an empty list when the folder does not exist or is inaccessible.
+    /// </summary>
+    public static IReadOnlyList<string> ListPresets(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            return [];
+
+        return Directory
+            .EnumerateFiles(folderPath, "*.json", SearchOption.TopDirectoryOnly)
+            .Select(p => Path.GetFileNameWithoutExtension(p))
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Loads a named preset from <paramref name="folderPath"/>.
+    /// Returns null when the file is missing or cannot be parsed.
+    /// </summary>
+    public static ViewConfig? LoadPreset(string folderPath, string presetName)
+    {
+        string path = PresetPath(folderPath, presetName);
+        if (!File.Exists(path))
+            return null;
+
+        try
+        {
+            string json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Saves <paramref name="config"/> as a named preset JSON file.
+    /// Creates the folder if it does not yet exist.
+    /// </summary>
+    public static void SavePreset(string folderPath, string presetName, ViewConfig config)
+    {
+        Directory.CreateDirectory(folderPath);
+        string json = JsonSerializer.Serialize(config, JsonOptions);
+        File.WriteAllText(PresetPath(folderPath, presetName), json);
+    }
+
+    private static string PresetPath(string folderPath, string presetName) =>
+        Path.Combine(folderPath, $"{presetName}.json");
+
+    // -----------------------------------------------------------------------
     // ExtensibleStorage helpers
     // -----------------------------------------------------------------------
 
