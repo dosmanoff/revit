@@ -51,9 +51,24 @@ public sealed class ViewKindConfig
     /// Only applies when Kind = Section.
     /// South = viewer on -Y side looking north; North = viewer on +Y side looking south;
     /// East = viewer on +X side looking west; West = viewer on -X side looking east.
+    /// When AlignToElement = true the directions are relative to the element's own axes.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public SectionDirection SectionDirection { get; set; } = SectionDirection.South;
+
+    /// <summary>
+    /// When true, the section frame is aligned to the element's local orientation
+    /// (wall direction, FacingOrientation, etc.) rather than world axes.
+    /// Falls back to world axes when the element has no detectable orientation.
+    /// Only applies when Kind = Section.
+    /// </summary>
+    public bool AlignToElement { get; set; } = false;
+
+    /// <summary>
+    /// Optional view template name to apply after creation.
+    /// Must match a template of the same ViewType in the project.
+    /// </summary>
+    public string? ViewTemplateName { get; set; }
 }
 
 public enum ViewKind

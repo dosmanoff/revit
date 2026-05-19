@@ -33,8 +33,10 @@ public partial class SmartViewsDialog : Window
             {
                 Kind               = k.Kind,
                 SectionDirection   = k.SectionDirection,
+                AlignToElement     = k.AlignToElement,
                 NameTemplate       = k.NameTemplate,
                 ViewFamilyTypeName = k.ViewFamilyTypeName,
+                ViewTemplateName   = k.ViewTemplateName,
             })
             .ToList();
 

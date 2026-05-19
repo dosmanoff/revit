@@ -1,0 +1,40 @@
+<Window x:Class="SmartViews.UI.PreflightDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SmartViews — Pre-flight Check"
+        Width="560" SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+
+    <StackPanel Margin="16">
+
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+            <Run FontWeight="SemiBold">The following issues were detected before running.</Run>
+            <Run>Affected elements will be skipped or may cause errors.</Run>
+        </TextBlock>
+
+        <ListView x:Name="LvIssues"
+                  MaxHeight="280"
+                  Margin="0,0,0,12"
+                  SelectionMode="Single"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Element" Width="200"
+                                    DisplayMemberBinding="{Binding ElementName}"/>
+                    <GridViewColumn Header="Issue" Width="320"
+                                    DisplayMemberBinding="{Binding Issue}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Proceed Anyway" IsDefault="True"
+                    Padding="16,5" Margin="0,0,8,0"
+                    Click="Proceed_Click"/>
+            <Button Content="Cancel" IsCancel="True"
+                    Padding="16,5"/>
+        </StackPanel>
+
+    </StackPanel>
+</Window>

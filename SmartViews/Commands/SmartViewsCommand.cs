@@ -23,6 +23,7 @@ public class SmartViewsCommand : IExternalCommand
             return Result.Cancelled;
 
         ConfigLoader.Save(doc, dialog.Config);
+        config = dialog.Config;
 
         IList<ElementId> selectedIds = uidoc.Selection.GetElementIds().ToList();
         if (selectedIds.Count == 0)
@@ -31,7 +32,16 @@ public class SmartViewsCommand : IExternalCommand
             return Result.Cancelled;
         }
 
-        var engine = new ViewCreationEngine(doc, dialog.Config);
+        // Pre-flight — warn about elements likely to fail before touching the model.
+        IReadOnlyList<PreflightIssue> issues = PreflightChecker.Check(doc, selectedIds, config);
+        if (issues.Count > 0)
+        {
+            var preflightDlg = new PreflightDialog(issues);
+            if (preflightDlg.ShowDialog() != true)
+                return Result.Cancelled;
+        }
+
+        var engine = new ViewCreationEngine(doc, config);
 
         using var txGroup = new TransactionGroup(doc, "SmartViews — Create Views");
         txGroup.Start();

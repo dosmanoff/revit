@@ -12,10 +12,7 @@ public sealed class ViewCreationEngine
     private readonly Document _doc;
     private readonly ViewConfig _config;
 
-    // Tracks names committed in this run (within-run dedup).
     private readonly HashSet<string> _usedNames = new(StringComparer.OrdinalIgnoreCase);
-
-    // Per name-template sequence counter for {Index} token.
     private readonly Dictionary<string, int> _templateCounters = new();
 
     public ViewCreationEngine(Document doc, ViewConfig config)
@@ -86,13 +83,12 @@ public sealed class ViewCreationEngine
             using var tx = new Transaction(_doc, $"SmartViews: {viewName}");
             tx.Start();
 
-            // Overwrite: delete the existing view before creating the replacement.
             if (viewToDelete is not null)
                 _doc.Delete(viewToDelete);
 
             View? view = kindConfig.Kind switch
             {
-                ViewKind.Section     => CreateSection(paddedBbox, kindConfig),
+                ViewKind.Section     => CreateSection(element, paddedBbox, kindConfig),
                 ViewKind.Plan        => CreatePlan(element, kindConfig),
                 ViewKind.Isometric3D => CreateIsometric(paddedBbox, kindConfig),
                 _ => throw new NotSupportedException($"ViewKind '{kindConfig.Kind}' is not supported."),
@@ -101,6 +97,7 @@ public sealed class ViewCreationEngine
             if (view is not null)
             {
                 view.Name = viewName;
+                ApplyViewTemplate(view, kindConfig.ViewTemplateName);
                 existingNames.Add(viewName);
                 _usedNames.Add(viewName);
                 result.RecordCreated();
@@ -114,78 +111,74 @@ public sealed class ViewCreationEngine
     // Section
     // -----------------------------------------------------------------------
 
-    private View? CreateSection(BoundingBoxXYZ paddedBbox, ViewKindConfig kindConfig)
+    private View? CreateSection(Element element, BoundingBoxXYZ paddedBbox, ViewKindConfig kindConfig)
     {
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.Section, kindConfig.ViewFamilyTypeName);
-        BoundingBoxXYZ sectionBox = BuildSectionBox(paddedBbox, kindConfig.SectionDirection);
+
+        (XYZ fwd, XYZ rgt) = kindConfig.AlignToElement
+            ? GetElementOrientation(element)
+            : (XYZ.BasisY, XYZ.BasisX);
+
+        BoundingBoxXYZ sectionBox = BuildSectionBox(paddedBbox, kindConfig.SectionDirection, fwd, rgt);
         return ViewSection.CreateSection(_doc, vft.Id, sectionBox);
     }
 
     /// <summary>
-    /// Builds a BoundingBoxXYZ whose Transform expresses the section's coordinate frame.
+    /// Builds the section BoundingBoxXYZ from the padded element bbox, a viewing direction,
+    /// and the element's orientation vectors.
     ///
-    /// Convention (confirmed against Revit API examples):
-    ///   BasisX = right direction in the view
-    ///   BasisY = up direction in the view (+Z for vertical sections)
-    ///   BasisZ = BasisX × BasisY (right-handed); points toward the viewer
-    ///   Origin = centre of the element bbox
-    ///   Min/Max in local space cover the full element extent
+    /// Coordinate frame convention (matches Revit API examples):
+    ///   BasisX = right direction in the rendered view
+    ///   BasisY = up direction (+Z)
+    ///   BasisZ = BasisX × BasisY (right-handed) — points toward the viewer
+    ///   Origin = centre of the padded bbox
     ///
-    /// Local axis → world axis mapping per direction:
-    ///   South (viewer -Y): localX=+X, localY=+Z, localZ=-Y
-    ///   North (viewer +Y): localX=-X, localY=+Z, localZ=+Y
-    ///   East  (viewer +X): localX=+Y, localY=+Z, localZ=+X
-    ///   West  (viewer -X): localX=-Y, localY=+Z, localZ=-X
+    /// For each SectionDirection, given element forward (fwd) and right (rgt):
+    ///   South → BasisX = +rgt,  BasisZ = −fwd  (viewer behind the "front face")
+    ///   North → BasisX = −rgt,  BasisZ = +fwd
+    ///   East  → BasisX = +fwd,  BasisZ = +rgt  (viewer on the "right side")
+    ///   West  → BasisX = −fwd,  BasisZ = −rgt
+    ///
+    /// Half-extents are computed via AABB projection so rotated elements produce
+    /// a correctly-sized box even when the bbox axes don't align with the view axes.
     /// </summary>
-    private static BoundingBoxXYZ BuildSectionBox(BoundingBoxXYZ bbox, SectionDirection dir)
+    private static BoundingBoxXYZ BuildSectionBox(
+        BoundingBoxXYZ bbox,
+        SectionDirection dir,
+        XYZ fwd,
+        XYZ rgt)
     {
+        XYZ basisX = dir switch
+        {
+            SectionDirection.South =>  rgt,
+            SectionDirection.North => -rgt,
+            SectionDirection.East  =>  fwd,
+            _                      => -fwd,   // West
+        };
+
+        XYZ basisZ = dir switch
+        {
+            SectionDirection.South => -fwd,
+            SectionDirection.North =>  fwd,
+            SectionDirection.East  =>  rgt,
+            _                      => -rgt,   // West
+        };
+
+        // For an AABB, the half-extent along an arbitrary unit direction u is:
+        //   |u.X|·halfX  +  |u.Y|·halfY  +  |u.Z|·halfZ
+        double hLocal = HalfExtentAlongAxis(bbox, basisX);
+        double vLocal = (bbox.Max.Z - bbox.Min.Z) / 2;       // always world-Z
+        double dLocal = HalfExtentAlongAxis(bbox, basisZ);
+
         double midX = (bbox.Min.X + bbox.Max.X) / 2;
         double midY = (bbox.Min.Y + bbox.Max.Y) / 2;
         double midZ = (bbox.Min.Z + bbox.Max.Z) / 2;
-        double extX = bbox.Max.X - bbox.Min.X;
-        double extY = bbox.Max.Y - bbox.Min.Y;
-        double extZ = bbox.Max.Z - bbox.Min.Z;
-
-        XYZ basisX, basisY, basisZ;
-        // Half-extents in local X, Y, Z
-        double hLocal, vLocal, dLocal;
-
-        switch (dir)
-        {
-            case SectionDirection.South: // viewer on -Y, looks +Y; localZ = -worldY
-                basisX = XYZ.BasisX;
-                basisY = XYZ.BasisZ;
-                basisZ = new XYZ(0, -1, 0);
-                hLocal = extX / 2; vLocal = extZ / 2; dLocal = extY / 2;
-                break;
-
-            case SectionDirection.North: // viewer on +Y, looks -Y; localZ = +worldY
-                basisX = new XYZ(-1, 0, 0);
-                basisY = XYZ.BasisZ;
-                basisZ = XYZ.BasisY;
-                hLocal = extX / 2; vLocal = extZ / 2; dLocal = extY / 2;
-                break;
-
-            case SectionDirection.East: // viewer on +X, looks -X; localZ = +worldX
-                basisX = XYZ.BasisY;
-                basisY = XYZ.BasisZ;
-                basisZ = XYZ.BasisX;
-                hLocal = extY / 2; vLocal = extZ / 2; dLocal = extX / 2;
-                break;
-
-            default: // West: viewer on -X, looks +X; localZ = -worldX
-                basisX = new XYZ(0, -1, 0);
-                basisY = XYZ.BasisZ;
-                basisZ = new XYZ(-1, 0, 0);
-                hLocal = extY / 2; vLocal = extZ / 2; dLocal = extX / 2;
-                break;
-        }
 
         var transform = new Transform(Transform.Identity)
         {
             Origin = new XYZ(midX, midY, midZ),
             BasisX = basisX,
-            BasisY = basisY,
+            BasisY = XYZ.BasisZ,
             BasisZ = basisZ,
         };
 
@@ -195,6 +188,54 @@ public sealed class ViewCreationEngine
             Min = new XYZ(-hLocal, -vLocal, -dLocal),
             Max = new XYZ( hLocal,  vLocal,  dLocal),
         };
+    }
+
+    private static double HalfExtentAlongAxis(BoundingBoxXYZ bbox, XYZ axis)
+    {
+        double halfX = (bbox.Max.X - bbox.Min.X) / 2;
+        double halfY = (bbox.Max.Y - bbox.Min.Y) / 2;
+        double halfZ = (bbox.Max.Z - bbox.Min.Z) / 2;
+        return Math.Abs(axis.X) * halfX
+             + Math.Abs(axis.Y) * halfY
+             + Math.Abs(axis.Z) * halfZ;
+    }
+
+    /// <summary>
+    /// Returns the element's (forward, right) unit vectors in the XY plane.
+    ///
+    /// Priority:
+    ///   1. LocationCurve  → direction along the curve  (walls, beams, pipes, …)
+    ///   2. FamilyInstance → FacingOrientation           (doors, windows, columns, …)
+    ///   3. World axes     → (BasisY, BasisX)            (fallback)
+    ///
+    /// "right" is always "forward rotated 90° clockwise in XY", which satisfies
+    /// rgt × BasisZ = −fwd (required for the right-handed section frames above).
+    /// </summary>
+    private static (XYZ Forward, XYZ Right) GetElementOrientation(Element element)
+    {
+        XYZ? fwd = null;
+
+        if (element.Location is LocationCurve locCurve)
+        {
+            Curve curve = locCurve.Curve;
+            XYZ dir = (curve.GetEndPoint(1) - curve.GetEndPoint(0)).Normalize();
+            var flat = new XYZ(dir.X, dir.Y, 0);
+            if (flat.GetLength() > 1e-6)
+                fwd = flat.Normalize();
+        }
+        else if (element is FamilyInstance fi)
+        {
+            var flat = new XYZ(fi.FacingOrientation.X, fi.FacingOrientation.Y, 0);
+            if (flat.GetLength() > 1e-6)
+                fwd = flat.Normalize();
+        }
+
+        if (fwd is null)
+            return (XYZ.BasisY, XYZ.BasisX);
+
+        // 90° CW rotation in XY: (x, y) → (y, −x)
+        var right = new XYZ(fwd.Y, -fwd.X, 0);
+        return (fwd, right);
     }
 
     // -----------------------------------------------------------------------
@@ -210,12 +251,10 @@ public sealed class ViewCreationEngine
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, kindConfig.ViewFamilyTypeName);
         ViewPlan planView = ViewPlan.Create(_doc, vft.Id, level.Id);
 
-        // Crop to the element's padded bounding box projected onto the plan.
-        // For unrotated plans the view CS matches world CS in X and Y; Z is the view range depth.
         BoundingBoxXYZ paddedBbox = ApplyOffset(element.get_BoundingBox(null)!, _config.CropOffset);
         BoundingBoxXYZ existingCrop = planView.CropBox;
 
-        planView.CropBoxActive = true;
+        planView.CropBoxActive  = true;
         planView.CropBoxVisible = true;
         planView.CropBox = new BoundingBoxXYZ
         {
@@ -231,7 +270,6 @@ public sealed class ViewCreationEngine
         if (element.LevelId != ElementId.InvalidElementId)
             return _doc.GetElement(element.LevelId) as Level;
 
-        // Hosted elements (doors, windows, …) — walk up to the host's level.
         Parameter? hostParam = element.get_Parameter(BuiltInParameter.HOST_ID_PARAM);
         if (hostParam?.AsElementId() is { } hostId
             && hostId != ElementId.InvalidElementId)
@@ -258,6 +296,26 @@ public sealed class ViewCreationEngine
     }
 
     // -----------------------------------------------------------------------
+    // View template
+    // -----------------------------------------------------------------------
+
+    private void ApplyViewTemplate(View view, string? templateName)
+    {
+        if (string.IsNullOrWhiteSpace(templateName))
+            return;
+
+        View? template = new FilteredElementCollector(_doc)
+            .OfClass(typeof(View))
+            .Cast<View>()
+            .FirstOrDefault(v => v.IsTemplate
+                && v.ViewType == view.ViewType
+                && string.Equals(v.Name, templateName, StringComparison.OrdinalIgnoreCase));
+
+        if (template is not null)
+            view.ViewTemplateId = template.Id;
+    }
+
+    // -----------------------------------------------------------------------
     // ViewFamilyType lookup
     // -----------------------------------------------------------------------
 
@@ -280,8 +338,6 @@ public sealed class ViewCreationEngine
                 string.Equals(t.Name, preferredName, StringComparison.OrdinalIgnoreCase));
             if (preferred is not null)
                 return preferred;
-
-            // Preferred name specified but not found — fall through to first match rather than throw.
         }
 
         return candidates[0];
@@ -296,7 +352,6 @@ public sealed class ViewCreationEngine
         ViewKindConfig kindConfig,
         ViewCreationResult result)
     {
-        // Increment per-template counter before substitution so {Index} is never 0.
         string template = kindConfig.NameTemplate;
         _templateCounters.TryGetValue(template, out int idx);
         _templateCounters[template] = ++idx;
@@ -328,12 +383,6 @@ public sealed class ViewCreationEngine
     // Duplicate handling
     // -----------------------------------------------------------------------
 
-    /// <summary>
-    /// Checks <paramref name="name"/> against existing and in-run names.
-    /// Returns true if the caller should proceed; may modify <paramref name="name"/>
-    /// (AppendSuffix case). Sets <paramref name="viewToDelete"/> when the caller must
-    /// delete an existing view inside its Transaction before creating the replacement.
-    /// </summary>
     private bool ResolveUniqueName(
         ref string name,
         HashSet<string> existingNames,
