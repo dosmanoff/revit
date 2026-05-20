@@ -1,5 +1,7 @@
 using SmartViews.Config;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Forms;
 
 namespace SmartViews.UI;
@@ -27,16 +29,17 @@ public partial class SmartViewsDialog : Window
         CmbDuplicates.ItemsSource  = Enum.GetValues<DuplicateHandling>();
         CmbDuplicates.SelectedItem = config.DuplicateHandling;
 
-        // DataGrid is bound to copies so cancellation leaves the original intact.
+        // DataGrid rows are copies so cancellation leaves the original intact.
         GridViewKinds.ItemsSource = config.ViewKinds
             .Select(k => new ViewKindConfig
             {
-                Kind               = k.Kind,
-                SectionDirection   = k.SectionDirection,
-                AlignToElement     = k.AlignToElement,
-                NameTemplate       = k.NameTemplate,
-                ViewFamilyTypeName = k.ViewFamilyTypeName,
-                ViewTemplateName   = k.ViewTemplateName,
+                Kind                 = k.Kind,
+                SectionDirection     = k.SectionDirection,
+                CreateAllDirections  = k.CreateAllDirections,
+                AlignToElement       = k.AlignToElement,
+                NameTemplate         = k.NameTemplate,
+                ViewFamilyTypeName   = k.ViewFamilyTypeName,
+                ViewTemplateName     = k.ViewTemplateName,
             })
             .ToList();
 
@@ -47,7 +50,30 @@ public partial class SmartViewsDialog : Window
                 : Enum.GetValues<ViewKind>();
         }
 
+        // Plan view range
+        bool hasPlanRange = config.PlanViewRange is not null;
+        PlanViewRangeConfig pr = config.PlanViewRange ?? new PlanViewRangeConfig();
+        TxtPlanTop.Text    = pr.TopOffset.ToString("F2");
+        TxtPlanCut.Text    = pr.CutOffset.ToString("F2");
+        TxtPlanBottom.Text = pr.BottomOffset.ToString("F2");
+        TxtPlanDepth.Text  = pr.ViewDepth.ToString("F2");
+        ChkPlanRange.IsChecked = hasPlanRange;
+        SetPlanRangeFieldsEnabled(hasPlanRange);
+
         RefreshPresetList(preserveSelection: true);
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan view range
+    // -----------------------------------------------------------------------
+
+    private void ChkPlanRange_Changed(object sender, RoutedEventArgs e)
+        => SetPlanRangeFieldsEnabled(ChkPlanRange.IsChecked == true);
+
+    private void SetPlanRangeFieldsEnabled(bool enabled)
+    {
+        foreach (TextBox tb in PnlPlanRangeFields.Children.OfType<TextBox>())
+            tb.IsEnabled = enabled;
     }
 
     // -----------------------------------------------------------------------
@@ -82,7 +108,6 @@ public partial class SmartViewsDialog : Window
             return;
         }
 
-        // Preserve folder path and preset name — only overwrite the content settings.
         preset.ConfigFolderPath = folder;
         PopulateControls(preset);
         CmbPreset.Text = name;
@@ -131,8 +156,8 @@ public partial class SmartViewsDialog : Window
     {
         using var dlg = new FolderBrowserDialog
         {
-            Description    = "Select the folder where SmartViews config files are stored",
-            SelectedPath   = TxtConfigFolder.Text,
+            Description         = "Select the folder where SmartViews config files are stored",
+            SelectedPath        = TxtConfigFolder.Text,
             ShowNewFolderButton = true,
         };
 
@@ -163,13 +188,36 @@ public partial class SmartViewsDialog : Window
     {
         config = null;
 
-        if (!double.TryParse(TxtCropOffset.Text, out double offset) || offset < 0)
+        if (!TryParseNonNegative(TxtCropOffset.Text, out double offset))
         {
-            System.Windows.MessageBox.Show(
-                "Crop offset must be a non-negative number.",
+            System.Windows.MessageBox.Show("Crop offset must be a non-negative number.",
                 "SmartViews", MessageBoxButton.OK, MessageBoxImage.Warning);
             TxtCropOffset.Focus();
             return false;
+        }
+
+        PlanViewRangeConfig? planRange = null;
+        if (ChkPlanRange.IsChecked == true)
+        {
+            if (!TryParseDouble(TxtPlanTop.Text,    out double top)    ||
+                !TryParseDouble(TxtPlanCut.Text,    out double cut)    ||
+                !TryParseDouble(TxtPlanBottom.Text, out double bottom) ||
+                !TryParseDouble(TxtPlanDepth.Text,  out double depth))
+            {
+                System.Windows.MessageBox.Show(
+                    "All plan view range offsets must be valid numbers.",
+                    "SmartViews", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtPlanTop.Focus();
+                return false;
+            }
+
+            planRange = new PlanViewRangeConfig
+            {
+                TopOffset    = top,
+                CutOffset    = cut,
+                BottomOffset = bottom,
+                ViewDepth    = depth,
+            };
         }
 
         config = new ViewConfig
@@ -177,9 +225,20 @@ public partial class SmartViewsDialog : Window
             ConfigFolderPath  = TxtConfigFolder.Text.Trim(),
             CropOffset        = offset,
             DuplicateHandling = (DuplicateHandling)(CmbDuplicates.SelectedItem ?? DuplicateHandling.Skip),
+            PlanViewRange     = planRange,
             ViewKinds         = (GridViewKinds.ItemsSource as IEnumerable<ViewKindConfig>)?.ToList() ?? [],
         };
 
         return true;
     }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private static bool TryParseDouble(string text, out double value) =>
+        double.TryParse(text.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+
+    private static bool TryParseNonNegative(string text, out double value) =>
+        TryParseDouble(text, out value) && value >= 0;
 }

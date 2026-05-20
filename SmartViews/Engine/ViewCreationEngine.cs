@@ -72,46 +72,65 @@ public sealed class ViewCreationEngine
 
         foreach (ViewKindConfig kindConfig in _config.ViewKinds)
         {
-            string? viewName = ResolveViewName(element, kindConfig, result);
-            if (viewName is null)
-                continue;
-
-            if (!ResolveUniqueName(ref viewName, existingNames, _config.DuplicateHandling, result,
-                    out ElementId? viewToDelete))
-                continue;
-
-            using var tx = new Transaction(_doc, $"SmartViews: {viewName}");
-            tx.Start();
-
-            if (viewToDelete is not null)
-                _doc.Delete(viewToDelete);
-
-            View? view = kindConfig.Kind switch
+            // Expand multi-direction rows into individual direction passes.
+            foreach (SectionDirection dir in EffectiveDirections(kindConfig))
             {
-                ViewKind.Section     => CreateSection(element, paddedBbox, kindConfig),
-                ViewKind.Plan        => CreatePlan(element, kindConfig),
-                ViewKind.Isometric3D => CreateIsometric(paddedBbox, kindConfig),
-                _ => throw new NotSupportedException($"ViewKind '{kindConfig.Kind}' is not supported."),
-            };
+                string? viewName = ResolveViewName(element, kindConfig, dir, result);
+                if (viewName is null)
+                    continue;
 
-            if (view is not null)
-            {
-                view.Name = viewName;
-                ApplyViewTemplate(view, kindConfig.ViewTemplateName);
-                existingNames.Add(viewName);
-                _usedNames.Add(viewName);
-                result.RecordCreated();
+                if (!ResolveUniqueName(ref viewName, existingNames, _config.DuplicateHandling, result,
+                        out ElementId? viewToDelete))
+                    continue;
+
+                using var tx = new Transaction(_doc, $"SmartViews: {viewName}");
+                tx.Start();
+
+                // Overwrite: remove viewports first so Revit allows deletion of placed views.
+                if (viewToDelete is not null)
+                    DeleteViewWithViewports(viewToDelete);
+
+                View? view = kindConfig.Kind switch
+                {
+                    ViewKind.Section     => CreateSection(element, paddedBbox, kindConfig, dir),
+                    ViewKind.Plan        => CreatePlan(element, kindConfig),
+                    ViewKind.Isometric3D => CreateIsometric(paddedBbox, kindConfig),
+                    _ => throw new NotSupportedException($"ViewKind '{kindConfig.Kind}' is not supported."),
+                };
+
+                if (view is not null)
+                {
+                    view.Name = viewName;
+                    ApplyViewTemplate(view, kindConfig.ViewTemplateName);
+                    existingNames.Add(viewName);
+                    _usedNames.Add(viewName);
+                    result.RecordCreated();
+                }
+
+                tx.Commit();
             }
-
-            tx.Commit();
         }
     }
+
+    /// <summary>
+    /// When CreateAllDirections is set on a Section row, yields all four directions;
+    /// otherwise yields the single configured direction. Non-section rows always
+    /// yield one pass (the direction is irrelevant for plans and 3D views).
+    /// </summary>
+    private static IEnumerable<SectionDirection> EffectiveDirections(ViewKindConfig k) =>
+        k.Kind == ViewKind.Section && k.CreateAllDirections
+            ? Enum.GetValues<SectionDirection>()
+            : [k.SectionDirection];
 
     // -----------------------------------------------------------------------
     // Section
     // -----------------------------------------------------------------------
 
-    private View? CreateSection(Element element, BoundingBoxXYZ paddedBbox, ViewKindConfig kindConfig)
+    private View? CreateSection(
+        Element element,
+        BoundingBoxXYZ paddedBbox,
+        ViewKindConfig kindConfig,
+        SectionDirection dir)
     {
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.Section, kindConfig.ViewFamilyTypeName);
 
@@ -119,28 +138,23 @@ public sealed class ViewCreationEngine
             ? GetElementOrientation(element)
             : (XYZ.BasisY, XYZ.BasisX);
 
-        BoundingBoxXYZ sectionBox = BuildSectionBox(paddedBbox, kindConfig.SectionDirection, fwd, rgt);
+        BoundingBoxXYZ sectionBox = BuildSectionBox(paddedBbox, dir, fwd, rgt);
         return ViewSection.CreateSection(_doc, vft.Id, sectionBox);
     }
 
     /// <summary>
-    /// Builds the section BoundingBoxXYZ from the padded element bbox, a viewing direction,
-    /// and the element's orientation vectors.
+    /// Builds the section BoundingBoxXYZ.
     ///
-    /// Coordinate frame convention (matches Revit API examples):
-    ///   BasisX = right direction in the rendered view
-    ///   BasisY = up direction (+Z)
-    ///   BasisZ = BasisX × BasisY (right-handed) — points toward the viewer
-    ///   Origin = centre of the padded bbox
+    /// Convention: BasisX = right, BasisY = up (+Z), BasisZ = BasisX × BasisY (toward viewer).
     ///
-    /// For each SectionDirection, given element forward (fwd) and right (rgt):
-    ///   South → BasisX = +rgt,  BasisZ = −fwd  (viewer behind the "front face")
-    ///   North → BasisX = −rgt,  BasisZ = +fwd
-    ///   East  → BasisX = +fwd,  BasisZ = +rgt  (viewer on the "right side")
-    ///   West  → BasisX = −fwd,  BasisZ = −rgt
+    /// Direction → basis vectors (given element forward=fwd, right=rgt):
+    ///   South  BasisX = +rgt   BasisZ = −fwd
+    ///   North  BasisX = −rgt   BasisZ = +fwd
+    ///   East   BasisX = +fwd   BasisZ = +rgt
+    ///   West   BasisX = −fwd   BasisZ = −rgt
     ///
-    /// Half-extents are computed via AABB projection so rotated elements produce
-    /// a correctly-sized box even when the bbox axes don't align with the view axes.
+    /// AABB half-extent along axis u: |u.X|·hX + |u.Y|·hY + |u.Z|·hZ
+    /// ensures correct box dimensions for arbitrarily-oriented elements.
     /// </summary>
     private static BoundingBoxXYZ BuildSectionBox(
         BoundingBoxXYZ bbox,
@@ -153,7 +167,7 @@ public sealed class ViewCreationEngine
             SectionDirection.South =>  rgt,
             SectionDirection.North => -rgt,
             SectionDirection.East  =>  fwd,
-            _                      => -fwd,   // West
+            _                      => -fwd,
         };
 
         XYZ basisZ = dir switch
@@ -161,13 +175,11 @@ public sealed class ViewCreationEngine
             SectionDirection.South => -fwd,
             SectionDirection.North =>  fwd,
             SectionDirection.East  =>  rgt,
-            _                      => -rgt,   // West
+            _                      => -rgt,
         };
 
-        // For an AABB, the half-extent along an arbitrary unit direction u is:
-        //   |u.X|·halfX  +  |u.Y|·halfY  +  |u.Z|·halfZ
         double hLocal = HalfExtentAlongAxis(bbox, basisX);
-        double vLocal = (bbox.Max.Z - bbox.Min.Z) / 2;       // always world-Z
+        double vLocal = (bbox.Max.Z - bbox.Min.Z) / 2;
         double dLocal = HalfExtentAlongAxis(bbox, basisZ);
 
         double midX = (bbox.Min.X + bbox.Max.X) / 2;
@@ -201,15 +213,9 @@ public sealed class ViewCreationEngine
     }
 
     /// <summary>
-    /// Returns the element's (forward, right) unit vectors in the XY plane.
-    ///
-    /// Priority:
-    ///   1. LocationCurve  → direction along the curve  (walls, beams, pipes, …)
-    ///   2. FamilyInstance → FacingOrientation           (doors, windows, columns, …)
-    ///   3. World axes     → (BasisY, BasisX)            (fallback)
-    ///
-    /// "right" is always "forward rotated 90° clockwise in XY", which satisfies
-    /// rgt × BasisZ = −fwd (required for the right-handed section frames above).
+    /// Extracts (forward, right) unit vectors from the element's location.
+    /// Priority: LocationCurve → FacingOrientation (FamilyInstance) → world axes.
+    /// right = forward rotated 90° clockwise in XY, satisfying rgt × BasisZ = −fwd.
     /// </summary>
     private static (XYZ Forward, XYZ Right) GetElementOrientation(Element element)
     {
@@ -233,8 +239,7 @@ public sealed class ViewCreationEngine
         if (fwd is null)
             return (XYZ.BasisY, XYZ.BasisX);
 
-        // 90° CW rotation in XY: (x, y) → (y, −x)
-        var right = new XYZ(fwd.Y, -fwd.X, 0);
+        var right = new XYZ(fwd.Y, -fwd.X, 0);   // 90° CW in XY
         return (fwd, right);
     }
 
@@ -251,6 +256,7 @@ public sealed class ViewCreationEngine
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, kindConfig.ViewFamilyTypeName);
         ViewPlan planView = ViewPlan.Create(_doc, vft.Id, level.Id);
 
+        // Crop region.
         BoundingBoxXYZ paddedBbox = ApplyOffset(element.get_BoundingBox(null)!, _config.CropOffset);
         BoundingBoxXYZ existingCrop = planView.CropBox;
 
@@ -261,6 +267,21 @@ public sealed class ViewCreationEngine
             Min = new XYZ(paddedBbox.Min.X, paddedBbox.Min.Y, existingCrop.Min.Z),
             Max = new XYZ(paddedBbox.Max.X, paddedBbox.Max.Y, existingCrop.Max.Z),
         };
+
+        // View range — apply custom offsets when configured.
+        if (_config.PlanViewRange is { } vrCfg)
+        {
+            Autodesk.Revit.DB.PlanViewRange viewRange = planView.GetViewRange();
+            viewRange.SetLevelId(PlanViewPlane.TopClipPlane,    level.Id);
+            viewRange.SetOffset(PlanViewPlane.TopClipPlane,     vrCfg.TopOffset);
+            viewRange.SetLevelId(PlanViewPlane.CutPlane,        level.Id);
+            viewRange.SetOffset(PlanViewPlane.CutPlane,         vrCfg.CutOffset);
+            viewRange.SetLevelId(PlanViewPlane.BottomClipPlane, level.Id);
+            viewRange.SetOffset(PlanViewPlane.BottomClipPlane,  vrCfg.BottomOffset);
+            viewRange.SetLevelId(PlanViewPlane.ViewDepthPlane,  level.Id);
+            viewRange.SetOffset(PlanViewPlane.ViewDepthPlane,   vrCfg.ViewDepth);
+            planView.SetViewRange(viewRange);
+        }
 
         return planView;
     }
@@ -350,6 +371,7 @@ public sealed class ViewCreationEngine
     private string? ResolveViewName(
         Element element,
         ViewKindConfig kindConfig,
+        SectionDirection dir,
         ViewCreationResult result)
     {
         string template = kindConfig.NameTemplate;
@@ -363,10 +385,11 @@ public sealed class ViewCreationEngine
             : string.Empty;
 
         string name = template
-            .Replace("{Mark}",  mark)
-            .Replace("{Type}",  typeName)
-            .Replace("{Level}", levelName)
-            .Replace("{Index}", idx.ToString())
+            .Replace("{Mark}",      mark)
+            .Replace("{Type}",      typeName)
+            .Replace("{Level}",     levelName)
+            .Replace("{Index}",     idx.ToString())
+            .Replace("{Direction}", dir.ToString())
             .Trim();
 
         if (string.IsNullOrEmpty(name))
@@ -434,6 +457,26 @@ public sealed class ViewCreationEngine
             .Where(v => !v.IsTemplate)
             .FirstOrDefault(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))
             ?.Id;
+
+    /// <summary>
+    /// Removes all viewports that reference <paramref name="viewId"/> from their sheets,
+    /// then deletes the view. This prevents Revit's "view is placed on a sheet" error
+    /// when Overwrite is selected.
+    /// </summary>
+    private void DeleteViewWithViewports(ElementId viewId)
+    {
+        List<ElementId> viewportIds = new FilteredElementCollector(_doc)
+            .OfClass(typeof(Viewport))
+            .Cast<Viewport>()
+            .Where(vp => vp.ViewId == viewId)
+            .Select(vp => vp.Id)
+            .ToList();
+
+        foreach (ElementId vpId in viewportIds)
+            _doc.Delete(vpId);
+
+        _doc.Delete(viewId);
+    }
 
     // -----------------------------------------------------------------------
     // Helpers

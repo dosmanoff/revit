@@ -14,6 +14,13 @@ public sealed class ViewConfig
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DuplicateHandling DuplicateHandling { get; set; } = DuplicateHandling.Skip;
 
+    /// <summary>
+    /// View-range offsets applied to every Plan view created in this config.
+    /// All values are in feet, measured above the host Level.
+    /// Null = use Revit's default view range.
+    /// </summary>
+    public PlanViewRangeConfig? PlanViewRange { get; set; }
+
     /// <summary>One entry per view type to create for each selected element.</summary>
     public List<ViewKindConfig> ViewKinds { get; set; } = [];
 
@@ -26,10 +33,26 @@ public sealed class ViewConfig
             new ViewKindConfig
             {
                 Kind = ViewKind.Section,
-                NameTemplate = "{Mark} - Section",
+                NameTemplate = "{Mark} - {Direction}",
+                CreateAllDirections = false,
             },
         ],
     };
+}
+
+public sealed class PlanViewRangeConfig
+{
+    /// <summary>Top clip plane offset above the host level (ft).</summary>
+    public double TopOffset    { get; set; } = 7.5;
+
+    /// <summary>Cut plane offset above the host level (ft). Typical: 4 ft.</summary>
+    public double CutOffset    { get; set; } = 4.0;
+
+    /// <summary>Bottom clip plane offset above the host level (ft).</summary>
+    public double BottomOffset { get; set; } = 0.0;
+
+    /// <summary>View depth plane offset above the host level (ft).</summary>
+    public double ViewDepth    { get; set; } = 0.0;
 }
 
 public sealed class ViewKindConfig
@@ -38,8 +61,8 @@ public sealed class ViewKindConfig
     public ViewKind Kind { get; set; } = ViewKind.Section;
 
     /// <summary>
-    /// Supports tokens: {Mark}, {Level}, {Type}, {Index}.
-    /// Example: "{Mark} - {Level} Section"
+    /// Supports tokens: {Mark}, {Level}, {Type}, {Index}, {Direction}.
+    /// Example: "{Mark} - {Direction} Elevation"
     /// </summary>
     public string NameTemplate { get; set; } = "{Mark} - {Type}";
 
@@ -47,19 +70,24 @@ public sealed class ViewKindConfig
     public string? ViewFamilyTypeName { get; set; }
 
     /// <summary>
-    /// Direction the viewer stands when looking at the element.
+    /// Direction the viewer stands. Used when CreateAllDirections = false.
+    /// When AlignToElement = true, directions are relative to the element's local axes.
     /// Only applies when Kind = Section.
-    /// South = viewer on -Y side looking north; North = viewer on +Y side looking south;
-    /// East = viewer on +X side looking west; West = viewer on -X side looking east.
-    /// When AlignToElement = true the directions are relative to the element's own axes.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public SectionDirection SectionDirection { get; set; } = SectionDirection.South;
 
     /// <summary>
+    /// When true (and Kind = Section), creates four views — one for each SectionDirection —
+    /// instead of the single direction in SectionDirection.
+    /// Use {Direction} in NameTemplate to differentiate them: "{Mark} {Direction}".
+    /// </summary>
+    public bool CreateAllDirections { get; set; } = false;
+
+    /// <summary>
     /// When true, the section frame is aligned to the element's local orientation
-    /// (wall direction, FacingOrientation, etc.) rather than world axes.
-    /// Falls back to world axes when the element has no detectable orientation.
+    /// (wall/curve direction or FacingOrientation) instead of world axes.
+    /// Falls back to world axes when no orientation can be detected.
     /// Only applies when Kind = Section.
     /// </summary>
     public bool AlignToElement { get; set; } = false;
