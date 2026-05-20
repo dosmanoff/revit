@@ -11,19 +11,10 @@
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <RevitDir Condition="'$(RevitDir)'==''">C:\Program Files\Autodesk\Revit 2025</RevitDir>
-  </PropertyGroup>
-
   <ItemGroup>
-    <Reference Include="RevitAPI">
-      <HintPath>$(RevitDir)\RevitAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>$(RevitDir)\RevitAPIUI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <!-- Reference-only packages: Revit ships the real DLLs at runtime -->
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI"   Version="2025.4.0" ExcludeAssets="runtime"/>
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="2025.4.0" ExcludeAssets="runtime"/>
   </ItemGroup>
 
   <ItemGroup>
