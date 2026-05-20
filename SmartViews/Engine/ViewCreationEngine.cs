@@ -11,6 +11,7 @@ public sealed class ViewCreationEngine
 {
     private readonly Document _doc;
     private readonly ViewConfig _config;
+    private readonly CropOffsets _offsets;
 
     private readonly HashSet<string> _usedNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _templateCounters = new();
@@ -19,6 +20,7 @@ public sealed class ViewCreationEngine
     {
         _doc = doc;
         _config = config;
+        _offsets = config.Offsets ?? new CropOffsets();
     }
 
     // -----------------------------------------------------------------------
@@ -68,14 +70,12 @@ public sealed class ViewCreationEngine
             return;
         }
 
-        BoundingBoxXYZ paddedBbox = ApplyOffset(rawBbox, _config.CropOffset);
-
         foreach (ViewKindConfig kindConfig in _config.ViewKinds)
         {
-            // Expand multi-direction rows into individual direction passes.
             foreach (SectionDirection dir in EffectiveDirections(kindConfig))
             {
-                string? viewName = ResolveViewName(element, kindConfig, dir, result);
+                string? sheetNumber = kindConfig.SheetTarget?.SheetNumber;
+                string? viewName = ResolveViewName(element, kindConfig, dir, sheetNumber, result);
                 if (viewName is null)
                     continue;
 
@@ -86,15 +86,14 @@ public sealed class ViewCreationEngine
                 using var tx = new Transaction(_doc, $"SmartViews: {viewName}");
                 tx.Start();
 
-                // Overwrite: remove viewports first so Revit allows deletion of placed views.
                 if (viewToDelete is not null)
                     DeleteViewWithViewports(viewToDelete);
 
                 View? view = kindConfig.Kind switch
                 {
-                    ViewKind.Section     => CreateSection(element, paddedBbox, kindConfig, dir),
-                    ViewKind.Plan        => CreatePlan(element, kindConfig),
-                    ViewKind.Isometric3D => CreateIsometric(paddedBbox, kindConfig),
+                    ViewKind.Section     => CreateSection(element, rawBbox, kindConfig, dir),
+                    ViewKind.Plan        => CreatePlan(element, rawBbox, kindConfig),
+                    ViewKind.Isometric3D => CreateIsometric(rawBbox, kindConfig),
                     _ => throw new NotSupportedException($"ViewKind '{kindConfig.Kind}' is not supported."),
                 };
 
@@ -102,6 +101,13 @@ public sealed class ViewCreationEngine
                 {
                     view.Name = viewName;
                     ApplyViewTemplate(view, kindConfig.ViewTemplateName);
+
+                    if (kindConfig.SheetTarget is { SheetNumber: { } sn } target
+                        && !string.IsNullOrWhiteSpace(sn))
+                    {
+                        PlaceOnSheet(view, target, result);
+                    }
+
                     existingNames.Add(viewName);
                     _usedNames.Add(viewName);
                     result.RecordCreated();
@@ -112,23 +118,18 @@ public sealed class ViewCreationEngine
         }
     }
 
-    /// <summary>
-    /// When CreateAllDirections is set on a Section row, yields all four directions;
-    /// otherwise yields the single configured direction. Non-section rows always
-    /// yield one pass (the direction is irrelevant for plans and 3D views).
-    /// </summary>
     private static IEnumerable<SectionDirection> EffectiveDirections(ViewKindConfig k) =>
         k.Kind == ViewKind.Section && k.CreateAllDirections
             ? Enum.GetValues<SectionDirection>()
             : [k.SectionDirection];
 
     // -----------------------------------------------------------------------
-    // Section
+    // Section  (D1: elevation-style — origin at near face)
     // -----------------------------------------------------------------------
 
     private View? CreateSection(
         Element element,
-        BoundingBoxXYZ paddedBbox,
+        BoundingBoxXYZ rawBbox,
         ViewKindConfig kindConfig,
         SectionDirection dir)
     {
@@ -138,25 +139,23 @@ public sealed class ViewCreationEngine
             ? GetElementOrientation(element)
             : (XYZ.BasisY, XYZ.BasisX);
 
-        BoundingBoxXYZ sectionBox = BuildSectionBox(paddedBbox, dir, fwd, rgt);
+        BoundingBoxXYZ sectionBox = BuildSectionBox(rawBbox, dir, fwd, rgt);
         return ViewSection.CreateSection(_doc, vft.Id, sectionBox);
     }
 
     /// <summary>
-    /// Builds the section BoundingBoxXYZ.
+    /// Builds the section BoundingBoxXYZ with an elevation-style near-face origin (D1).
     ///
-    /// Convention: BasisX = right, BasisY = up (+Z), BasisZ = BasisX × BasisY (toward viewer).
+    /// Coordinate frame: BasisX = right, BasisY = world Z (up), BasisZ = toward viewer.
+    /// The transform origin is placed at the near face of the element's AABB so the
+    /// cut plane (local Z = 0) sits just outside the near face, with Max.Z = Near (small
+    /// positive gap) and Min.Z = -(fullDepth + Far).
     ///
-    /// Direction → basis vectors (given element forward=fwd, right=rgt):
-    ///   South  BasisX = +rgt   BasisZ = −fwd
-    ///   North  BasisX = −rgt   BasisZ = +fwd
-    ///   East   BasisX = +fwd   BasisZ = +rgt
-    ///   West   BasisX = −fwd   BasisZ = −rgt
-    ///
-    /// AABB half-extent along axis u: |u.X|·hX + |u.Y|·hY + |u.Z|·hZ
-    /// ensures correct box dimensions for arbitrarily-oriented elements.
+    /// Direction → (BasisX, BasisZ):
+    ///   South  (+rgt, −fwd)   North  (−rgt, +fwd)
+    ///   East   (+fwd, +rgt)   West   (−fwd, −rgt)
     /// </summary>
-    private static BoundingBoxXYZ BuildSectionBox(
+    private BoundingBoxXYZ BuildSectionBox(
         BoundingBoxXYZ bbox,
         SectionDirection dir,
         XYZ fwd,
@@ -178,44 +177,50 @@ public sealed class ViewCreationEngine
             _                      => -rgt,
         };
 
-        double hLocal = HalfExtentAlongAxis(bbox, basisX);
-        double vLocal = (bbox.Max.Z - bbox.Min.Z) / 2;
-        double dLocal = HalfExtentAlongAxis(bbox, basisZ);
+        double hLocal    = HalfExtentAlongAxis(bbox, basisX);
+        double vLocal    = (bbox.Max.Z - bbox.Min.Z) / 2.0;
+        double dLocal    = HalfExtentAlongAxis(bbox, basisZ);   // half-depth of element
 
-        double midX = (bbox.Min.X + bbox.Max.X) / 2;
-        double midY = (bbox.Min.Y + bbox.Max.Y) / 2;
-        double midZ = (bbox.Min.Z + bbox.Max.Z) / 2;
+        double midX = (bbox.Min.X + bbox.Max.X) / 2.0;
+        double midY = (bbox.Min.Y + bbox.Max.Y) / 2.0;
+        double midZ = (bbox.Min.Z + bbox.Max.Z) / 2.0;
+
+        // Near-face centre (closest face to viewer in BasisZ direction).
+        XYZ bboxCenter   = new(midX, midY, midZ);
+        XYZ nearFaceCenter = bboxCenter + dLocal * basisZ;
 
         var transform = new Transform(Transform.Identity)
         {
-            Origin = new XYZ(midX, midY, midZ),
+            Origin = nearFaceCenter,
             BasisX = basisX,
             BasisY = XYZ.BasisZ,
             BasisZ = basisZ,
         };
 
+        double fullDepth = 2.0 * dLocal;
+
         return new BoundingBoxXYZ
         {
             Transform = transform,
-            Min = new XYZ(-hLocal, -vLocal, -dLocal),
-            Max = new XYZ( hLocal,  vLocal,  dLocal),
+            Min = new XYZ(-hLocal - _offsets.Left,   -vLocal - _offsets.Bottom, -(fullDepth + _offsets.Far)),
+            Max = new XYZ( hLocal + _offsets.Right,   vLocal + _offsets.Top,     _offsets.Near),
         };
     }
 
     private static double HalfExtentAlongAxis(BoundingBoxXYZ bbox, XYZ axis)
     {
-        double halfX = (bbox.Max.X - bbox.Min.X) / 2;
-        double halfY = (bbox.Max.Y - bbox.Min.Y) / 2;
-        double halfZ = (bbox.Max.Z - bbox.Min.Z) / 2;
+        double halfX = (bbox.Max.X - bbox.Min.X) / 2.0;
+        double halfY = (bbox.Max.Y - bbox.Min.Y) / 2.0;
+        double halfZ = (bbox.Max.Z - bbox.Min.Z) / 2.0;
         return Math.Abs(axis.X) * halfX
              + Math.Abs(axis.Y) * halfY
              + Math.Abs(axis.Z) * halfZ;
     }
 
     /// <summary>
-    /// Extracts (forward, right) unit vectors from the element's location.
+    /// Returns (forward, right) unit vectors for the element.
     /// Priority: LocationCurve → FacingOrientation (FamilyInstance) → world axes.
-    /// right = forward rotated 90° clockwise in XY, satisfying rgt × BasisZ = −fwd.
+    /// right = forward rotated 90° clockwise in XY.
     /// </summary>
     private static (XYZ Forward, XYZ Right) GetElementOrientation(Element element)
     {
@@ -244,10 +249,10 @@ public sealed class ViewCreationEngine
     }
 
     // -----------------------------------------------------------------------
-    // Plan
+    // Plan  (D4: Left/Right/Top/Bottom offsets)
     // -----------------------------------------------------------------------
 
-    private View? CreatePlan(Element element, ViewKindConfig kindConfig)
+    private View? CreatePlan(Element element, BoundingBoxXYZ rawBbox, ViewKindConfig kindConfig)
     {
         Level level = GetHostLevel(element)
             ?? throw new InvalidOperationException(
@@ -256,19 +261,16 @@ public sealed class ViewCreationEngine
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, kindConfig.ViewFamilyTypeName);
         ViewPlan planView = ViewPlan.Create(_doc, vft.Id, level.Id);
 
-        // Crop region.
-        BoundingBoxXYZ paddedBbox = ApplyOffset(element.get_BoundingBox(null)!, _config.CropOffset);
         BoundingBoxXYZ existingCrop = planView.CropBox;
 
         planView.CropBoxActive  = true;
         planView.CropBoxVisible = true;
         planView.CropBox = new BoundingBoxXYZ
         {
-            Min = new XYZ(paddedBbox.Min.X, paddedBbox.Min.Y, existingCrop.Min.Z),
-            Max = new XYZ(paddedBbox.Max.X, paddedBbox.Max.Y, existingCrop.Max.Z),
+            Min = new XYZ(rawBbox.Min.X - _offsets.Left,  rawBbox.Min.Y - _offsets.Bottom, existingCrop.Min.Z),
+            Max = new XYZ(rawBbox.Max.X + _offsets.Right, rawBbox.Max.Y + _offsets.Top,    existingCrop.Max.Z),
         };
 
-        // View range — apply custom offsets when configured.
         if (_config.PlanViewRange is { } vrCfg)
         {
             Autodesk.Revit.DB.PlanViewRange viewRange = planView.GetViewRange();
@@ -304,16 +306,71 @@ public sealed class ViewCreationEngine
     }
 
     // -----------------------------------------------------------------------
-    // 3-D Isometric
+    // 3-D Isometric  (D4: Left/Right = X, Top/Bottom = Z, Far = Y symmetric)
     // -----------------------------------------------------------------------
 
-    private View? CreateIsometric(BoundingBoxXYZ paddedBbox, ViewKindConfig kindConfig)
+    private View? CreateIsometric(BoundingBoxXYZ rawBbox, ViewKindConfig kindConfig)
     {
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.ThreeDimensional, kindConfig.ViewFamilyTypeName);
         View3D view3d = View3D.CreateIsometric(_doc, vft.Id);
-        view3d.SetSectionBox(paddedBbox);
+
+        var sectionBox = new BoundingBoxXYZ
+        {
+            Min = new XYZ(rawBbox.Min.X - _offsets.Left,   rawBbox.Min.Y - _offsets.Far,    rawBbox.Min.Z - _offsets.Bottom),
+            Max = new XYZ(rawBbox.Max.X + _offsets.Right,  rawBbox.Max.Y + _offsets.Far,    rawBbox.Max.Z + _offsets.Top),
+        };
+
+        view3d.SetSectionBox(sectionBox);
         view3d.IsSectionBoxActive = true;
         return view3d;
+    }
+
+    // -----------------------------------------------------------------------
+    // Sheet placement  (Phase 3.1)
+    // -----------------------------------------------------------------------
+
+    private void PlaceOnSheet(View view, SheetTarget target, ViewCreationResult result)
+    {
+        ViewSheet? sheet = new FilteredElementCollector(_doc)
+            .OfClass(typeof(ViewSheet))
+            .Cast<ViewSheet>()
+            .FirstOrDefault(s => string.Equals(
+                s.SheetNumber, target.SheetNumber, StringComparison.OrdinalIgnoreCase));
+
+        if (sheet is null)
+        {
+            result.RecordError(
+                $"Sheet \"{target.SheetNumber}\" not found — view \"{view.Name}\" was not placed.");
+            return;
+        }
+
+        if (!Viewport.CanAddViewToSheet(_doc, sheet.Id, view.Id))
+        {
+            result.RecordError(
+                $"Cannot place view \"{view.Name}\" on sheet \"{target.SheetNumber}\" " +
+                "(already placed or view type not allowed).");
+            return;
+        }
+
+        XYZ center = target.ViewportCenter is { } pt
+            ? new XYZ(pt.X, pt.Y, 0)
+            : new XYZ(sheet.Outline.Max.X / 2, sheet.Outline.Max.Y / 2, 0);
+
+        Viewport vp = Viewport.Create(_doc, sheet.Id, view.Id, center);
+
+        if (!string.IsNullOrWhiteSpace(target.ViewportTypeName))
+        {
+            ElementId? typeId = new FilteredElementCollector(_doc)
+                .OfClass(typeof(ElementType))
+                .Cast<ElementType>()
+                .Where(t => t.GetType().Name == "ViewportType")
+                .FirstOrDefault(t => string.Equals(
+                    t.Name, target.ViewportTypeName, StringComparison.OrdinalIgnoreCase))
+                ?.Id;
+
+            if (typeId is not null)
+                vp.ChangeTypeId(typeId);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -350,8 +407,7 @@ public sealed class ViewCreationEngine
 
         if (candidates.Count == 0)
             throw new InvalidOperationException(
-                $"No ViewFamilyType found for ViewFamily.{family}. " +
-                "Ensure the project template includes one.");
+                $"No ViewFamilyType found for ViewFamily.{family}.");
 
         if (preferredName is not null)
         {
@@ -365,21 +421,22 @@ public sealed class ViewCreationEngine
     }
 
     // -----------------------------------------------------------------------
-    // Name resolution
+    // Name resolution  (Phase 3.2: {Sheet} token)
     // -----------------------------------------------------------------------
 
     private string? ResolveViewName(
         Element element,
         ViewKindConfig kindConfig,
         SectionDirection dir,
+        string? sheetNumber,
         ViewCreationResult result)
     {
         string template = kindConfig.NameTemplate;
         _templateCounters.TryGetValue(template, out int idx);
         _templateCounters[template] = ++idx;
 
-        string mark = element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? string.Empty;
-        string typeName = element.Document.GetElement(element.GetTypeId())?.Name ?? string.Empty;
+        string mark      = element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? string.Empty;
+        string typeName  = element.Document.GetElement(element.GetTypeId())?.Name ?? string.Empty;
         string levelName = element.LevelId != ElementId.InvalidElementId
             ? (element.Document.GetElement(element.LevelId)?.Name ?? string.Empty)
             : string.Empty;
@@ -390,6 +447,7 @@ public sealed class ViewCreationEngine
             .Replace("{Level}",     levelName)
             .Replace("{Index}",     idx.ToString())
             .Replace("{Direction}", dir.ToString())
+            .Replace("{Sheet}",     sheetNumber ?? string.Empty)
             .Trim();
 
         if (string.IsNullOrEmpty(name))
@@ -459,9 +517,8 @@ public sealed class ViewCreationEngine
             ?.Id;
 
     /// <summary>
-    /// Removes all viewports that reference <paramref name="viewId"/> from their sheets,
-    /// then deletes the view. This prevents Revit's "view is placed on a sheet" error
-    /// when Overwrite is selected.
+    /// Removes all viewports that reference <paramref name="viewId"/>, then deletes the view.
+    /// Required before overwriting a view that is already placed on a sheet.
     /// </summary>
     private void DeleteViewWithViewports(ElementId viewId)
     {
@@ -481,13 +538,6 @@ public sealed class ViewCreationEngine
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
-
-    private static BoundingBoxXYZ ApplyOffset(BoundingBoxXYZ bbox, double offset) =>
-        new()
-        {
-            Min = new XYZ(bbox.Min.X - offset, bbox.Min.Y - offset, bbox.Min.Z - offset),
-            Max = new XYZ(bbox.Max.X + offset, bbox.Max.Y + offset, bbox.Max.Z + offset),
-        };
 
     private HashSet<string> CollectExistingViewNames() =>
         new FilteredElementCollector(_doc)

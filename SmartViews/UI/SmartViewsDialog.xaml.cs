@@ -24,7 +24,15 @@ public partial class SmartViewsDialog : Window
     private void PopulateControls(ViewConfig config)
     {
         TxtConfigFolder.Text = config.ConfigFolderPath;
-        TxtCropOffset.Text   = config.CropOffset.ToString("F2");
+
+        CropOffsets off = config.Offsets ?? new CropOffsets();
+        TxtOffLeft.Text   = off.Left.ToString("F2");
+        TxtOffRight.Text  = off.Right.ToString("F2");
+        TxtOffTop.Text    = off.Top.ToString("F2");
+        TxtOffBottom.Text = off.Bottom.ToString("F2");
+        TxtOffNear.Text   = off.Near.ToString("F2");
+        TxtOffFar.Text    = off.Far.ToString("F2");
+        TxtOffAll.Text    = string.Empty;
 
         CmbDuplicates.ItemsSource  = Enum.GetValues<DuplicateHandling>();
         CmbDuplicates.SelectedItem = config.DuplicateHandling;
@@ -33,13 +41,23 @@ public partial class SmartViewsDialog : Window
         GridViewKinds.ItemsSource = config.ViewKinds
             .Select(k => new ViewKindConfig
             {
-                Kind                 = k.Kind,
-                SectionDirection     = k.SectionDirection,
-                CreateAllDirections  = k.CreateAllDirections,
-                AlignToElement       = k.AlignToElement,
-                NameTemplate         = k.NameTemplate,
-                ViewFamilyTypeName   = k.ViewFamilyTypeName,
-                ViewTemplateName     = k.ViewTemplateName,
+                Kind                = k.Kind,
+                SectionDirection    = k.SectionDirection,
+                CreateAllDirections = k.CreateAllDirections,
+                AlignToElement      = k.AlignToElement,
+                NameTemplate        = k.NameTemplate,
+                ViewFamilyTypeName  = k.ViewFamilyTypeName,
+                ViewTemplateName    = k.ViewTemplateName,
+                SheetTarget         = k.SheetTarget is null ? null : new SheetTarget
+                {
+                    SheetNumber      = k.SheetTarget.SheetNumber,
+                    ViewportTypeName = k.SheetTarget.ViewportTypeName,
+                    ViewportCenter   = k.SheetTarget.ViewportCenter is null ? null : new PointConfig
+                    {
+                        X = k.SheetTarget.ViewportCenter.X,
+                        Y = k.SheetTarget.ViewportCenter.Y,
+                    },
+                },
             })
             .ToList();
 
@@ -61,6 +79,27 @@ public partial class SmartViewsDialog : Window
         SetPlanRangeFieldsEnabled(hasPlanRange);
 
         RefreshPresetList(preserveSelection: true);
+    }
+
+    // -----------------------------------------------------------------------
+    // "Set all" handler — copies TxtOffAll value to all six offset fields.
+    // -----------------------------------------------------------------------
+
+    private void TxtOffAll_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string text = TxtOffAll.Text.Trim();
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        if (!TryParseNonNegative(text, out double v))
+            return;
+
+        TxtOffLeft.Text   = v.ToString("F2");
+        TxtOffRight.Text  = v.ToString("F2");
+        TxtOffTop.Text    = v.ToString("F2");
+        TxtOffBottom.Text = v.ToString("F2");
+        TxtOffFar.Text    = v.ToString("F2");
+        // Near is intentionally left alone — it's a small gap, semantically different.
     }
 
     // -----------------------------------------------------------------------
@@ -188,11 +227,17 @@ public partial class SmartViewsDialog : Window
     {
         config = null;
 
-        if (!TryParseNonNegative(TxtCropOffset.Text, out double offset))
+        if (!TryParseNonNegative(TxtOffLeft.Text,   out double offLeft)   ||
+            !TryParseNonNegative(TxtOffRight.Text,  out double offRight)  ||
+            !TryParseNonNegative(TxtOffTop.Text,    out double offTop)    ||
+            !TryParseNonNegative(TxtOffBottom.Text, out double offBottom) ||
+            !TryParseNonNegative(TxtOffNear.Text,   out double offNear)   ||
+            !TryParseNonNegative(TxtOffFar.Text,    out double offFar))
         {
-            System.Windows.MessageBox.Show("Crop offset must be a non-negative number.",
+            System.Windows.MessageBox.Show(
+                "All crop offsets must be non-negative numbers.",
                 "SmartViews", MessageBoxButton.OK, MessageBoxImage.Warning);
-            TxtCropOffset.Focus();
+            TxtOffLeft.Focus();
             return false;
         }
 
@@ -222,8 +267,17 @@ public partial class SmartViewsDialog : Window
 
         config = new ViewConfig
         {
+            SchemaVersion     = ViewConfig.CurrentSchemaVersion,
             ConfigFolderPath  = TxtConfigFolder.Text.Trim(),
-            CropOffset        = offset,
+            Offsets           = new CropOffsets
+            {
+                Left   = offLeft,
+                Right  = offRight,
+                Top    = offTop,
+                Bottom = offBottom,
+                Near   = offNear,
+                Far    = offFar,
+            },
             DuplicateHandling = (DuplicateHandling)(CmbDuplicates.SelectedItem ?? DuplicateHandling.Skip),
             PlanViewRange     = planRange,
             ViewKinds         = (GridViewKinds.ItemsSource as IEnumerable<ViewKindConfig>)?.ToList() ?? [],

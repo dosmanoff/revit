@@ -33,8 +33,9 @@ public static class ConfigLoader
 
         try
         {
-            return JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions)
-                   ?? ViewConfig.Default();
+            ViewConfig cfg = JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions)
+                             ?? ViewConfig.Default();
+            return Migrate(cfg);
         }
         catch (JsonException)
         {
@@ -82,12 +83,37 @@ public static class ConfigLoader
         try
         {
             string json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions);
+            ViewConfig? cfg = JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions);
+            return cfg is null ? null : Migrate(cfg);
         }
         catch (Exception ex) when (ex is IOException or JsonException)
         {
             return null;
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Schema migration
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Upgrades <paramref name="config"/> to the current schema version in-place.
+    /// v0 → v1: converts the uniform "cropOffset" field to the six-sided Offsets object.
+    /// </summary>
+    private static ViewConfig Migrate(ViewConfig config)
+    {
+        if (config.SchemaVersion >= ViewConfig.CurrentSchemaVersion)
+            return config;
+
+        // v0 → v1
+        if (config.SchemaVersion == 0)
+        {
+            double legacy = config.LegacyCropOffset > 0 ? config.LegacyCropOffset : 1.0;
+            config.Offsets = CropOffsets.Uniform(legacy);
+            config.SchemaVersion = 1;
+        }
+
+        return config;
     }
 
     /// <summary>
