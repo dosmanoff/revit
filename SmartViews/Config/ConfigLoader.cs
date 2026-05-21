@@ -1,5 +1,6 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
+using System.IO;
 using System.Text.Json;
 
 namespace SmartViews.Config;
@@ -33,8 +34,9 @@ public static class ConfigLoader
 
         try
         {
-            return JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions)
-                   ?? ViewConfig.Default();
+            ViewConfig cfg = JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions)
+                             ?? ViewConfig.Default();
+            return Migrate(cfg);
         }
         catch (JsonException)
         {
@@ -48,6 +50,86 @@ public static class ConfigLoader
         string json = JsonSerializer.Serialize(config, JsonOptions);
         WriteToExtensibleStorage(doc, json);
     }
+
+    // -----------------------------------------------------------------------
+    // File-based preset API
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns preset names (without the .json extension) found in <paramref name="folderPath"/>.
+    /// Returns an empty list when the folder does not exist or is inaccessible.
+    /// </summary>
+    public static IReadOnlyList<string> ListPresets(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            return [];
+
+        return Directory
+            .EnumerateFiles(folderPath, "*.json", SearchOption.TopDirectoryOnly)
+            .Select(p => Path.GetFileNameWithoutExtension(p))
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Loads a named preset from <paramref name="folderPath"/>.
+    /// Returns null when the file is missing or cannot be parsed.
+    /// </summary>
+    public static ViewConfig? LoadPreset(string folderPath, string presetName)
+    {
+        string path = PresetPath(folderPath, presetName);
+        if (!File.Exists(path))
+            return null;
+
+        try
+        {
+            string json = File.ReadAllText(path);
+            ViewConfig? cfg = JsonSerializer.Deserialize<ViewConfig>(json, JsonOptions);
+            return cfg is null ? null : Migrate(cfg);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Schema migration
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Upgrades <paramref name="config"/> to the current schema version in-place.
+    /// v0 → v1: converts the uniform "cropOffset" field to the six-sided Offsets object.
+    /// </summary>
+    private static ViewConfig Migrate(ViewConfig config)
+    {
+        if (config.SchemaVersion >= ViewConfig.CurrentSchemaVersion)
+            return config;
+
+        // v0 → v1
+        if (config.SchemaVersion == 0)
+        {
+            double legacy = config.LegacyCropOffset > 0 ? config.LegacyCropOffset : 1.0;
+            config.Offsets = CropOffsets.Uniform(legacy);
+            config.SchemaVersion = 1;
+        }
+
+        return config;
+    }
+
+    /// <summary>
+    /// Saves <paramref name="config"/> as a named preset JSON file.
+    /// Creates the folder if it does not yet exist.
+    /// </summary>
+    public static void SavePreset(string folderPath, string presetName, ViewConfig config)
+    {
+        Directory.CreateDirectory(folderPath);
+        string json = JsonSerializer.Serialize(config, JsonOptions);
+        File.WriteAllText(PresetPath(folderPath, presetName), json);
+    }
+
+    private static string PresetPath(string folderPath, string presetName) =>
+        Path.Combine(folderPath, $"{presetName}.json");
 
     // -----------------------------------------------------------------------
     // ExtensibleStorage helpers

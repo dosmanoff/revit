@@ -1,0 +1,81 @@
+<Window x:Class="SmartViews.UI.ErrorSummaryDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SmartViews — Summary"
+        Width="520" SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <Style x:Key="StatBadge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style x:Key="StatLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="16">
+
+        <!-- Stat badges -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <Border Style="{StaticResource StatBadge}" Background="#2e7d32">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource StatLabel}" Text="Created  "/>
+                    <TextBlock Style="{StaticResource StatLabel}" x:Name="TxtCreated" Text="0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatBadge}" Background="#f57f17">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource StatLabel}" Text="Skipped  "/>
+                    <TextBlock Style="{StaticResource StatLabel}" x:Name="TxtSkipped" Text="0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatBadge}" Background="#c62828">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource StatLabel}" Text="Errors  "/>
+                    <TextBlock Style="{StaticResource StatLabel}" x:Name="TxtErrors" Text="0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Error list — only shown when there are errors -->
+        <StackPanel x:Name="PnlErrors" Visibility="Collapsed" Margin="0,0,0,12">
+            <TextBlock Text="Error details:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <ListView x:Name="LvErrors"
+                      MaxHeight="240"
+                      SelectionMode="Single"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Error" Width="480"
+                                        DisplayMemberBinding="{Binding}"/>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </StackPanel>
+
+        <!-- Prompt text -->
+        <TextBlock x:Name="TxtPrompt"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,12"
+                   Text="Commit all created views to the model?"/>
+
+        <!-- Buttons -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="BtnCommit"
+                    Content="Commit" IsDefault="True"
+                    Padding="20,5" Margin="0,0,8,0"
+                    Click="Commit_Click"/>
+            <Button Content="Roll Back" IsCancel="True"
+                    Padding="20,5"
+                    Click="RollBack_Click"/>
+        </StackPanel>
+
+    </StackPanel>
+</Window>
