@@ -299,7 +299,7 @@ public sealed class ViewCreationEngine
             && hostId != ElementId.InvalidElementId)
         {
             Element? host = _doc.GetElement(hostId);
-            if (host?.LevelId != ElementId.InvalidElementId)
+            if (host is not null && host.LevelId != ElementId.InvalidElementId)
                 return _doc.GetElement(host.LevelId) as Level;
         }
 
