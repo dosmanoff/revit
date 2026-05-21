@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SlabRebar</AssemblyName>
+    <RootNamespace>SlabRebar</RootNamespace>
+    <Platforms>x64</Platforms>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI"   Version="2025.4.0" ExcludeAssets="runtime"/>
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="2025.4.0" ExcludeAssets="runtime"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="SlabRebar.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
