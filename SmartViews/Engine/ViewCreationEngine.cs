@@ -1,5 +1,6 @@
 using Autodesk.Revit.DB;
 using SmartViews.Config;
+using View = Autodesk.Revit.DB.View;
 
 namespace SmartViews.Engine;
 
