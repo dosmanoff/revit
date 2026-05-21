@@ -3,11 +3,10 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>SmartViews</AssemblyName>
-    <RootNamespace>SmartViews</RootNamespace>
+    <AssemblyName>AutoNumbering</AssemblyName>
+    <RootNamespace>AutoNumbering</RootNamespace>
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
@@ -16,13 +15,10 @@
     <!-- Reference-only packages: Revit ships the real DLLs at runtime -->
     <PackageReference Include="Nice3point.Revit.Api.RevitAPI"   Version="2025.4.0" ExcludeAssets="runtime"/>
     <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="2025.4.0" ExcludeAssets="runtime"/>
-    <!-- JSON config serialisation — ships with .NET 8, listed explicitly for clarity -->
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
-  <!-- Copy the .addin manifest next to the DLL so Revit can discover it -->
   <ItemGroup>
-    <None Include="SmartViews.addin" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="AutoNumbering.addin" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
