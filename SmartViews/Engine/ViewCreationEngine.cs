@@ -353,9 +353,11 @@ public sealed class ViewCreationEngine
             return;
         }
 
+        BoundingBoxUV outline = sheet.Outline;
         XYZ center = target.ViewportCenter is { } pt
             ? new XYZ(pt.X, pt.Y, 0)
-            : new XYZ(sheet.Outline.Max.X / 2, sheet.Outline.Max.Y / 2, 0);
+            : new XYZ((outline.Min.U + outline.Max.U) / 2,
+                      (outline.Min.V + outline.Max.V) / 2, 0);
 
         Viewport vp = Viewport.Create(_doc, sheet.Id, view.Id, center);
 

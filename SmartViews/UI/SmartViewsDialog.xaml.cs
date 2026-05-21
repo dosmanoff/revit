@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
+using TextBox = System.Windows.Controls.TextBox;
 
 namespace SmartViews.UI;
 
