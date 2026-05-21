@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>SlabRebar</Name>
+    <Assembly>SlabRebar.dll</Assembly>
+    <FullClassName>SlabRebar.App</FullClassName>
+    <ClientId>C3D4E5F6-A7B8-9012-CDEF-123456789012</ClientId>
+    <VendorId>SlabRebar</VendorId>
+    <VendorDescription>Slab Rebar Classifier for Revit 2025</VendorDescription>
+  </AddIn>
+</RevitAddIns>
