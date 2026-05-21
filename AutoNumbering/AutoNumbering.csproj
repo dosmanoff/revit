@@ -9,6 +9,7 @@
     <RootNamespace>AutoNumbering</RootNamespace>
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +20,10 @@
 
   <ItemGroup>
     <None Include="AutoNumbering.addin" CopyToOutputDirectory="PreserveNewest" />
+    <!-- XAML file excluded: dialog is built entirely in code for cross-platform compilation -->
+    <Page Remove="UI\AutoNumberingDialog.xaml" />
+    <EmbeddedResource Remove="UI\AutoNumberingDialog.xaml" />
+    <None Include="UI\AutoNumberingDialog.xaml" />
   </ItemGroup>
 
 </Project>
