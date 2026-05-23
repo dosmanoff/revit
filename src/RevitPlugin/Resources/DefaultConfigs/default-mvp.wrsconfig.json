@@ -57,6 +57,33 @@
     "hook_start": "None",
     "hook_end": "None"
   },
+  "perimeter": {
+    "enabled": true,
+    "edge_rebar": {
+      "enabled": true,
+      "bar_type": "Ø12 A500C",
+      "count": 1,
+      "l_leg_length": 0,
+      "position": "Both",
+      "edge_cover": 30,
+      "end_cover": 30,
+      "edges": "All"
+    }
+  },
+  "opening": {
+    "enabled": true,
+    "edge_rebar": {
+      "enabled": true,
+      "bar_type": "Ø12 A500C",
+      "count": 1,
+      "min_width": 0,
+      "max_width": null,
+      "sides": "All",
+      "anchorage_length": 400,
+      "edge_cover": 30,
+      "position": "Both"
+    }
+  },
   "parameter_mapping": {
     "from_wall": {
       "Mark": "WRS_Wall_Mark",

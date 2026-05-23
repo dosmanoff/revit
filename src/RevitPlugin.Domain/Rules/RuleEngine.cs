@@ -14,9 +14,15 @@ public sealed class RuleEngine
 
     public RuleEngine(IEnumerable<IRule> rules) => _rules = rules.ToList();
 
-    /// <summary>Дефолтный движок с правилами уровня M1 MVP.</summary>
+    /// <summary>Дефолтный движок с правилами уровня M1 MVP (sequence важен — порядок Rule Id определяет порядок выполнения).</summary>
     public static RuleEngine CreateDefault() =>
-        new(new IRule[] { new ExternalMeshRule(), new InternalMeshRule() });
+        new(new IRule[]
+        {
+            new ExternalMeshRule(),
+            new InternalMeshRule(),
+            new PerimeterEdgeRule(),
+            new OpeningEdgeRule()
+        });
 
     public JobReport Run(IEnumerable<WallContext> walls, RebarConfig config, string jobId)
     {

@@ -10,6 +10,17 @@
 ### Удалено
 - Команда `CreateWallsCommand` и сервис `WallCreationService` — выходят за рамки скоупа плагина (плагин не создаёт стены, только армирует существующие).
 
+### Изменено
+- **Спецификация и ROADMAP** обновлены до версии 0.2:
+  - Явно зафиксирован монолитный скоуп; исключённые precast-фичи (lifting hooks,
+    embedded inserts, shear connectors, sandwich layers, shop drawings, Smart
+    Assemblies) перечислены в SPEC §5.2.
+  - Модуль M3 расширен до **Smart Numbering** (`Mark` стержней через партицию).
+  - Модуль M4 расширен до **Smart Views + Smart Dimensions + Smart Tags** (+ Smart Sheets на v1.0).
+  - Модуль M5 добавляет **Bar laps** (стыки стержней по высоте) и опциональные
+    **2D bar bend drawings** (v1.x).
+  - Per-layer конфигурация для sandwich-walls перенесена в v1.x.
+
 ### Добавлено
 - Полный пакет проектной документации:
   [SPEC](SPEC.md), [ARCHITECTURE](ARCHITECTURE.md), [MODULES](MODULES.md),
@@ -22,14 +33,20 @@
 - Доменный слой `RevitPlugin.Domain` (чистый .NET 8, без Revit) с моделями
   `RebarConfig`, `WallContext`, `RebarPlacement`, абстракциями адаптеров
   (`IRebarFactory`, `IWallRepository`, `IParameterStore`).
-- Движок правил `RuleEngine` и реализации `ExternalMeshRule`, `InternalMeshRule` для MVP.
+- Движок правил `RuleEngine` и реализации правил для MVP:
+  `ExternalMeshRule`, `InternalMeshRule`, `PerimeterEdgeRule`, `OpeningEdgeRule`.
+- `ConfigValidator` — статический анализ конфигурации (имя, schema_version,
+  диапазоны spacing/cover/offset, перекрёстные ограничения min_thickness/max_thickness,
+  count/position/sides по периметру и проёмам).
 - JSON-загрузка конфигов через `ConfigStorage` (System.Text.Json) с поддержкой `schema_version`.
-- Заводская конфигурация `Resources/DefaultConfigs/default-mvp.wrsconfig.json`.
+- Заводская конфигурация `Resources/DefaultConfigs/default-mvp.wrsconfig.json`
+  (включает external + internal mesh, perimeter edge, opening edge).
 - Реестр Shared Parameters плагина: `Resources/SharedParameters.txt` (16 параметров `WRS_*`).
 - Команда `ArmWallCommand` (заглушка UI, оркестратор будет подключён в M1).
 - Extension-методы `DocumentExtensions` для упрощения работы с Revit DB.
 - CI-воркфлоу: `build.yml` (Revit 2024 + 2025), `pr-check.yml`.
-- Юнит-тесты: `ConfigSerializationTests`, `ExternalMeshRuleTests`.
+- Юнит-тесты: `ConfigSerializationTests`, `ConfigValidatorTests`,
+  `ExternalMeshRuleTests`, `PerimeterEdgeRuleTests`, `OpeningEdgeRuleTests`.
 
 ---
 

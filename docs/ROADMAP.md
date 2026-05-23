@@ -61,22 +61,30 @@
 
 ---
 
-## M3. Виды и спецификации (2 недели)
+## M3. Виды, размеры, теги, спецификации (3 недели)
 
-**Цель.** Закрыть модули M4 и M5 на уровне MVP.
+**Цель.** Закрыть модули M4 (Smart Views + Smart Dimensions + Smart Tags) и M5 на уровне MVP.
 
 **Скоуп.**
-- Adapters: `ViewFactory` (Section + Elevation), `ScheduleFactory`.
+- Domain: `ViewSpec`, `DimensionSpec`, `TagSpec`, `ScheduleSpec` + `SmartNumberingService` (партиция → Mark).
+- Adapters: `ViewFactory` (Section + Elevation), `DimensionFactory` (Smart Dimensions), `TagFactory` (Smart Tags), `ScheduleFactory`.
 - Application: `ViewGenerationOrchestrator`, `ScheduleOrchestrator`.
-- Команды: `CreateViewsCommand`, `CreateSchedulesCommand`.
-- UI: `CreateViewsView`, `CreateSchedulesView`.
-- Конфиг: секции `views`, `schedules`.
+- Команды: `CreateViewsCommand`, `CreateSchedulesCommand`, `RenumberRebarCommand` (Smart Numbering re-run).
+- UI: `CreateViewsView` (чекбоксы: Section, Elevation, Dimensions, Tags), `CreateSchedulesView`.
+- Конфиг: секции `views.section_per_wall`, `views.elevation_per_wall`, `views.dimensions`, `views.tags`, `schedules`.
 - Шаблон вида `WRS_StructuralSection`, `WRS_WallElevation` — поставляются в `Resources/`.
+- Шаблоны тегов: `WRS_RebarTag_Vertical.rfa`, `WRS_RebarTag_Horizontal.rfa` (placeholder в Resources).
 - Один шаблон спецификации: `rebar_by_wall_mark`.
 - Доработать `parameter_mapping` для view-параметров.
+- Extensible Storage: `WRS.DimensionLink`, `WRS.TagLink` (для идемпотентности).
 
 **Definition of done.**
-- На `M3.rvt`: после Arm Walls + Create Views + Create Schedules в проекте появляются вид сечения, вид развёртки, и спецификация с группировкой по `WRS_Wall_Mark`.
+- На `M3.rvt`: после Arm Walls + Create Views + Create Schedules в проекте появляются:
+  - вид сечения и вид развёртки;
+  - на развёртке проставлены габариты стены + цепочка размеров шага вертикальных стержней;
+  - на сечении стоят теги с маркой и количеством стержней;
+  - спецификация с группировкой по `WRS_Wall_Mark`, корректные `Mark` через Smart Numbering.
+- Повторный запуск Create Views — не дублирует размеры/теги (фильтр по `WRS.DimensionLink`).
 - Bar bend in opening реализован (доработка из M2).
 
 ---
@@ -100,16 +108,20 @@
 
 ---
 
-## M5. Полировка, Partial Update, релиз v1.0 (2 недели)
+## M5. Полировка, Smart Sheets, Partial Update, релиз v1.0 (2–3 недели)
 
 **Цель.** Готовый к продакшену продукт.
 
 **Скоуп.**
-- Partial Update: API + UI.
-- Modify Rebar: пометка `WRS_Modified = Yes` и защита от пересоздания.
-- Полный набор спецификаций (`dowels_only`, `steel_usage`).
+- Partial Update: API + UI (выбор правил для пересборки).
+- Modify Rebar: пометка `WRS_Modified = Yes` и защита от пересоздания (распространяется и на размеры / теги).
+- Полный набор спецификаций (`dowels_only`, `steel_usage`, `pivot_by_level`).
 - Detail Section узлов (FoundationJoint, LCorner, TConnection, Opening).
 - 3D Check View.
+- **Smart Sheets** — авто-раскладка созданных видов на листы по шаблону (`sheets.layout` в конфиге).
+- **Полные Smart Dimensions** — проёмы, защитные слои, узлы.
+- **Полные Smart Tags** — multi-leader для групп стержней, теги выпусков и узловых стержней.
+- **Bar laps** — стыки стержней по высоте для стен > 12 м (анкеровка по нормативу).
 - Импорт/экспорт конфигов из/в файл.
 - JSON Schema валидация в редакторе.
 - Превью правил (SVG) в редакторе.
@@ -122,6 +134,7 @@
 - USER_GUIDE с 8+ скриншотами.
 - 60%+ покрытие Domain unit-тестами.
 - В отчёте `JobReport` < 1% Warning на тестовых сценариях.
+- На демо-проекте сценарий «pick walls → Arm Walls → Create Views → Create Schedules → Create Sheets» проходит < 60 секунд для 10 стен.
 
 ---
 

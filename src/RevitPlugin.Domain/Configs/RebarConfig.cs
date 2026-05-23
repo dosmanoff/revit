@@ -30,6 +30,9 @@ public sealed record RebarConfig
     [JsonPropertyName("external_reinforcement")] public MeshConfig? ExternalReinforcement { get; init; }
     [JsonPropertyName("internal_reinforcement")] public MeshConfig? InternalReinforcement { get; init; }
 
+    [JsonPropertyName("perimeter")] public PerimeterConfig? Perimeter { get; init; }
+    [JsonPropertyName("opening")] public OpeningConfig? Opening { get; init; }
+
     [JsonPropertyName("parameter_mapping")] public ParameterMapping ParameterMapping { get; init; } = new();
 
     /// <summary>

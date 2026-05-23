@@ -53,21 +53,23 @@ public class ConfigSerializationTests
     [Fact]
     public void Round_trip_preserves_unknown_sections_via_extension_data()
     {
+        // Используем секцию из будущих модулей (M4: l_corner), ещё не покрытую типизированными моделями —
+        // она должна попасть в ExtensionData и пережить round-trip без потери данных.
         const string json = """
             {
               "schema_version": 1,
               "id": "abc",
               "name": "rt",
-              "opening": { "edge_rebar": [] }
+              "l_corner": { "outer": { "bar1": { "diameter": 12 } } }
             }
             """;
 
         var config = ConfigStorage.FromJson(json);
-        config.ExtensionData.Should().ContainKey("opening");
+        config.ExtensionData.Should().ContainKey("l_corner");
 
         var serialized = ConfigStorage.ToJson(config);
-        serialized.Should().Contain("\"opening\"");
-        serialized.Should().Contain("edge_rebar");
+        serialized.Should().Contain("\"l_corner\"");
+        serialized.Should().Contain("bar1");
     }
 
     [Fact]
