@@ -34,19 +34,19 @@
 // Каждая команда — отдельный класс в Commands/
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]
-public class CreateWallsCommand : IExternalCommand
+public class ArmWallCommand : IExternalCommand
 {
-    public Result Execute(ExternalCommandData commandData, 
-                          ref string message, 
+    public Result Execute(ExternalCommandData commandData,
+                          ref string message,
                           ElementSet elements)
     {
         // Получить контекст
         var uiApp = commandData.Application;
         var doc = uiApp.ActiveUIDocument.Document;
-        
-        // Делегировать в сервис
-        var service = new WallCreationService(doc);
-        return service.Execute();
+
+        // Делегировать в оркестратор (Application layer)
+        var orchestrator = new WallReinforcementOrchestrator(doc);
+        return orchestrator.Execute(uiApp.ActiveUIDocument.Selection);
     }
 }
 ```

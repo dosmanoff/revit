@@ -30,16 +30,30 @@
     <RevitVersion>2024</RevitVersion>
   </PropertyGroup>
 
+  <!--
+       Путь к RevitAPI.dll. По умолчанию ищем в стандартной папке установки Revit,
+       но можно переопределить через MSBuild property RevitApiPath:
+         dotnet build -c Debug2025 -p:RevitApiPath="C:\Program Files\Autodesk\Revit 2025"
+  -->
+  <PropertyGroup>
+    <RevitApiPath Condition="'$(RevitApiPath)'==''">C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitApiPath>
+  </PropertyGroup>
+
   <!-- Revit API References (локальные, не NuGet) -->
   <ItemGroup>
     <Reference Include="RevitAPI">
-      <HintPath>$(AppData)\Autodesk\Revit\Addins\$(RevitVersion)\RevitAPI.dll</HintPath>
+      <HintPath>$(RevitApiPath)\RevitAPI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="RevitAPIUI">
-      <HintPath>$(AppData)\Autodesk\Revit\Addins\$(RevitVersion)\RevitAPIUI.dll</HintPath>
+      <HintPath>$(RevitApiPath)\RevitAPIUI.dll</HintPath>
       <Private>false</Private>
     </Reference>
+  </ItemGroup>
+
+  <!-- Доменный слой (чистый .NET 8, без Revit) -->
+  <ItemGroup>
+    <ProjectReference Include="..\RevitPlugin.Domain\RevitPlugin.Domain.csproj" />
   </ItemGroup>
 
   <!-- NuGet зависимости -->
@@ -50,10 +64,16 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
   </ItemGroup>
 
-  <!-- Копировать .addin файл при сборке -->
+  <!-- Копировать .addin и ресурсы при сборке -->
   <ItemGroup>
     <None Update="RevitPlugin.addin">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\DefaultConfigs\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\SharedParameters.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

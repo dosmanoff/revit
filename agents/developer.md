@@ -253,15 +253,15 @@ t.SetFailureHandlingOptions(options);
 ### Обязательные XML-комментарии
 ```csharp
 /// <summary>
-/// Создаёт стены по переданному контуру на заданном уровне.
+/// Размещает арматуру в стене согласно правилу из конфигурации.
 /// </summary>
-/// <param name="contour">Замкнутый контур из линий.</param>
-/// <param name="levelId">Id уровня для базовой привязки.</param>
-/// <returns>Список созданных стен.</returns>
+/// <param name="wall">Стена-хост (host wall).</param>
+/// <param name="config">Конфигурация армирования, привязанная к стене.</param>
+/// <returns>Список созданных стержней арматуры.</returns>
 /// <exception cref="InvalidOperationException">
-/// Бросается если контур не замкнут.
+/// Бросается, если стена несовместима с конфигом (см. Applicability).
 /// </exception>
-public IList<Wall> CreateWalls(IList<Curve> contour, ElementId levelId) { }
+public IList<Rebar> ApplyMesh(Wall wall, RebarConfig config) { }
 ```
 
 ### Extension methods для Revit

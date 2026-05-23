@@ -33,49 +33,43 @@ Revit API работает только внутри Revit. Для юнит-те
 
 ### Базовая структура
 ```csharp
-public class WallCreationServiceTests
+public class ExternalMeshRuleTests
 {
-    private readonly Mock<IWallRepository> _wallRepoMock;
-    private readonly Mock<ILevelRepository> _levelRepoMock;
-    private readonly WallCreationService _sut; // System Under Test
+    private readonly ExternalMeshRule _sut = new();
 
-    public WallCreationServiceTests()
+    private static RebarConfig DefaultConfig() => new()
     {
-        _wallRepoMock = new Mock<IWallRepository>();
-        _levelRepoMock = new Mock<ILevelRepository>();
-        _sut = new WallCreationService(_wallRepoMock.Object, _levelRepoMock.Object);
+        Name = "test",
+        ExternalReinforcement = new MeshConfig()
+    };
+
+    [Fact]
+    public void Wall_5x3_at_step_200_produces_25_verticals_and_14_horizontals()
+    {
+        // Arrange
+        var wall = WallContext.CreateStraight(length: 5000, height: 3000, thickness: 200);
+
+        // Act
+        var result = _sut.Execute(wall, DefaultConfig());
+
+        // Assert
+        result.Warnings.Should().BeEmpty();
+        result.Placements.Count(p => p.Role == BarRole.Vertical).Should().Be(25);
+        result.Placements.Count(p => p.Role == BarRole.Horizontal).Should().Be(14);
     }
 
     [Fact]
-    public void Execute_ValidContour_CreatesWalls()
+    public void Disabled_mesh_produces_no_placements()
     {
-        // Arrange
-        var contour = CreateTestContour();
-        var levelId = new FakeElementId(1);
-        _levelRepoMock
-            .Setup(r => r.GetByName("Level 1"))
-            .Returns(new FakeLevel { Name = "Level 1" });
+        var config = new RebarConfig
+        {
+            Name = "test",
+            ExternalReinforcement = new MeshConfig { Enabled = false }
+        };
+        var wall = WallContext.CreateStraight(5000, 3000, 200);
 
-        // Act
-        var result = _sut.Execute(contour, "Level 1");
-
-        // Assert
-        result.Should().Be(Result.Succeeded);
-        _wallRepoMock.Verify(r => r.Create(It.IsAny<Curve>(), levelId), Times.Exactly(4));
-    }
-
-    [Fact]
-    public void Execute_EmptyContour_ReturnsFailed()
-    {
-        // Arrange
-        var emptyContour = new List<Curve>();
-
-        // Act
-        var result = _sut.Execute(emptyContour, "Level 1");
-
-        // Assert
-        result.Should().Be(Result.Failed);
-        _wallRepoMock.Verify(r => r.Create(It.IsAny<Curve>(), It.IsAny<ElementId>()), Times.Never);
+        _sut.IsApplicable(wall, config).Should().BeFalse();
+        _sut.Execute(wall, config).Placements.Should().BeEmpty();
     }
 }
 ```
@@ -98,11 +92,22 @@ public interface IWallWrapper : IElementWrapper
     WallType WallType { get; }
 }
 
-// В сервисе работаем с интерфейсами, не с Wall напрямую
-public class WallCreationService
+// В сервисе работаем с интерфейсами и доменом, не с Wall напрямую
+public class WallReinforcementOrchestrator
 {
-    private readonly IWallRepository _repo;
-    public WallCreationService(IWallRepository repo) => _repo = repo;
+    private readonly IWallRepository _walls;
+    private readonly IRebarFactory _rebar;
+    private readonly RuleEngine _engine;
+
+    public WallReinforcementOrchestrator(
+        IWallRepository walls,
+        IRebarFactory rebar,
+        RuleEngine engine)
+    {
+        _walls = walls;
+        _rebar = rebar;
+        _engine = engine;
+    }
 }
 ```
 
@@ -262,7 +267,7 @@ dotnet test --collect:"XPlat Code Coverage"
 reportgenerator -reports:"coverage.xml" -targetdir:"coverage-report"
 
 # Только определённый класс
-dotnet test --filter "FullyQualifiedName~WallCreationServiceTests"
+dotnet test --filter "FullyQualifiedName~ExternalMeshRuleTests"
 ```
 
 ---

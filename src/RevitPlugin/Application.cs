@@ -6,44 +6,41 @@ namespace RevitPlugin;
 
 /// <summary>
 /// Точка входа плагина Revit. Реализует <see cref="IExternalApplication"/>.
-/// Регистрирует UI (Ribbon) и подписывается на события приложения.
+/// Регистрирует Ribbon WRS — Wall Reinforcement Suite и подписывается на события приложения.
+/// Подробности компоновки Ribbon — в <c>docs/UI_FLOWS.md §1</c>.
 /// </summary>
 public class Application : IExternalApplication
 {
+    internal const string TabName = "WRS — Wall Reinforcement Suite";
+
     private static readonly string _logPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RevitPlugin", "logs", "revitplugin-.log");
+        "WRSPlugin", "logs", "wrsplugin-.log");
 
-    /// <summary>
-    /// Вызывается при запуске Revit. Инициализирует логирование и создаёт UI.
-    /// </summary>
     public Result OnStartup(UIControlledApplication application)
     {
         InitializeLogging();
-        Log.Information("RevitPlugin OnStartup — Revit {Version}",
+        Log.Information("WRS Plugin OnStartup — Revit {Version}",
             application.ControlledApplication.VersionNumber);
 
         try
         {
-            CreateRibbonPanel(application);
-            Log.Information("Ribbon panel created successfully");
+            CreateRibbon(application);
+            Log.Information("Ribbon panels created successfully");
             return Result.Succeeded;
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "Failed to initialize RevitPlugin");
-            TaskDialog.Show("RevitPlugin Error",
+            Log.Fatal(ex, "Failed to initialize WRS Plugin");
+            TaskDialog.Show("WRS Plugin Error",
                 $"Failed to load plugin:\n{ex.Message}");
             return Result.Failed;
         }
     }
 
-    /// <summary>
-    /// Вызывается при закрытии Revit. Освобождает ресурсы и закрывает логи.
-    /// </summary>
     public Result OnShutdown(UIControlledApplication application)
     {
-        Log.Information("RevitPlugin OnShutdown");
+        Log.Information("WRS Plugin OnShutdown");
         Log.CloseAndFlush();
         return Result.Succeeded;
     }
@@ -62,30 +59,32 @@ public class Application : IExternalApplication
             .CreateLogger();
     }
 
-    private static void CreateRibbonPanel(UIControlledApplication app)
+    private static void CreateRibbon(UIControlledApplication app)
     {
-        // Создать вкладку
-        const string tabName = "BIM Tools";
-        try { app.CreateRibbonTab(tabName); }
+        try { app.CreateRibbonTab(TabName); }
         catch { /* вкладка уже существует */ }
 
-        // Создать панель
-        var panel = app.CreateRibbonPanel(tabName, "Automation");
-
-        // Путь к DLL плагина
         var dllPath = Assembly.GetExecutingAssembly().Location;
+        var wallsPanel = app.CreateRibbonPanel(TabName, "Walls");
 
-        // Кнопка примера команды
-        var btnData = new PushButtonData(
-            name: "CreateWalls",
-            text: "Create Walls",
+        var armWalls = new PushButtonData(
+            name: "ArmWalls",
+            text: "Arm\nWalls",
             assemblyName: dllPath,
-            className: "RevitPlugin.Commands.CreateWallsCommand")
+            className: "RevitPlugin.Commands.ArmWallCommand")
         {
-            ToolTip = "Creates walls from selected lines",
-            LongDescription = "Select model lines and click to create walls along them.",
+            ToolTip = "Разместить арматуру в выбранных стенах по конфигурации.",
+            LongDescription = "Использует Wall Link стены или предлагает выбрать конфиг вручную. "
+                            + "Запуск идёт в одной транзакции; Undo возвращает в исходное состояние."
         };
 
-        panel.AddItem(btnData);
+        wallsPanel.AddItem(armWalls);
+
+        // Будущие команды Ribbon (см. docs/UI_FLOWS.md §1):
+        // Configurations: Config Editor, Open Config Folder
+        // Walls: Link Wall, Update Rebar, Modify Rebar, Delete Rebar
+        // Dowels: Create Dowels, Update Dowels
+        // Output: Create Views, Create Schedules
+        // Появятся по мере прохождения этапов ROADMAP M1–M5.
     }
 }

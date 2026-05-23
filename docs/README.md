@@ -46,17 +46,34 @@
 
 ---
 
+## Что делает плагин
+
+Плагин **не создаёт стены** — он работает с уже существующими в модели стенами и автоматизирует:
+
+- **Армирование** монолитных и сборных ЖБ-стен по конфигурации: внешняя/внутренняя сетки, периметр, окантовка проёмов, L-/T-узлы, дополнительные стержни.
+- **Выпуски (dowels)** из нижележащих конструкций (фундаментная плита, нижестоящая стена, перекрытие) в стену-приёмник.
+- **Назначение параметров** на арматуру (марка стены, ярус, секция, этаж, роль стержня, позиция) — для фильтрации на видах и группировки в спецификациях.
+- **Создание видов**: поперечные сечения, продольные развёртки, узлы (фундаментный стык, L-/T-узлы, окантовка проёмов), 3D-проверочный вид.
+- **Создание спецификаций**: ведомость деталей арматуры, ВРС, ведомость выпусков, сводная по этажам.
+- **Конфигуратор армирования** — все нормативы, диаметры, шаги, формы хранятся в JSON-конфигурациях (`.wrsconfig.json`), которые можно версионировать и переносить между проектами.
+
+Референс по функциональности — [BeSmart Concrete Collection](https://arkance.world/global/products/be-smart/building/concrete-collection).
+
+---
+
 ## Быстрый старт
 
-После установки в Revit появится вкладка **BIM Tools** на Ribbon.
+После установки в Revit появится вкладка **WRS — Wall Reinforcement Suite** на Ribbon.
 
-### Создание стен по линиям
+### Армирование стены
 
-1. Откройте план этажа
-2. Нарисуйте линии модели (Model Line)
-3. Выберите линии
-4. Нажмите **BIM Tools → Automation → Create Walls**
-5. Стены создадутся вдоль выбранных линий
+1. Откройте план этажа в проекте.
+2. Выберите стену (или несколько).
+3. Нажмите **WRS → Walls → Link Wall** — привяжите выбранные стены к конфигурации.
+4. Нажмите **WRS → Walls → Arm Walls** — плагин разместит арматуру по правилам конфига в одной транзакции (Undo возвращает в исходное состояние).
+5. Запустите **WRS → Output → Create Views** и **Create Schedules** — появятся сечения, развёртки и спецификации по марке стены.
+
+Подробнее по UX и состояниям — в [UI_FLOWS.md](UI_FLOWS.md).
 
 ---
 
@@ -72,34 +89,44 @@ cd revit
 ### Сборка
 
 ```bash
-# Revit 2024
+# Revit 2024 (по умолчанию)
 dotnet build src/RevitPlugin/RevitPlugin.csproj -c Debug2024
 
 # Revit 2025
 dotnet build src/RevitPlugin/RevitPlugin.csproj -c Debug2025
 ```
 
+> Для сборки `RevitPlugin.csproj` требуются `RevitAPI.dll` и `RevitAPIUI.dll` из установленного Revit. Domain-слой (`RevitPlugin.Domain`) и тесты — чистый .NET 8, собираются без Revit.
+
 ### Тесты
 
 ```bash
-dotnet test src/RevitPlugin.Tests/
+dotnet test src/RevitPlugin.Tests/RevitPlugin.Tests.csproj
 ```
+
+Тесты покрывают доменную логику правил (`ExternalMeshRule`, `RuleEngine`) и сериализацию конфигов (`ConfigStorage`). Revit API не требуется.
 
 ### Структура проекта
 
 ```
 revit/
-├── CLAUDE.md              ← Оркестратор AI-агентов
-├── agents/                ← Специализированные AI-агенты
+├── CLAUDE.md                       ← Оркестратор AI-агентов
+├── agents/                         ← Специализированные AI-агенты
 │   ├── architect.md
 │   ├── developer.md
 │   ├── tester.md
 │   └── docs.md
 ├── src/
-│   ├── RevitPlugin/       ← Основной проект
-│   └── RevitPlugin.Tests/ ← Тесты
+│   ├── RevitPlugin/                ← Revit-add-in (net8.0-windows, требует RevitAPI)
+│   ├── RevitPlugin.Domain/         ← Доменная логика (net8.0, без Revit)
+│   └── RevitPlugin.Tests/          ← Юнит-тесты (net8.0, без Revit)
+├── .github/workflows/
+│   ├── build.yml                   ← CI: сборка под Revit 2024 + 2025, тесты
+│   └── pr-check.yml                ← PR: форматирование + сборка + тесты
 └── docs/
-    ├── README.md          ← Этот файл
+    ├── README.md                   ← Этот файл
+    ├── SPEC.md, ARCHITECTURE.md, MODULES.md, ROADMAP.md
+    ├── CONFIG_SCHEMA.md, PARAMETERS.md, UI_FLOWS.md
     └── CHANGELOG.md
 ```
 

@@ -1,0 +1,96 @@
+name: build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  domain-and-tests:
+    name: Domain + tests (.NET 8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore (Domain + Tests)
+        run: |
+          dotnet restore src/RevitPlugin.Domain/RevitPlugin.Domain.csproj
+          dotnet restore src/RevitPlugin.Tests/RevitPlugin.Tests.csproj
+
+      - name: Build Domain
+        run: dotnet build src/RevitPlugin.Domain/RevitPlugin.Domain.csproj --no-restore -c Release
+
+      - name: Build Tests
+        run: dotnet build src/RevitPlugin.Tests/RevitPlugin.Tests.csproj --no-restore -c Release
+
+      - name: Run unit tests
+        run: |
+          dotnet test src/RevitPlugin.Tests/RevitPlugin.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --logger "console;verbosity=normal"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+
+  revit-addin:
+    name: Revit add-in (${{ matrix.revit }})
+    runs-on: windows-latest
+    needs: domain-and-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        revit: [2024, 2025]
+    # Шаг отмечен continue-on-error, пока в репозитории не настроен источник RevitAPI.dll
+    # (например, self-hosted runner с установленным Revit или приватный NuGet-зеркало
+    # с эталонными сборками Autodesk). См. issue tracker: «CI: provision RevitAPI for builds».
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Check for RevitAPI DLLs
+        id: probe
+        shell: pwsh
+        run: |
+          $path = "C:\Program Files\Autodesk\Revit ${{ matrix.revit }}"
+          if (Test-Path "$path\RevitAPI.dll") {
+            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "path=$path" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Warning "RevitAPI.dll not found at $path — skipping Revit add-in build."
+          }
+
+      - name: Build add-in
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          dotnet build src/RevitPlugin/RevitPlugin.csproj `
+            -c Release${{ matrix.revit }} `
+            -p:RevitApiPath="${{ steps.probe.outputs.path }}"
+
+      - name: Upload add-in artifact
+        if: steps.probe.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RevitPlugin-${{ matrix.revit }}
+          path: |
+            src/RevitPlugin/bin/Release${{ matrix.revit }}/**/RevitPlugin.dll
+            src/RevitPlugin/bin/Release${{ matrix.revit }}/**/RevitPlugin.addin
+            src/RevitPlugin/bin/Release${{ matrix.revit }}/**/Resources/**

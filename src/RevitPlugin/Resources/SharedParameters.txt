@@ -1,0 +1,24 @@
+# This is a Revit shared parameter file.
+# Generated for Wall Reinforcement Suite (WRS) — do not edit manually.
+# See docs/PARAMETERS.md for the canonical list and semantics.
+*META	VERSION	MINVERSION
+META	2	1
+*GROUP	ID	NAME
+GROUP	1	WRS — Wall Reinforcement
+*PARAM	GUID	NAME	DATATYPE	DATACATEGORY	GROUP	VISIBLE	DESCRIPTION	USERMODIFIABLE	HIDEWHENNOVALUE
+PARAM	c1b60001-0000-4000-8000-000000000001	WRS_Config_Id	TEXT		1	1	UUID configuration by which the rebar was created	1	0
+PARAM	c1b60001-0000-4000-8000-000000000002	WRS_Config_Version	INTEGER		1	1	Configuration version at creation time	1	0
+PARAM	c1b60001-0000-4000-8000-000000000003	WRS_Rule_Id	TEXT		1	1	Rule identifier (for example, wrs.external_mesh)	1	0
+PARAM	c1b60001-0000-4000-8000-000000000004	WRS_Bar_Role	TEXT		1	1	Bar role: Vertical, Horizontal, Edge, Diagonal, Stirrup, Dowel, Corner, Opening, Custom	1	0
+PARAM	c1b60001-0000-4000-8000-000000000005	WRS_Bar_Position	TEXT		1	1	Position label (for example, 1, 2, K1)	1	0
+PARAM	c1b60001-0000-4000-8000-000000000006	WRS_Bar_Group	TEXT		1	1	Logical group for sorting on views	1	0
+PARAM	c1b60001-0000-4000-8000-000000000010	WRS_Wall_Mark	TEXT		1	1	Mark of the host wall (copy)	1	0
+PARAM	c1b60001-0000-4000-8000-000000000011	WRS_Wall_Type	TEXT		1	1	Host wall type name	1	0
+PARAM	c1b60001-0000-4000-8000-000000000012	WRS_Wall_Tier	TEXT		1	1	Wall tier	1	0
+PARAM	c1b60001-0000-4000-8000-000000000013	WRS_Wall_Section	TEXT		1	1	Wall section	1	0
+PARAM	c1b60001-0000-4000-8000-000000000014	WRS_Wall_Level	TEXT		1	1	Host wall level name	1	0
+PARAM	c1b60001-0000-4000-8000-000000000015	WRS_Wall_Block	TEXT		1	1	Building block	1	0
+PARAM	c1b60001-0000-4000-8000-000000000020	WRS_Run_Stamp	TEXT		1	1	Timestamp of last plugin run	1	0
+PARAM	c1b60001-0000-4000-8000-000000000021	WRS_Job_Id	TEXT		1	1	GUID of the run (for traceability)	1	0
+PARAM	c1b60001-0000-4000-8000-000000000030	WRS_Modified	YESNO		1	1	Marked by user as do-not-recreate	1	0
+PARAM	c1b60001-0000-4000-8000-000000000040	WRS_Bar_Tag	TEXT		1	1	Ready-made tag for views ({Mark}_{Position})	1	0

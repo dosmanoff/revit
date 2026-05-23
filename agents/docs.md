@@ -47,14 +47,14 @@
 /// </exception>
 /// <example>
 /// <code>
-/// using var t = new Transaction(doc, "Create walls");
+/// using var t = new Transaction(doc, "Arm Walls");
 /// t.Start();
-/// var service = new WallCreationService(doc);
-/// var walls = service.CreateWalls(contour, "Level 1");
+/// var orchestrator = new WallReinforcementOrchestrator(doc);
+/// var report = orchestrator.Run(selectedWalls, config);
 /// t.Commit();
 /// </code>
 /// </example>
-public IList<Wall> CreateWalls(Document document, IList<Curve> contour, string levelName)
+public JobReport Run(IList<Wall> walls, RebarConfig config)
 ```
 
 ### Специфика Revit
@@ -165,9 +165,9 @@ dotnet test src/RevitPlugin.Tests/
 ## [1.0.0] — 2025-05-20
 
 ### Добавлено
-- Команда создания стен по контуру (`CreateWallsCommand`)
+- Команда `ArmWallCommand` — размещение арматуры в выбранных стенах по конфигурации
 - Поддержка Revit 2024 и 2025
-- Панель инструментов в Revit Ribbon
+- Ribbon-панель `WRS — Wall Reinforcement Suite`
 
 ### Исправлено
 - Исправлена ошибка при работе с семействами без активированных типоразмеров

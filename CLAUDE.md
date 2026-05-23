@@ -174,7 +174,7 @@ git push origin v1.0.0
 git checkout -b feature/<название-фичи>
 
 # Commit с описанием
-git commit -m "feat: добавить CreateWallsCommand"
+git commit -m "feat(M1): добавить ExternalMeshRule"
 
 # Push и Pull Request
 git push origin feature/<название-фичи>

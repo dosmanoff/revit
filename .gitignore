@@ -1,0 +1,19 @@
+# .NET build outputs
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/
+TestResults/
+
+# JetBrains Rider
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WRS plugin runtime
+%APPDATA%/WRSPlugin/

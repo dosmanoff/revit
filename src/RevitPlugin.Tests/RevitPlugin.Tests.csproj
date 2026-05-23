@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,8 +18,12 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
   </ItemGroup>
 
+  <!--
+       Тесты зависят только от доменного слоя (без Revit), чтобы CI и локальный
+       прогон не требовали установленного Revit.
+  -->
   <ItemGroup>
-    <ProjectReference Include="..\RevitPlugin\RevitPlugin.csproj" />
+    <ProjectReference Include="..\RevitPlugin.Domain\RevitPlugin.Domain.csproj" />
   </ItemGroup>
 
 </Project>
