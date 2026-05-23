@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>RevitPlugin</AssemblyName>
+    <RootNamespace>RevitPlugin</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>Your Name</Authors>
+    <Description>Revit Plugin for BIM Automation</Description>
+  </PropertyGroup>
+
+  <!-- Конфигурации для разных версий Revit -->
+  <PropertyGroup Condition="'$(Configuration)'=='Debug2024' Or '$(Configuration)'=='Release2024'">
+    <DefineConstants>REVIT2024</DefineConstants>
+    <RevitVersion>2024</RevitVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug2025' Or '$(Configuration)'=='Release2025'">
+    <DefineConstants>REVIT2025</DefineConstants>
+    <RevitVersion>2025</RevitVersion>
+  </PropertyGroup>
+
+  <!-- Fallback: если версия не указана, используем 2024 -->
+  <PropertyGroup Condition="'$(RevitVersion)'==''">
+    <DefineConstants>REVIT2024</DefineConstants>
+    <RevitVersion>2024</RevitVersion>
+  </PropertyGroup>
+
+  <!-- Revit API References (локальные, не NuGet) -->
+  <ItemGroup>
+    <Reference Include="RevitAPI">
+      <HintPath>$(AppData)\Autodesk\Revit\Addins\$(RevitVersion)\RevitAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>$(AppData)\Autodesk\Revit\Addins\$(RevitVersion)\RevitAPIUI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- NuGet зависимости -->
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    <PackageReference Include="Serilog" Version="3.*" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
+  </ItemGroup>
+
+  <!-- Копировать .addin файл при сборке -->
+  <ItemGroup>
+    <None Update="RevitPlugin.addin">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
