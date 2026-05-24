@@ -10,6 +10,7 @@
     <RootNamespace>SmartViews</RootNamespace>
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
