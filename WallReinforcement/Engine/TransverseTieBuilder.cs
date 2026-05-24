@@ -7,7 +7,7 @@ namespace WallReinforcement.Engine;
 
 /// <summary>
 /// Places transverse ties (stirrups across the wall thickness) at a grid spacing.
-/// Skipped for walls thinner than <see cref="TiesConfig.MinThicknessMm"/>.
+/// Skipped for walls thinner than <see cref="TiesConfig.MinThickness"/>.
 ///
 /// A tie is a single straight bar in the section plane (perpendicular to the wall length)
 /// running from the exterior-face cover line to the interior-face cover line. For monolithic
@@ -24,18 +24,18 @@ public class TransverseTieBuilder
     {
         TiesConfig ties = cfg.Ties;
         if (!ties.Enabled) return 0;
-        if (axes.Thickness < UnitConv.MmToFt(ties.MinThicknessMm)) return 0;
+        if (axes.Thickness < cfg.Ft(ties.MinThickness)) return 0;
 
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, ties.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double endsCover   = UnitConv.MmToFt(cfg.Cover.EndsMm);
-        double topCover    = UnitConv.MmToFt(cfg.Cover.TopMm);
-        double bottomCover = UnitConv.MmToFt(cfg.Cover.BottomMm);
-        double extOffset   =  axes.HalfThickness - UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intOffset   = -axes.HalfThickness + UnitConv.MmToFt(cfg.Cover.InteriorMm);
-        double sx          = UnitConv.MmToFt(ties.SpacingXMm);
-        double sy          = UnitConv.MmToFt(ties.SpacingYMm);
+        double endsCover   = cfg.Ft(cfg.Cover.Ends);
+        double topCover    = cfg.Ft(cfg.Cover.Top);
+        double bottomCover = cfg.Ft(cfg.Cover.Bottom);
+        double extOffset   =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
+        double intOffset   = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
+        double sx          = cfg.Ft(ties.SpacingX);
+        double sy          = cfg.Ft(ties.SpacingY);
 
         int count = 0;
         foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, sx))

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "name": "aci-full-12in",
+  "units": "Imperial",
+  "_comment": "ACI 318: 12-inch monolithic wall, every builder enabled. Lengths in inches; string values like \"1'-3\\\"\" also accepted.",
+  "cover": {
+    "exterior": 2.0,
+    "interior": 1.5,
+    "top":      2.0,
+    "bottom":   2.0,
+    "ends":     2.0
+  },
+  "faceMesh": {
+    "exterior": {
+      "vertical":   { "barType": "#5", "spacing": 12 },
+      "horizontal": { "barType": "#4", "spacing": 12 }
+    },
+    "interior": {
+      "vertical":   { "barType": "#4", "spacing": 12 },
+      "horizontal": { "barType": "#4", "spacing": 12 }
+    }
+  },
+  "openings": {
+    "enabled":   true,
+    "barType":   "#5",
+    "extension": 24,
+    "minWidth":  12,
+    "diagonals": { "enabled": true, "barType": "#5", "length": "2'-6\"", "angleDeg": 45 }
+  },
+  "edges": {
+    "top":    { "enabled": true, "barType": "#4", "legLength": 12, "spacing": 12 },
+    "bottom": { "enabled": true, "barType": "#4", "legLength": 12, "spacing": 12 },
+    "ends":   { "enabled": true, "barType": "#4", "legLength": 12, "spacing": 12 }
+  },
+  "ties": {
+    "enabled":      true,
+    "barType":      "#3",
+    "spacingX":     16,
+    "spacingY":     16,
+    "minThickness": 10
+  },
+  "corners":    { "enabled": true, "barType": "#5", "lapLength": "2'-0\"", "spacing": 12 },
+  "tJunctions": { "enabled": true, "barType": "#5", "lapLength": "2'-0\"", "spacing": 12 }
+}

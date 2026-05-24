@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "name": "aci-minimal-12in",
+  "units": "Imperial",
+  "_comment": "ACI 318: typical interior wall, #4 vertical & horizontal each face at 12\" o.c.",
+  "cover": {
+    "exterior": 2.0,
+    "interior": 1.5,
+    "top":      2.0,
+    "bottom":   2.0,
+    "ends":     2.0
+  },
+  "faceMesh": {
+    "exterior": {
+      "vertical":   { "barType": "#4", "spacing": 12 },
+      "horizontal": { "barType": "#4", "spacing": 12 }
+    },
+    "interior": {
+      "vertical":   { "barType": "#4", "spacing": 12 },
+      "horizontal": { "barType": "#4", "spacing": 12 }
+    }
+  }
+}
