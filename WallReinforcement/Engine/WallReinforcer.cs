@@ -20,6 +20,9 @@ public class WallReinforcer
         var meshBuilder = new FaceMeshBuilder(_doc);
         var trimBuilder = new OpeningTrimBuilder(_doc);
         var edgeBuilder = new EdgeBarBuilder(_doc);
+        var tieBuilder  = new TransverseTieBuilder(_doc);
+        var cornerBuilder = new CornerBarBuilder(_doc);
+        var tBuilder      = new TJunctionBarBuilder(_doc);
 
         foreach (ElementId id in wallIds)
         {
@@ -41,10 +44,15 @@ public class WallReinforcer
                 int replaced = ExistingRebarCleaner.Clean(_doc, id, cfg.Name);
                 WallAxes axes = WallAxes.For(wall);
 
+                IReadOnlyList<WallJunction> junctions = WallJunctions.Detect(axes);
+
                 int created = 0;
                 created += meshBuilder.Build(wall, cfg, tag);
                 created += trimBuilder.Build(axes, cfg, tag);
                 created += edgeBuilder.Build(axes, cfg, tag);
+                created += tieBuilder.Build(axes, cfg, tag);
+                created += cornerBuilder.Build(axes, cfg, junctions, tag);
+                created += tBuilder.Build(axes, cfg, junctions, tag);
 
                 if (dryRun)
                     tx.RollBack();

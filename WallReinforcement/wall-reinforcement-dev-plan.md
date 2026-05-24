@@ -149,15 +149,15 @@ WallReinforcement/
 - WPF dialog: source, config picker, dry-run/apply, results summary.
 - **Exit criteria**: select 5 walls of varying length/height → run config → 10 `AreaReinforcement` elements created, schedules look right, second run replaces cleanly.
 
-### Phase 2 — Openings & edges
+### Phase 2 — Openings & edges ✅
 - `OpeningTrimBuilder`: trim bars around hosted doors/windows and rectangular openings; diagonal corner bars.
 - `EdgeBarBuilder`: U-bars at top/bottom/ends.
 - Min-width filter for openings.
 
-### Phase 3 — Junctions & ties
-- Corner L-bars at wall-wall L-junctions (90°).
-- T-junction continuity bars.
-- Transverse ties between exterior/interior meshes on thick walls.
+### Phase 3 — Junctions & ties ✅
+- `TransverseTieBuilder`: stirrups across wall thickness on grid, skipped below `minThicknessMm`.
+- `CornerBarBuilder` + `WallJunctions` detection: L-bars at wall-wall L-junctions, owner-by-min-ElementId to avoid double placement when both corner walls are in the run.
+- `TJunctionBarBuilder`: lap bars from stem wall into through wall; alternating direction per height step.
 
 ### Phase 4 — Documentation hooks (separate plugin or shared lib)
 - Hand-off to a future *SmartDocumentation* plugin for views/sheets/schedules of the rebar produced here. **Not built in this repo yet** — listed only so the JSON tag convention (`WR:*`) is designed to be queryable from elsewhere.

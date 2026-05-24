@@ -21,6 +21,15 @@ public class ReinforcementConfig
 
     [JsonPropertyName("edges")]
     public EdgesConfig Edges { get; set; } = new();
+
+    [JsonPropertyName("ties")]
+    public TiesConfig Ties { get; set; } = new();
+
+    [JsonPropertyName("corners")]
+    public CornersConfig Corners { get; set; } = new();
+
+    [JsonPropertyName("tJunctions")]
+    public TJunctionsConfig TJunctions { get; set; } = new();
 }
 
 public class CoverConfig
@@ -81,4 +90,29 @@ public class EdgeConfig
     [JsonPropertyName("barType")]     public string BarType     { get; set; } = "Ø10";
     [JsonPropertyName("legLengthMm")] public double LegLengthMm { get; set; } = 250;
     [JsonPropertyName("spacingMm")]   public double SpacingMm   { get; set; } = 200;
+}
+
+public class TiesConfig
+{
+    [JsonPropertyName("enabled")]    public bool   Enabled    { get; set; } = false;
+    [JsonPropertyName("barType")]    public string BarType    { get; set; } = "Ø8";
+    [JsonPropertyName("spacingXMm")] public double SpacingXMm { get; set; } = 400;
+    [JsonPropertyName("spacingYMm")] public double SpacingYMm { get; set; } = 400;
+    [JsonPropertyName("minThicknessMm")] public double MinThicknessMm { get; set; } = 250;
+}
+
+public class CornersConfig
+{
+    [JsonPropertyName("enabled")]      public bool   Enabled      { get; set; } = false;
+    [JsonPropertyName("barType")]      public string BarType      { get; set; } = "Ø12";
+    [JsonPropertyName("lapLengthMm")]  public double LapLengthMm  { get; set; } = 400;
+    [JsonPropertyName("spacingMm")]    public double SpacingMm    { get; set; } = 200;
+}
+
+public class TJunctionsConfig
+{
+    [JsonPropertyName("enabled")]      public bool   Enabled      { get; set; } = false;
+    [JsonPropertyName("barType")]      public string BarType      { get; set; } = "Ø12";
+    [JsonPropertyName("lapLengthMm")]  public double LapLengthMm  { get; set; } = 400;
+    [JsonPropertyName("spacingMm")]    public double SpacingMm    { get; set; } = 200;
 }
