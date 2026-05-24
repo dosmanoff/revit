@@ -41,7 +41,7 @@ public class FaceMeshBuilder
         IList<Curve> boundary = BuildInsetBoundary(wall, geomFace, cfg.Cover, side);
         if (boundary.Count < 3) return 0;
 
-        ElementId barTypeId   = LookupBarType(face.Vertical.BarType);
+        ElementId barTypeId   = RebarFactory.LookupBarType(_doc, face.Vertical.BarType);
         ElementId hookTypeId  = ElementId.InvalidElementId;
         ElementId areaTypeId  = DefaultAreaReinforcementTypeId();
 
@@ -117,18 +117,10 @@ public class FaceMeshBuilder
         TrySetDouble(areaReinf, BuiltInParameter.REBAR_SYSTEM_SPACING_FRONT_DIR_2,
             UnitConv.MmToFt(face.Horizontal.SpacingMm));
 
-        ElementId vertBar  = LookupBarType(face.Vertical.BarType);
-        ElementId horizBar = LookupBarType(face.Horizontal.BarType);
+        ElementId vertBar  = RebarFactory.LookupBarType(_doc, face.Vertical.BarType);
+        ElementId horizBar = RebarFactory.LookupBarType(_doc, face.Horizontal.BarType);
         TrySetElementId(areaReinf, BuiltInParameter.REBAR_SYSTEM_BAR_TYPE_FRONT_DIR_1, vertBar);
         TrySetElementId(areaReinf, BuiltInParameter.REBAR_SYSTEM_BAR_TYPE_FRONT_DIR_2, horizBar);
-    }
-
-    private ElementId LookupBarType(string name)
-    {
-        var hit = new FilteredElementCollector(_doc)
-            .OfClass(typeof(RebarBarType))
-            .FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-        return hit?.Id ?? ElementId.InvalidElementId;
     }
 
     private ElementId DefaultAreaReinforcementTypeId()

@@ -28,11 +28,11 @@ public class OpeningTrimBuilder
 
         double minWidthFt = UnitConv.MmToFt(op.MinWidthMm);
 
-        ElementId trimBarTypeId = LookupBarType(op.BarType);
+        ElementId trimBarTypeId = RebarFactory.LookupBarType(_doc, op.BarType);
         if (trimBarTypeId == ElementId.InvalidElementId) return 0;
 
         ElementId diagBarTypeId = op.Diagonals.Enabled
-            ? LookupBarType(op.Diagonals.BarType)
+            ? RebarFactory.LookupBarType(_doc, op.Diagonals.BarType)
             : ElementId.InvalidElementId;
 
         IReadOnlyList<OpeningRect> openings = WallGeometry.GetOpenings(axes);
@@ -118,31 +118,8 @@ public class OpeningTrimBuilder
     private int PlaceStraight(WallAxes axes, ElementId barTypeId, string tag, XYZ p1, XYZ p2)
     {
         if (p1.DistanceTo(p2) < 1e-6) return 0;
-
-        IList<Curve> curves = new List<Curve> { Line.CreateBound(p1, p2) };
-        Rebar rebar = Rebar.CreateFromCurves(
-            _doc,
-            RebarStyle.Standard,
-            (RebarBarType)_doc.GetElement(barTypeId),
-            startHook:        null,
-            endHook:          null,
-            host:             axes.Wall,
-            norm:             axes.Normal,
-            curves:           curves,
-            startHookOrient:  RebarHookOrientation.Right,
-            endHookOrient:    RebarHookOrientation.Right,
-            useExistingShapeIfPossible: true,
-            createNewShape:   true);
-
-        ExistingRebarCleaner.Tag(rebar, tag);
+        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall,
+                            axes.Normal, new List<Curve> { Line.CreateBound(p1, p2) }, tag);
         return 1;
-    }
-
-    private ElementId LookupBarType(string name)
-    {
-        var hit = new FilteredElementCollector(_doc)
-            .OfClass(typeof(RebarBarType))
-            .FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-        return hit?.Id ?? ElementId.InvalidElementId;
     }
 }

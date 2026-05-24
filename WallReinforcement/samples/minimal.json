@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "name": "minimal-200mm-mesh",
+  "cover": {
+    "exterior": 30,
+    "interior": 25,
+    "top":      30,
+    "bottom":   30,
+    "ends":     30
+  },
+  "faceMesh": {
+    "exterior": {
+      "vertical":   { "barType": "Ø12", "spacing": 200 },
+      "horizontal": { "barType": "Ø10", "spacing": 200 }
+    },
+    "interior": {
+      "vertical":   { "barType": "Ø12", "spacing": 200 },
+      "horizontal": { "barType": "Ø10", "spacing": 200 }
+    }
+  }
+}

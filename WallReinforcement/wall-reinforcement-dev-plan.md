@@ -37,40 +37,41 @@ Naming: created elements get a `Comments` tag like `WR:{ConfigName}:{WallId}` so
 ```jsonc
 {
   "name": "default-200mm-wall",
+  "schemaVersion": 1,
   "cover": {
-    "exterior": 30,   // mm, distance from outer face
-    "interior": 25,   // mm, distance from inner face
+    "exterior": 30, "interior": 25,
     "top": 30, "bottom": 30, "ends": 30
   },
   "faceMesh": {
     "exterior": {
-      "vertical":   { "barType": "Ø12", "spacing": 200, "hookTop": "Std90", "hookBottom": null },
-      "horizontal": { "barType": "Ø10", "spacing": 200, "hookEnds": null }
+      "vertical":   { "barType": "Ø12", "spacing": 200 },
+      "horizontal": { "barType": "Ø10", "spacing": 200 }
     },
     "interior":   { /* same shape */ }
   },
   "openings": {
-    "trimBars":   { "barType": "Ø12", "extension": 500, "enabled": true },
-    "diagonals":  { "barType": "Ø12", "length": 700, "angleDeg": 45, "enabled": true },
-    "minWidthMm": 300   // openings smaller than this are skipped
+    "enabled":     true,
+    "barType":     "Ø12",
+    "extensionMm": 500,
+    "minWidthMm":  300,
+    "diagonals":   { "enabled": true, "barType": "Ø12", "lengthMm": 700, "angleDeg": 45 }
   },
   "edges": {
-    "top":    { "uBar": { "barType": "Ø10", "legLength": 250, "enabled": true } },
-    "bottom": { "uBar": { "barType": "Ø10", "legLength": 250, "enabled": true } },
-    "ends":   { "uBar": { "barType": "Ø10", "legLength": 250, "enabled": true } }
+    "top":    { "enabled": true, "barType": "Ø10", "legLengthMm": 250, "spacingMm": 200 },
+    "bottom": { "enabled": true, "barType": "Ø10", "legLengthMm": 250, "spacingMm": 200 },
+    "ends":   { "enabled": true, "barType": "Ø10", "legLengthMm": 250, "spacingMm": 200 }
   },
   "ties": {
-    "enabled": false,           // Phase 2
-    "barType": "Ø8",
-    "spacingX": 400, "spacingY": 400,
-    "hookType": "135deg"
+    "enabled": false, "barType": "Ø8",
+    "spacingXMm": 400, "spacingYMm": 400,
+    "minThicknessMm": 250
   },
-  "corners": { "enabled": false /* Phase 2 */ },
-  "tJunctions": { "enabled": false /* Phase 2 */ }
+  "corners":    { "enabled": false, "barType": "Ø12", "lapLengthMm": 400, "spacingMm": 200 },
+  "tJunctions": { "enabled": false, "barType": "Ø12", "lapLengthMm": 400, "spacingMm": 200 }
 }
 ```
 
-All length values are stored in **millimetres** in JSON and converted to internal feet at the API boundary (`UnitUtils.ConvertToInternalUnits`). Bar-type names are looked up by `Name` against `RebarBarType` in the active document.
+All length values are stored in **millimetres** in JSON and converted to internal feet at the API boundary (`UnitUtils.ConvertToInternalUnits`). Bar-type names are looked up by `Name` against `RebarBarType` in the active document. Authoritative examples live in [`samples/`](samples/).
 
 ### 1.5 Idempotency / re-runs
 - Before placing new rebar, the engine deletes existing rebar whose `Comments` parameter starts with `WR:{ConfigName}:{WallId}`. This makes re-running the config on the same wall safe and predictable.
