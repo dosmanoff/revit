@@ -80,4 +80,5 @@ public class EdgeConfig
     [JsonPropertyName("enabled")]     public bool   Enabled     { get; set; } = false;
     [JsonPropertyName("barType")]     public string BarType     { get; set; } = "Ø10";
     [JsonPropertyName("legLengthMm")] public double LegLengthMm { get; set; } = 250;
+    [JsonPropertyName("spacingMm")]   public double SpacingMm   { get; set; } = 200;
 }

@@ -16,8 +16,10 @@ public class WallReinforcer
 
     public RunResult Run(IEnumerable<ElementId> wallIds, ReinforcementConfig cfg, bool dryRun)
     {
-        var result = new RunResult { DryRun = dryRun };
+        var result      = new RunResult { DryRun = dryRun };
         var meshBuilder = new FaceMeshBuilder(_doc);
+        var trimBuilder = new OpeningTrimBuilder(_doc);
+        var edgeBuilder = new EdgeBarBuilder(_doc);
 
         foreach (ElementId id in wallIds)
         {
@@ -37,7 +39,12 @@ public class WallReinforcer
             try
             {
                 int replaced = ExistingRebarCleaner.Clean(_doc, id, cfg.Name);
-                int created  = meshBuilder.Build(wall, cfg, tag);
+                WallAxes axes = WallAxes.For(wall);
+
+                int created = 0;
+                created += meshBuilder.Build(wall, cfg, tag);
+                created += trimBuilder.Build(axes, cfg, tag);
+                created += edgeBuilder.Build(axes, cfg, tag);
 
                 if (dryRun)
                     tx.RollBack();
