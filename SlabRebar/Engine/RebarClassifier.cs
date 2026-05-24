@@ -111,7 +111,7 @@ public class RebarClassifier
     {
         var curves = rebar.GetCenterlineCurves(
             false, false, false,
-            MultiplanarOption.IncludeAllMultiplanarCurves, 0.001);
+            MultiplanarOption.IncludeAllMultiplanarCurves, 0);
 
         if (curves.FirstOrDefault() is Line line)
         {

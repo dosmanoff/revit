@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Discover projects
+        id: projects
+        shell: bash
+        run: |
+          mapfile -t projects < <(find . -name "*.csproj" -not -path "*/bin/*" -not -path "*/obj/*" | sort)
+          printf '%s\n' "${projects[@]}"
+          {
+            echo 'list<<EOF'
+            printf '%s\n' "${projects[@]}"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore + build each project
+        shell: bash
+        run: |
+          set -e
+          while IFS= read -r proj; do
+            [ -z "$proj" ] && continue
+            echo "::group::$proj"
+            dotnet build "$proj" -c Release --nologo
+            echo "::endgroup::"
+          done <<< "${{ steps.projects.outputs.list }}"
