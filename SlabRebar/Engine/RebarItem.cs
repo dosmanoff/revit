@@ -4,15 +4,25 @@ using System.Runtime.CompilerServices;
 
 namespace SlabRebar.Engine;
 
+public enum RebarKind
+{
+    Slab,
+    Dowel,
+}
+
 public class RebarItem : INotifyPropertyChanged
 {
     public ElementId Id           { get; set; } = ElementId.InvalidElementId;
     public string    HostName     { get; set; } = string.Empty;
-    // "Bottom" | "Top"
+    public string    TypeName     { get; set; } = string.Empty;
+    public RebarKind Kind         { get; set; } = RebarKind.Slab;
+    // "Bottom" | "Top" — empty for Dowel
     public string    Zone         { get; set; } = string.Empty;
-    // "X" | "Y"
+    // "X" | "Y" — empty for Dowel
     public string    Direction    { get; set; } = string.Empty;
     public string    CurrentValue { get; set; } = string.Empty;
+
+    public string KindDisplay => Kind == RebarKind.Dowel ? "Dowel" : "Slab";
 
     private string _proposedLabel = string.Empty;
     public string ProposedLabel

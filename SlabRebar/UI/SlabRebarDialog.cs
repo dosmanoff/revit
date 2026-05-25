@@ -18,13 +18,15 @@ public class SlabRebarDialog : Window
     private List<RebarItem> _items = [];
     private bool _suppressRefresh;
 
-    private TextBlock _txtSelectionInfo = null!;
-    private TextBox   _txtBotX          = null!;
-    private TextBox   _txtBotY          = null!;
-    private TextBox   _txtTopX          = null!;
-    private TextBox   _txtTopY          = null!;
-    private ComboBox  _cmbTargetParam   = null!;
-    private DataGrid  _elementsGrid     = null!;
+    private TextBlock _txtSelectionInfo  = null!;
+    private TextBox   _txtBotX           = null!;
+    private TextBox   _txtBotY           = null!;
+    private TextBox   _txtTopX           = null!;
+    private TextBox   _txtTopY           = null!;
+    private TextBox   _txtDowel          = null!;
+    private ComboBox  _cmbTargetSlab     = null!;
+    private ComboBox  _cmbTargetDowel    = null!;
+    private DataGrid  _elementsGrid      = null!;
 
     public ClassificationConfig   Config       { get; private set; }
     public bool                   NeedReselect { get; private set; }
@@ -37,10 +39,10 @@ public class SlabRebarDialog : Window
         Config = config;
 
         Title                 = "Slab Rebar Classifier";
-        Width                 = 700;
-        Height                = 560;
-        MinWidth              = 580;
-        MinHeight             = 400;
+        Width                 = 760;
+        Height                = 620;
+        MinWidth              = 620;
+        MinHeight             = 440;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         BuildUI();
@@ -103,43 +105,58 @@ public class SlabRebarDialog : Window
 
     private UIElement BuildLabelsRow()
     {
-        _txtBotX = MakeTextBox(72, Config.LabelBottomX);
-        _txtBotY = MakeTextBox(72, Config.LabelBottomY);
-        _txtTopX = MakeTextBox(72, Config.LabelTopX);
-        _txtTopY = MakeTextBox(72, Config.LabelTopY);
+        _txtBotX  = MakeTextBox(78, Config.LabelBottomX);
+        _txtBotY  = MakeTextBox(78, Config.LabelBottomY);
+        _txtTopX  = MakeTextBox(78, Config.LabelTopX);
+        _txtTopY  = MakeTextBox(78, Config.LabelTopY);
+        _txtDowel = MakeTextBox(78, Config.LabelDowel);
 
-        _txtBotX.TextChanged += Labels_Changed;
-        _txtBotY.TextChanged += Labels_Changed;
-        _txtTopX.TextChanged += Labels_Changed;
-        _txtTopY.TextChanged += Labels_Changed;
+        _txtBotX.TextChanged  += Labels_Changed;
+        _txtBotY.TextChanged  += Labels_Changed;
+        _txtTopX.TextChanged  += Labels_Changed;
+        _txtTopY.TextChanged  += Labels_Changed;
+        _txtDowel.TextChanged += Labels_Changed;
 
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(MakeBoldLabel("Bottom:"));
-        row.Children.Add(MakeLabel("X"));  row.Children.Add(_txtBotX);
-        row.Children.Add(MakeLabel("Y"));  row.Children.Add(_txtBotY);
-        row.Children.Add(new Border { Width = 20 });
+        row.Children.Add(MakeLabel("X")); row.Children.Add(_txtBotX);
+        row.Children.Add(MakeLabel("Y")); row.Children.Add(_txtBotY);
+        row.Children.Add(new Border { Width = 16 });
         row.Children.Add(MakeBoldLabel("Top:"));
-        row.Children.Add(MakeLabel("X"));  row.Children.Add(_txtTopX);
-        row.Children.Add(MakeLabel("Y"));  row.Children.Add(_txtTopY);
+        row.Children.Add(MakeLabel("X")); row.Children.Add(_txtTopX);
+        row.Children.Add(MakeLabel("Y")); row.Children.Add(_txtTopY);
+        row.Children.Add(new Border { Width = 16 });
+        row.Children.Add(MakeBoldLabel("Dowel:"));
+        row.Children.Add(_txtDowel);
 
-        return MakeGroupBox("Zone Labels  (value written to parameter)", row);
+        return MakeGroupBox("Labels  (value written to parameter)", row);
     }
 
     private UIElement BuildParameterRow()
     {
-        _cmbTargetParam = new ComboBox
-        {
-            Width             = 220,
-            IsEditable        = true,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+        _cmbTargetSlab  = MakeParamCombo(Config.TargetParameterSlab);
+        _cmbTargetDowel = MakeParamCombo(Config.TargetParameterDowel);
+        _cmbTargetSlab.LostFocus  += Param_Changed;
+        _cmbTargetDowel.LostFocus += Param_Changed;
 
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(MakeLabel("Write to:"));
-        row.Children.Add(_cmbTargetParam);
+        row.Children.Add(MakeBoldLabel("Slab parameter:"));
+        row.Children.Add(_cmbTargetSlab);
+        row.Children.Add(new Border { Width = 16 });
+        row.Children.Add(MakeBoldLabel("Dowel parameter:"));
+        row.Children.Add(_cmbTargetDowel);
 
-        return MakeGroupBox("Target Parameter", row);
+        return MakeGroupBox("Target Parameters", row);
     }
+
+    private static ComboBox MakeParamCombo(string text) => new()
+    {
+        Width             = 200,
+        IsEditable        = true,
+        VerticalAlignment = VerticalAlignment.Center,
+        Text              = text,
+        Margin            = new Thickness(4, 0, 0, 0),
+    };
 
     private UIElement BuildElementsGrid()
     {
@@ -180,7 +197,9 @@ public class SlabRebarDialog : Window
         });
 
         _elementsGrid.Columns.Add(TextCol("Host",          nameof(RebarItem.HostName),     140));
-        _elementsGrid.Columns.Add(TextCol("Zone",          nameof(RebarItem.Zone),          70));
+        _elementsGrid.Columns.Add(TextCol("Type",          nameof(RebarItem.TypeName),      80));
+        _elementsGrid.Columns.Add(TextCol("Kind",          nameof(RebarItem.KindDisplay),   60));
+        _elementsGrid.Columns.Add(TextCol("Zone",          nameof(RebarItem.Zone),          60));
         _elementsGrid.Columns.Add(TextCol("Direction",     nameof(RebarItem.Direction),     70));
         _elementsGrid.Columns.Add(TextCol("Current Value", nameof(RebarItem.CurrentValue), 110));
 
@@ -241,8 +260,10 @@ public class SlabRebarDialog : Window
         _txtSelectionInfo.Text = $"{_ids.Count} rebar element(s) selected";
 
         var writableParams = RebarClassifier.GetWritableStringParams(_doc, _ids);
-        _cmbTargetParam.ItemsSource = writableParams;
-        _cmbTargetParam.Text        = Config.TargetParameter;
+        _cmbTargetSlab.ItemsSource  = writableParams;
+        _cmbTargetDowel.ItemsSource = writableParams;
+        _cmbTargetSlab.Text         = Config.TargetParameterSlab;
+        _cmbTargetDowel.Text        = Config.TargetParameterDowel;
 
         _suppressRefresh = false;
         RebuildItems();
@@ -259,6 +280,9 @@ public class SlabRebarDialog : Window
 
         foreach (RebarItem item in _items)
             item.PropertyChanged += OnItemPropertyChanged;
+
+        ClassificationConfig cfg = CollectConfig();
+        classifier.RefreshCurrentValues(_items, cfg);
 
         _elementsGrid.ItemsSource = null;
         _elementsGrid.ItemsSource = _items;
@@ -278,9 +302,18 @@ public class SlabRebarDialog : Window
         RebarClassifier.RefreshProposedLabels(_items, CollectConfig());
     }
 
+    private void RefreshCurrentValues()
+    {
+        if (_suppressRefresh || _items.Count == 0) return;
+        new RebarClassifier(_doc).RefreshCurrentValues(_items, CollectConfig());
+        _elementsGrid.Items.Refresh();
+    }
+
     // ── Event handlers ───────────────────────────────────────────────────────
 
     private void Labels_Changed(object sender, TextChangedEventArgs e) => RefreshLabels();
+
+    private void Param_Changed(object sender, RoutedEventArgs e) => RefreshCurrentValues();
 
     private void InclusionChanged(object sender, RoutedEventArgs e) => RefreshLabels();
 
@@ -309,11 +342,13 @@ public class SlabRebarDialog : Window
 
     private ClassificationConfig CollectConfig() => new()
     {
-        LabelBottomX    = _txtBotX?.Text  ?? "Bot-X",
-        LabelBottomY    = _txtBotY?.Text  ?? "Bot-Y",
-        LabelTopX       = _txtTopX?.Text  ?? "Top-X",
-        LabelTopY       = _txtTopY?.Text  ?? "Top-Y",
-        TargetParameter = _cmbTargetParam?.Text?.Trim() ?? "Comments",
+        LabelBottomX         = _txtBotX?.Text         ?? "BOTTOM_X",
+        LabelBottomY         = _txtBotY?.Text         ?? "BOTTOM_Y",
+        LabelTopX            = _txtTopX?.Text         ?? "TOP_X",
+        LabelTopY            = _txtTopY?.Text         ?? "TOP_Y",
+        LabelDowel           = _txtDowel?.Text        ?? "DOWEL",
+        TargetParameterSlab  = _cmbTargetSlab?.Text?.Trim()  ?? "T/B SLAB",
+        TargetParameterDowel = _cmbTargetDowel?.Text?.Trim() ?? "Dowel",
     };
 
     private static GroupBox MakeGroupBox(string header, UIElement content) => new()
