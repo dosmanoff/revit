@@ -4,7 +4,7 @@
     <Name>WallReinforcement</Name>
     <Assembly>WallReinforcement.dll</Assembly>
     <FullClassName>WallReinforcement.App</FullClassName>
-    <ClientId>C3D4E5F6-A7B8-9012-CDEF-123456789012</ClientId>
+    <ClientId>234966A6-2160-4CD6-9927-2E3DD2623121</ClientId>
     <VendorId>WallReinforcement</VendorId>
     <VendorDescription>Wall Reinforcement plugin for monolithic walls in Revit 2025</VendorDescription>
   </AddIn>
