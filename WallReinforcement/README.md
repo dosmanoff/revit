@@ -8,38 +8,67 @@ See [`wall-reinforcement-dev-plan.md`](wall-reinforcement-dev-plan.md) for the f
 
 ```powershell
 dotnet build WallReinforcement\WallReinforcement.csproj -c Release
-```
-
-Copy two files into the per-user Revit add-ins folder:
-
-```text
-WallReinforcement.dll   →  %AppData%\Autodesk\Revit\Addins\2025\
-WallReinforcement.addin →  %AppData%\Autodesk\Revit\Addins\2025\
+Copy-Item "WallReinforcement\bin\Release\net8.0-windows\WallReinforcement.*" `
+          -Destination "$env:APPDATA\Autodesk\Revit\Addins\2025\"
 ```
 
 Restart Revit. A new tab **Smart Tools** → panel **Reinforcement** → button **Wall Reinforcement** appears.
 
-## Configure
+The build also copies the `samples/` folder next to the DLL so the in-dialog **New…** picker can find them.
 
-The plugin is driven by JSON files living in a user-chosen folder. The folder path is stored on `ProjectInformation` via ExtensibleStorage, so it travels with the `.rvt`. Configure it the first time you run the tool via **Browse…**.
+## Using the dialog
 
-Two ready-to-use samples ship in [`samples/`](samples/):
+1. **Browse…** picks the folder where your `*.json` configs live (path persisted on the .rvt via ExtensibleStorage).
+2. **Configuration** dropdown lists every `*.json` in that folder.
+3. **New…** copies one of the bundled templates (metric or ACI) into your folder.
+4. **Edit raw** opens the selected file in your default JSON editor (so you can comment, reformat, or use editor tooling).
+5. The tabs **Cover / Face Mesh / Openings / Edges / Ties / Corners / T-Junctions** let you edit every parameter in place. **Save** writes back to the same file; **Save As…** to a new one.
+6. **Units** dropdown switches the interpretation of plain numbers: `Metric` = millimetres, `Imperial` = inches.
+7. **Dry run** previews counts in the summary dialog without committing rebar.
+8. **Run** does the work inside one `TransactionGroup` per execution.
 
-| File | What it does |
+## JSON schema
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "name": "my-wall-config",
+  "units": "Metric",            // or "Imperial"
+  "cover": {
+    "exterior": 30, "interior": 25,
+    "top": 30, "bottom": 30, "ends": 30
+  },
+  ...
+}
+```
+
+Lengths are plain numbers (interpreted per `units`) **or** strings in feet-inches syntax that work regardless of `units`:
+
+```jsonc
+"length":    24,           // 24 mm or 24 in depending on units
+"lapLength": "2'-0\"",     // always 24 inches; ' and " are required
+"length":    "1'-3 1/2\""  // mixed feet and fractional inches
+```
+
+`barType` values are looked up by `Name` against `RebarBarType` in the active document — the matching family must already be loaded.
+
+### Bundled samples ([`samples/`](samples/))
+
+| File | When to use it |
 |---|---|
-| [`samples/minimal.json`](samples/minimal.json) | Only face-mesh on both faces (replicates Phase 1) |
-| [`samples/full.json`](samples/full.json)       | All builders enabled: openings, edges, ties, corners, T-junctions |
-
-All distances are in **millimetres**; `barType` values are looked up by `Name` against `RebarBarType` in the active document — the families must already be loaded. JSON keys are documented inline in [`wall-reinforcement-dev-plan.md`](wall-reinforcement-dev-plan.md#14-configurable-parameters-json-schema-v1).
+| [`samples/metric-minimal-200mm.json`](samples/metric-minimal-200mm.json) | SI face-mesh only, Ø10/Ø12 bars at 200 mm |
+| [`samples/metric-full-300mm.json`](samples/metric-full-300mm.json)       | SI everything-on, 300 mm wall, monolithic defaults |
+| [`samples/aci-minimal-12in.json`](samples/aci-minimal-12in.json)         | ACI 318 face-mesh only, #4 at 12" o.c. |
+| [`samples/aci-full-12in.json`](samples/aci-full-12in.json)               | ACI 318 everything-on, 12" wall, #3/#4/#5 bars, ft-in lap lengths |
 
 ## Smoke-test recipe
 
-1. Open a project that already has the rebar families referenced by the config loaded (or modify the sample to use bar types you do have).
-2. Draw a structural straight wall, ~3 m long, 3 m tall, thickness ≥ 250 mm (so ties fire). Place a door or window if you want to see the opening trim work.
-3. Click **Wall Reinforcement**, pick the wall, **Browse…** to `WallReinforcement/samples/`, pick `full.json`, leave **Dry run** unchecked, hit **Run**.
-4. Expected output: 2 `AreaReinforcement` elements (one per face), opening trim + diagonals, U-bars along three edges, transverse ties on a 400 × 400 grid.
-5. Re-run with the same config → previously-placed bars (tagged `WR:full-300mm-monolithic:<wallId>` in the `Comments` parameter) get deleted before new ones land. Idempotent.
-6. Toggle **Dry run** → totals show in the summary but nothing commits.
+1. Open a project that has the rebar families used in your chosen sample loaded (e.g. `#3 / #4 / #5` ASTM bars for ACI, `Ø10 / Ø12 / Ø14` for SI). If not, edit the `barType` fields in the dialog to match the names you do have.
+2. Draw a straight structural wall, ~3 m / 10 ft long, ≥ 250 mm / 10" thick (so ties fire). Place a door or window if you want to see opening trim.
+3. Click **Wall Reinforcement** → pick the wall → **Browse…** to your config folder → **New…** to copy `aci-full-12in.json` (or `metric-full-300mm.json`) → edit if needed → **Save** → **Run**.
+4. Expected output: 2 `AreaReinforcement` elements (one per face), opening trim + diagonals, U-bars along three edges, transverse ties on a grid.
+5. Re-run with the same config → previously-placed bars (tagged `WR:{configName}:{wallId}` in the `Comments` parameter) get deleted before new ones land. Idempotent.
+6. Toggle **Dry run** → counts shown in summary, nothing committed.
 
 ## Adding new builders
 
@@ -55,4 +84,6 @@ public class XxxBuilder
 }
 ```
 
-Shared helpers (`LookupBarType`, `EvenlySpaced`, `Create`) live in [`Engine/RebarFactory.cs`](Engine/RebarFactory.cs). Use them. Wire your new builder into [`Engine/WallReinforcer.cs`](Engine/WallReinforcer.cs) and tag every placed rebar with the supplied `tag` so re-runs clean up correctly.
+- Lengths come out of the config via `cfg.Ft(length)` which respects `cfg.Units`.
+- Shared helpers (`LookupBarType`, `EvenlySpaced`, `Create`) live in [`Engine/RebarFactory.cs`](Engine/RebarFactory.cs).
+- Wire your new builder into [`Engine/WallReinforcer.cs`](Engine/WallReinforcer.cs) and tag every placed rebar with the supplied `tag` so re-runs clean up correctly.

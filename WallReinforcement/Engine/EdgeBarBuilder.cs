@@ -18,7 +18,7 @@ namespace WallReinforcement.Engine;
 ///         │  │  leg                 │  │  leg
 ///         │  ▼ (legLength)          │  ▼ (legLength)
 ///
-/// Bars are spaced along the edge by <see cref="EdgeConfig.SpacingMm"/>, leaving the
+/// Bars are spaced along the edge by <see cref="EdgeConfig.Spacing"/>, leaving the
 /// end-cover at each end of the edge.
 /// </summary>
 public class EdgeBarBuilder
@@ -39,25 +39,23 @@ public class EdgeBarBuilder
     private int BuildTopOrBottom(WallAxes axes, ReinforcementConfig cfg, EdgeConfig edge, bool isTop, string tag)
     {
         if (!edge.Enabled) return 0;
-
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double endsCover = UnitConv.MmToFt(cfg.Cover.EndsMm);
-        double spacing   = UnitConv.MmToFt(edge.SpacingMm);
-        double legLen    = UnitConv.MmToFt(edge.LegLengthMm);
-        double extOffset =  axes.HalfThickness - UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intOffset = -axes.HalfThickness + UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double endsCover = cfg.Ft(cfg.Cover.Ends);
+        double spacing   = cfg.Ft(edge.Spacing);
+        double legLen    = cfg.Ft(edge.LegLength);
+        double extOffset =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
+        double intOffset = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
         double crossV = isTop
-            ? axes.Height - UnitConv.MmToFt(cfg.Cover.TopMm)
-            : UnitConv.MmToFt(cfg.Cover.BottomMm);
+            ? axes.Height - cfg.Ft(cfg.Cover.Top)
+            : cfg.Ft(cfg.Cover.Bottom);
         double legV = isTop ? crossV - legLen : crossV + legLen;
 
         int count = 0;
         foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, spacing))
         {
-            // 3-segment U in a plane perpendicular to LengthDir.
             XYZ p1 = axes.At(u, legV,   extOffset);
             XYZ p2 = axes.At(u, crossV, extOffset);
             XYZ p3 = axes.At(u, crossV, intOffset);
@@ -72,17 +70,16 @@ public class EdgeBarBuilder
     private int BuildEnds(WallAxes axes, ReinforcementConfig cfg, EdgeConfig edge, string tag)
     {
         if (!edge.Enabled) return 0;
-
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double topCover    = UnitConv.MmToFt(cfg.Cover.TopMm);
-        double bottomCover = UnitConv.MmToFt(cfg.Cover.BottomMm);
-        double endsCover   = UnitConv.MmToFt(cfg.Cover.EndsMm);
-        double spacing     = UnitConv.MmToFt(edge.SpacingMm);
-        double legLen      = UnitConv.MmToFt(edge.LegLengthMm);
-        double extOffset   =  axes.HalfThickness - UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intOffset   = -axes.HalfThickness + UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double topCover    = cfg.Ft(cfg.Cover.Top);
+        double bottomCover = cfg.Ft(cfg.Cover.Bottom);
+        double endsCover   = cfg.Ft(cfg.Cover.Ends);
+        double spacing     = cfg.Ft(edge.Spacing);
+        double legLen      = cfg.Ft(edge.LegLength);
+        double extOffset   =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
+        double intOffset   = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
         int count = 0;
         foreach (var (uEdge, legSign) in new[] { (endsCover, +1.0), (axes.Length - endsCover, -1.0) })
@@ -91,7 +88,6 @@ public class EdgeBarBuilder
 
             foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, spacing))
             {
-                // U in a horizontal plane perpendicular to HeightDir.
                 XYZ p1 = axes.At(uLeg,  v, extOffset);
                 XYZ p2 = axes.At(uEdge, v, extOffset);
                 XYZ p3 = axes.At(uEdge, v, intOffset);

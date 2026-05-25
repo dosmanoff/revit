@@ -36,8 +36,9 @@ Naming: created elements get a `Comments` tag like `WR:{ConfigName}:{WallId}` so
 
 ```jsonc
 {
-  "name": "default-200mm-wall",
   "schemaVersion": 1,
+  "name": "default-wall",
+  "units": "Metric",          // or "Imperial"
   "cover": {
     "exterior": 30, "interior": 25,
     "top": 30, "bottom": 30, "ends": 30
@@ -50,28 +51,30 @@ Naming: created elements get a `Comments` tag like `WR:{ConfigName}:{WallId}` so
     "interior":   { /* same shape */ }
   },
   "openings": {
-    "enabled":     true,
-    "barType":     "Ø12",
-    "extensionMm": 500,
-    "minWidthMm":  300,
-    "diagonals":   { "enabled": true, "barType": "Ø12", "lengthMm": 700, "angleDeg": 45 }
+    "enabled":   true,
+    "barType":   "Ø12",
+    "extension": 500,
+    "minWidth":  300,
+    "diagonals": { "enabled": true, "barType": "Ø12", "length": 700, "angleDeg": 45 }
   },
   "edges": {
-    "top":    { "enabled": true, "barType": "Ø10", "legLengthMm": 250, "spacingMm": 200 },
-    "bottom": { "enabled": true, "barType": "Ø10", "legLengthMm": 250, "spacingMm": 200 },
-    "ends":   { "enabled": true, "barType": "Ø10", "legLengthMm": 250, "spacingMm": 200 }
+    "top":    { "enabled": true, "barType": "Ø10", "legLength": 250, "spacing": 200 },
+    "bottom": { "enabled": true, "barType": "Ø10", "legLength": 250, "spacing": 200 },
+    "ends":   { "enabled": true, "barType": "Ø10", "legLength": 250, "spacing": 200 }
   },
   "ties": {
     "enabled": false, "barType": "Ø8",
-    "spacingXMm": 400, "spacingYMm": 400,
-    "minThicknessMm": 250
+    "spacingX": 400, "spacingY": 400,
+    "minThickness": 250
   },
-  "corners":    { "enabled": false, "barType": "Ø12", "lapLengthMm": 400, "spacingMm": 200 },
-  "tJunctions": { "enabled": false, "barType": "Ø12", "lapLengthMm": 400, "spacingMm": 200 }
+  "corners":    { "enabled": false, "barType": "Ø12", "lapLength": 400, "spacing": 200 },
+  "tJunctions": { "enabled": false, "barType": "Ø12", "lapLength": 400, "spacing": 200 }
 }
 ```
 
-All length values are stored in **millimetres** in JSON and converted to internal feet at the API boundary (`UnitUtils.ConvertToInternalUnits`). Bar-type names are looked up by `Name` against `RebarBarType` in the active document. Authoritative examples live in [`samples/`](samples/).
+**Units** field controls how plain numeric lengths are interpreted: `Metric` → millimetres, `Imperial` → inches. **Strings** like `"1'-3\""`, `"2'-0\""`, `"3 1/2\""` are always parsed as feet-inches regardless of `units`, so you can mix freely (typical ACI workflow: cover/spacing as plain inches, lap lengths as ft-in).
+
+Bar-type names are looked up by `Name` against `RebarBarType` in the active document. Authoritative examples — both SI and ACI — live in [`samples/`](samples/).
 
 ### 1.5 Idempotency / re-runs
 - Before placing new rebar, the engine deletes existing rebar whose `Comments` parameter starts with `WR:{ConfigName}:{WallId}`. This makes re-running the config on the same wall safe and predictable.
@@ -83,11 +86,12 @@ All length values are stored in **millimetres** in JSON and converted to interna
 
 ### 1.7 UI
 - Single ribbon button on tab **Smart Tools** (shared with AutoNumbering), panel **Reinforcement**.
-- WPF dialog (code-only, no XAML — same constraint as AutoNumbering for Linux-CI compilation):
-  - Source selection: *Selected walls* / *Active view* / *Entire project*.
-  - Config picker: dropdown populated from the configured folder + "Browse…" + "Edit JSON".
-  - Mode toggle: *Dry run* / *Apply*.
-  - Run button → progress bar → results summary.
+- Code-only WPF dialog (no XAML — Linux-CI build constraint, same as AutoNumbering):
+  - Folder picker (Browse…) persists choice on the .rvt via ExtensibleStorage.
+  - Config dropdown + buttons: **New…** (copies a bundled sample into the folder), **Edit raw** (opens in OS default JSON editor), **Save**, **Save As…**.
+  - **Units** dropdown (Metric / Imperial) shown at top.
+  - `TabControl` with one tab per section (Cover / Face Mesh / Openings / Edges / Ties / Corners / T-Junctions) — every parameter is an editable field. Length inputs accept plain numbers or feet-inches strings.
+  - **Dry run** + **Run** at the bottom.
 
 ---
 

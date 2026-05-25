@@ -8,7 +8,7 @@ namespace WallReinforcement.Engine;
 /// <summary>
 /// L-shaped continuity bars at wall-to-wall L-corners.
 ///
-/// One L-bar per face per height step: two legs of length <see cref="CornersConfig.LapLengthMm"/>,
+/// One L-bar per face per height step: two legs of length <see cref="CornersConfig.LapLength"/>,
 /// one along our wall going away from the joint, one along the other wall going away from the joint.
 /// Both legs are inset by the appropriate face cover.
 ///
@@ -27,12 +27,12 @@ public class CornerBarBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, cfg.Corners.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double lap         = UnitConv.MmToFt(cfg.Corners.LapLengthMm);
-        double spacing     = UnitConv.MmToFt(cfg.Corners.SpacingMm);
-        double topCover    = UnitConv.MmToFt(cfg.Cover.TopMm);
-        double bottomCover = UnitConv.MmToFt(cfg.Cover.BottomMm);
-        double extCover    = UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intCover    = UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double lap         = cfg.Ft(cfg.Corners.LapLength);
+        double spacing     = cfg.Ft(cfg.Corners.Spacing);
+        double topCover    = cfg.Ft(cfg.Cover.Top);
+        double bottomCover = cfg.Ft(cfg.Cover.Bottom);
+        double extCover    = cfg.Ft(cfg.Cover.Exterior);
+        double intCover    = cfg.Ft(cfg.Cover.Interior);
 
         int count = 0;
         foreach (WallJunction j in junctions)

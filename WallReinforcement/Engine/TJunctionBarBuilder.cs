@@ -9,7 +9,7 @@ namespace WallReinforcement.Engine;
 /// L-shaped lap bars at T-junctions where OUR wall is the stem terminating on the through wall.
 ///
 /// One L-bar per face per height step: one leg along our wall going away from the joint
-/// (length <see cref="TJunctionsConfig.LapLengthMm"/>), one leg along the through wall.
+/// (length <see cref="TJunctionsConfig.LapLength"/>), one leg along the through wall.
 /// Through-wall direction alternates with the height step to approximate the typical "fan" pattern
 /// rather than piling all laps on one side.
 /// </summary>
@@ -25,12 +25,12 @@ public class TJunctionBarBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, cfg.TJunctions.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double lap         = UnitConv.MmToFt(cfg.TJunctions.LapLengthMm);
-        double spacing     = UnitConv.MmToFt(cfg.TJunctions.SpacingMm);
-        double topCover    = UnitConv.MmToFt(cfg.Cover.TopMm);
-        double bottomCover = UnitConv.MmToFt(cfg.Cover.BottomMm);
-        double extCover    = UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intCover    = UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double lap         = cfg.Ft(cfg.TJunctions.LapLength);
+        double spacing     = cfg.Ft(cfg.TJunctions.Spacing);
+        double topCover    = cfg.Ft(cfg.Cover.Top);
+        double bottomCover = cfg.Ft(cfg.Cover.Bottom);
+        double extCover    = cfg.Ft(cfg.Cover.Exterior);
+        double intCover    = cfg.Ft(cfg.Cover.Interior);
 
         int count = 0;
         int heightStep = 0;

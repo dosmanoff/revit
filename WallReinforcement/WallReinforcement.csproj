@@ -21,6 +21,10 @@
 
   <ItemGroup>
     <None Include="WallReinforcement.addin" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Ship sample configs alongside the DLL so the in-dialog "New…" picker finds them. -->
+    <None Include="samples\*.json" CopyToOutputDirectory="PreserveNewest">
+      <Link>samples\%(Filename)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -38,7 +38,7 @@ public class FaceMeshBuilder
         if (_doc.GetElement(faceRef).GetGeometryObjectFromReference(faceRef) is not Face geomFace)
             return 0;
 
-        IList<Curve> boundary = BuildInsetBoundary(wall, geomFace, cfg.Cover, side);
+        IList<Curve> boundary = BuildInsetBoundary(wall, geomFace, cfg, side);
         if (boundary.Count < 3) return 0;
 
         ElementId barTypeId   = RebarFactory.LookupBarType(_doc, face.Vertical.BarType);
@@ -54,7 +54,7 @@ public class FaceMeshBuilder
         AreaReinforcement areaReinf = AreaReinforcement.Create(
             _doc, wall, boundary, majorDir, areaTypeId, barTypeId, hookTypeId);
 
-        ApplyLayoutAndSpacing(areaReinf, face);
+        ApplyLayoutAndSpacing(areaReinf, face, cfg);
         ExistingRebarCleaner.Tag(areaReinf, tag);
 
         return 1;
@@ -65,12 +65,12 @@ public class FaceMeshBuilder
     /// by the cover values appropriate to <paramref name="side"/>.
     /// Phase-1 simplification: uses the face bounding rectangle in face UV space.
     /// </summary>
-    private static IList<Curve> BuildInsetBoundary(Wall wall, Face face, CoverConfig cover, ShellLayerType side)
+    private static IList<Curve> BuildInsetBoundary(Wall wall, Face face, ReinforcementConfig cfg, ShellLayerType side)
     {
         BoundingBoxUV bbUv = face.GetBoundingBox();
-        double coverHoriz = UnitConv.MmToFt(cover.EndsMm);
-        double coverBottom = UnitConv.MmToFt(cover.BottomMm);
-        double coverTop    = UnitConv.MmToFt(cover.TopMm);
+        double coverHoriz  = cfg.Ft(cfg.Cover.Ends);
+        double coverBottom = cfg.Ft(cfg.Cover.Bottom);
+        double coverTop    = cfg.Ft(cfg.Cover.Top);
 
         double uMin = bbUv.Min.U + coverHoriz;
         double uMax = bbUv.Max.U - coverHoriz;
@@ -103,7 +103,7 @@ public class FaceMeshBuilder
     ///   DIR_1 = bars along the AreaReinforcement's major direction (passed at Create — vertical here)
     ///   DIR_2 = bars perpendicular to DIR_1 (horizontal here)
     /// </summary>
-    private void ApplyLayoutAndSpacing(AreaReinforcement areaReinf, FaceConfig face)
+    private void ApplyLayoutAndSpacing(AreaReinforcement areaReinf, FaceConfig face, ReinforcementConfig cfg)
     {
         TrySetInt(areaReinf, BuiltInParameter.REBAR_SYSTEM_LAYOUT_RULE, (int)RebarLayoutRule.MaximumSpacing);
 
@@ -112,10 +112,8 @@ public class FaceMeshBuilder
         TrySetInt(areaReinf, BuiltInParameter.REBAR_SYSTEM_ACTIVE_BACK_DIR_1,  0);
         TrySetInt(areaReinf, BuiltInParameter.REBAR_SYSTEM_ACTIVE_BACK_DIR_2,  0);
 
-        TrySetDouble(areaReinf, BuiltInParameter.REBAR_SYSTEM_SPACING_FRONT_DIR_1,
-            UnitConv.MmToFt(face.Vertical.SpacingMm));
-        TrySetDouble(areaReinf, BuiltInParameter.REBAR_SYSTEM_SPACING_FRONT_DIR_2,
-            UnitConv.MmToFt(face.Horizontal.SpacingMm));
+        TrySetDouble(areaReinf, BuiltInParameter.REBAR_SYSTEM_SPACING_FRONT_DIR_1, cfg.Ft(face.Vertical.Spacing));
+        TrySetDouble(areaReinf, BuiltInParameter.REBAR_SYSTEM_SPACING_FRONT_DIR_2, cfg.Ft(face.Horizontal.Spacing));
 
         ElementId vertBar  = RebarFactory.LookupBarType(_doc, face.Vertical.BarType);
         ElementId horizBar = RebarFactory.LookupBarType(_doc, face.Horizontal.BarType);

@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
-  "name": "minimal-200mm-mesh",
+  "name": "metric-minimal-200mm",
+  "units": "Metric",
   "cover": {
     "exterior": 30,
     "interior": 25,

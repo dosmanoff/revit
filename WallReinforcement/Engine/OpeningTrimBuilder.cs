@@ -26,7 +26,7 @@ public class OpeningTrimBuilder
         OpeningsConfig op = cfg.Openings;
         if (!op.Enabled) return 0;
 
-        double minWidthFt = UnitConv.MmToFt(op.MinWidthMm);
+        double minWidthFt = cfg.Ft(op.MinWidth);
 
         ElementId trimBarTypeId = RebarFactory.LookupBarType(_doc, op.BarType);
         if (trimBarTypeId == ElementId.InvalidElementId) return 0;
@@ -54,12 +54,12 @@ public class OpeningTrimBuilder
     private int PlaceTrimsForOpening(WallAxes axes, OpeningRect rect, ReinforcementConfig cfg,
                                      ElementId barTypeId, string tag)
     {
-        double ext = UnitConv.MmToFt(cfg.Openings.ExtensionMm);
+        double ext = cfg.Ft(cfg.Openings.Extension);
         int n = 0;
 
         // Each face gets its own set of trims, offset from the wall centerplane.
-        double extOffset =  axes.HalfThickness - UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intOffset = -axes.HalfThickness + UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double extOffset =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
+        double intOffset = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
         foreach (double offset in new[] { extOffset, intOffset })
         {
@@ -86,14 +86,14 @@ public class OpeningTrimBuilder
     private int PlaceDiagonalsForOpening(WallAxes axes, OpeningRect rect, ReinforcementConfig cfg,
                                          ElementId barTypeId, string tag)
     {
-        double len = UnitConv.MmToFt(cfg.Openings.Diagonals.LengthMm);
+        double len = cfg.Ft(cfg.Openings.Diagonals.Length);
         double angRad = cfg.Openings.Diagonals.AngleDeg * Math.PI / 180.0;
         double du = len * Math.Cos(angRad);
         double dv = len * Math.Sin(angRad);
         int n = 0;
 
-        double extOffset =  axes.HalfThickness - UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intOffset = -axes.HalfThickness + UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double extOffset =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
+        double intOffset = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
         // Four corners: each diagonal points outward away from the opening.
         (double u, double v, double su, double sv)[] corners =
