@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "name": "full-300mm-monolithic",
+  "cover": {
+    "exterior": 35,
+    "interior": 25,
+    "top":      40,
+    "bottom":   40,
+    "ends":     40
+  },
+  "faceMesh": {
+    "exterior": {
+      "vertical":   { "barType": "Ø14", "spacing": 150 },
+      "horizontal": { "barType": "Ø12", "spacing": 200 }
+    },
+    "interior": {
+      "vertical":   { "barType": "Ø12", "spacing": 200 },
+      "horizontal": { "barType": "Ø10", "spacing": 200 }
+    }
+  },
+  "openings": {
+    "enabled":     true,
+    "barType":     "Ø14",
+    "extensionMm": 600,
+    "minWidthMm":  300,
+    "diagonals": {
+      "enabled":  true,
+      "barType":  "Ø12",
+      "lengthMm": 700,
+      "angleDeg": 45
+    }
+  },
+  "edges": {
+    "top":    { "enabled": true, "barType": "Ø10", "legLengthMm": 300, "spacingMm": 200 },
+    "bottom": { "enabled": true, "barType": "Ø10", "legLengthMm": 300, "spacingMm": 200 },
+    "ends":   { "enabled": true, "barType": "Ø10", "legLengthMm": 300, "spacingMm": 200 }
+  },
+  "ties": {
+    "enabled":        true,
+    "barType":        "Ø8",
+    "spacingXMm":     400,
+    "spacingYMm":     400,
+    "minThicknessMm": 250
+  },
+  "corners": {
+    "enabled":     true,
+    "barType":     "Ø12",
+    "lapLengthMm": 500,
+    "spacingMm":   200
+  },
+  "tJunctions": {
+    "enabled":     true,
+    "barType":     "Ø12",
+    "lapLengthMm": 500,
+    "spacingMm":   200
+  }
+}

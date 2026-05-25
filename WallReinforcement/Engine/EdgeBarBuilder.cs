@@ -40,7 +40,7 @@ public class EdgeBarBuilder
     {
         if (!edge.Enabled) return 0;
 
-        ElementId barTypeId = LookupBarType(edge.BarType);
+        ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
         double endsCover = UnitConv.MmToFt(cfg.Cover.EndsMm);
@@ -55,7 +55,7 @@ public class EdgeBarBuilder
         double legV = isTop ? crossV - legLen : crossV + legLen;
 
         int count = 0;
-        foreach (double u in EvenlySpaced(endsCover, axes.Length - endsCover, spacing))
+        foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, spacing))
         {
             // 3-segment U in a plane perpendicular to LengthDir.
             XYZ p1 = axes.At(u, legV,   extOffset);
@@ -73,7 +73,7 @@ public class EdgeBarBuilder
     {
         if (!edge.Enabled) return 0;
 
-        ElementId barTypeId = LookupBarType(edge.BarType);
+        ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
         double topCover    = UnitConv.MmToFt(cfg.Cover.TopMm);
@@ -89,7 +89,7 @@ public class EdgeBarBuilder
         {
             double uLeg = uEdge + legSign * legLen;
 
-            foreach (double v in EvenlySpaced(bottomCover, axes.Height - topCover, spacing))
+            foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, spacing))
             {
                 // U in a horizontal plane perpendicular to HeightDir.
                 XYZ p1 = axes.At(uLeg,  v, extOffset);
@@ -104,19 +104,6 @@ public class EdgeBarBuilder
         return count;
     }
 
-    /// <summary>Yield positions between <paramref name="from"/> and <paramref name="to"/> with at most <paramref name="step"/> apart.</summary>
-    private static IEnumerable<double> EvenlySpaced(double from, double to, double step)
-    {
-        if (to <= from || step <= 0) yield break;
-
-        double span = to - from;
-        int n = Math.Max(1, (int)Math.Ceiling(span / step));
-        double actualStep = span / n;
-
-        for (int i = 0; i <= n; i++)
-            yield return from + i * actualStep;
-    }
-
     private int PlaceU(WallAxes axes, ElementId barTypeId, string tag, XYZ normal,
                        XYZ p1, XYZ p2, XYZ p3, XYZ p4)
     {
@@ -126,30 +113,7 @@ public class EdgeBarBuilder
             Line.CreateBound(p2, p3),
             Line.CreateBound(p3, p4),
         };
-
-        Rebar rebar = Rebar.CreateFromCurves(
-            _doc,
-            RebarStyle.Standard,
-            (RebarBarType)_doc.GetElement(barTypeId),
-            startHook:        null,
-            endHook:          null,
-            host:             axes.Wall,
-            norm:             normal,
-            curves:           curves,
-            startHookOrient:  RebarHookOrientation.Right,
-            endHookOrient:    RebarHookOrientation.Right,
-            useExistingShapeIfPossible: true,
-            createNewShape:   true);
-
-        ExistingRebarCleaner.Tag(rebar, tag);
+        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall, normal, curves, tag);
         return 1;
-    }
-
-    private ElementId LookupBarType(string name)
-    {
-        var hit = new FilteredElementCollector(_doc)
-            .OfClass(typeof(RebarBarType))
-            .FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-        return hit?.Id ?? ElementId.InvalidElementId;
     }
 }

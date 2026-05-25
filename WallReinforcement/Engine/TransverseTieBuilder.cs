@@ -9,10 +9,10 @@ namespace WallReinforcement.Engine;
 /// Places transverse ties (stirrups across the wall thickness) at a grid spacing.
 /// Skipped for walls thinner than <see cref="TiesConfig.MinThicknessMm"/>.
 ///
-/// A tie is a closed rectangular loop in the section plane (perpendicular to the wall length):
-/// width = wallThickness - cover_ext - cover_int, height = a small constant (the loop height
-/// barely matters — Revit treats it as a stirrup with one segment per side).
-/// For monolithic walls a simple U-shape ("open tie") is usually enough; we use that here.
+/// A tie is a single straight bar in the section plane (perpendicular to the wall length)
+/// running from the exterior-face cover line to the interior-face cover line. For monolithic
+/// walls a simple "open tie" is the common detail and what we emit here; closed loops belong
+/// to Phase 5 if the bend geometry is needed.
 /// </summary>
 public class TransverseTieBuilder
 {
@@ -26,65 +26,29 @@ public class TransverseTieBuilder
         if (!ties.Enabled) return 0;
         if (axes.Thickness < UnitConv.MmToFt(ties.MinThicknessMm)) return 0;
 
-        ElementId barTypeId = LookupBarType(ties.BarType);
+        ElementId barTypeId = RebarFactory.LookupBarType(_doc, ties.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
         double endsCover   = UnitConv.MmToFt(cfg.Cover.EndsMm);
         double topCover    = UnitConv.MmToFt(cfg.Cover.TopMm);
         double bottomCover = UnitConv.MmToFt(cfg.Cover.BottomMm);
-        double extCover    = UnitConv.MmToFt(cfg.Cover.ExteriorMm);
-        double intCover    = UnitConv.MmToFt(cfg.Cover.InteriorMm);
+        double extOffset   =  axes.HalfThickness - UnitConv.MmToFt(cfg.Cover.ExteriorMm);
+        double intOffset   = -axes.HalfThickness + UnitConv.MmToFt(cfg.Cover.InteriorMm);
         double sx          = UnitConv.MmToFt(ties.SpacingXMm);
         double sy          = UnitConv.MmToFt(ties.SpacingYMm);
 
-        double extOffset =  axes.HalfThickness - extCover;
-        double intOffset = -axes.HalfThickness + intCover;
-
         int count = 0;
-        foreach (double u in EvenlySpaced(endsCover, axes.Length - endsCover, sx))
-        foreach (double v in EvenlySpaced(bottomCover, axes.Height - topCover, sy))
+        foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, sx))
+        foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, sy))
         {
-            // Two points across the wall thickness at (u, v); a single straight tie connecting them.
             XYZ pExt = axes.At(u, v, extOffset);
             XYZ pInt = axes.At(u, v, intOffset);
 
-            var curves = new List<Curve> { Line.CreateBound(pExt, pInt) };
-
-            Rebar rebar = Rebar.CreateFromCurves(
-                _doc,
-                RebarStyle.StirrupTie,
-                (RebarBarType)_doc.GetElement(barTypeId),
-                startHook:        null,
-                endHook:          null,
-                host:             axes.Wall,
-                norm:             axes.LengthDir,
-                curves:           curves,
-                startHookOrient:  RebarHookOrientation.Right,
-                endHookOrient:    RebarHookOrientation.Right,
-                useExistingShapeIfPossible: true,
-                createNewShape:   true);
-
-            ExistingRebarCleaner.Tag(rebar, tag);
+            RebarFactory.Create(_doc, RebarStyle.StirrupTie, barTypeId, axes.Wall,
+                                axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) }, tag);
             count++;
         }
 
         return count;
-    }
-
-    private static IEnumerable<double> EvenlySpaced(double from, double to, double step)
-    {
-        if (to <= from || step <= 0) yield break;
-        double span = to - from;
-        int n = Math.Max(1, (int)Math.Ceiling(span / step));
-        double actualStep = span / n;
-        for (int i = 0; i <= n; i++) yield return from + i * actualStep;
-    }
-
-    private ElementId LookupBarType(string name)
-    {
-        var hit = new FilteredElementCollector(_doc)
-            .OfClass(typeof(RebarBarType))
-            .FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-        return hit?.Id ?? ElementId.InvalidElementId;
     }
 }
