@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>WallReinforcement</AssemblyName>
+    <RootNamespace>WallReinforcement</RootNamespace>
+    <Platforms>x64</Platforms>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference-only packages: Revit ships the real DLLs at runtime -->
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI"   Version="2025.4.0" ExcludeAssets="runtime"/>
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="2025.4.0" ExcludeAssets="runtime"/>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="WallReinforcement.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

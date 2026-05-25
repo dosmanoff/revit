@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>WallReinforcement</Name>
+    <Assembly>WallReinforcement.dll</Assembly>
+    <FullClassName>WallReinforcement.App</FullClassName>
+    <ClientId>C3D4E5F6-A7B8-9012-CDEF-123456789012</ClientId>
+    <VendorId>WallReinforcement</VendorId>
+    <VendorDescription>Wall Reinforcement plugin for monolithic walls in Revit 2025</VendorDescription>
+  </AddIn>
+</RevitAddIns>
