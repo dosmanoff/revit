@@ -42,7 +42,10 @@ public class UpperSpliceBuilder
         if (!u.Enabled) return new Result(0, null);
 
         if (u.Form == UpperSpliceForm.Bent && slabAbove is null)
-            return new Result(0, "Bent upper splice requires a slab above the column; none found.");
+            return new Result(0,
+                "Bent upper splice requires a Floor above the column; none found. " +
+                "Either model the slab above as an OST_Floors element, switch the splice form to Straight " +
+                "(with ignoreSlabAbove=true), or use Cranked if the upper element is a smaller column.");
 
         RebarBarType barType = RebarFactory.GetBarType(_doc, u.BarType);
         RebarHookType? hookTop    = RebarFactory.GetHookType(_doc, u.HookTopType);
