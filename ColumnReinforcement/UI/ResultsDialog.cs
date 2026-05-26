@@ -19,17 +19,33 @@ public static class ResultsDialog
         sb.AppendLine($"Bars created:  {result.TotalCreated}");
         sb.AppendLine($"Bars replaced: {result.TotalReplaced}");
 
-        var problems = result.Outcomes
-            .Where(o => o.Status != ColumnStatus.Success && !string.IsNullOrEmpty(o.Reason))
+        // Show notes for every column that has a Reason, regardless of overall status.
+        // A column can succeed overall (longitudinals + ties placed) while some
+        // sub-step (dowels, splices) was skipped for a reportable reason — without
+        // surfacing those reasons here, the user has no way to see why they didn't
+        // get the bars they enabled in the config.
+        var notes = result.Outcomes
+            .Where(o => !string.IsNullOrEmpty(o.Reason))
             .Take(10)
             .ToList();
 
-        if (problems.Count > 0)
+        if (notes.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("Issues (first 10):");
-            foreach (var p in problems)
-                sb.AppendLine($"  · Column {p.ColumnId.Value}: {p.Reason}");
+            sb.AppendLine(notes.Count == result.Failed
+                ? "Issues (first 10):"
+                : "Notes (first 10):");
+            foreach (var n in notes)
+            {
+                string prefix = n.Status switch
+                {
+                    ColumnStatus.Success => "ⓘ",
+                    ColumnStatus.Skipped => "—",
+                    ColumnStatus.Failed  => "✗",
+                    _ => "·",
+                };
+                sb.AppendLine($"  {prefix} Column {n.ColumnId.Value}: {n.Reason}");
+            }
         }
 
         var td = new TaskDialog("Column Reinforcement")

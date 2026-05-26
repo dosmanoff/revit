@@ -39,7 +39,17 @@ public class FoundationDowelBuilder
     {
         DowelsConfig d = cfg.Dowels;
         if (!d.Enabled) return new Result(0, null);
-        if (slabBelow is null) return new Result(0, "Dowels enabled but no slab found below the column.");
+        if (slabBelow is null)
+        {
+            string searched = d.OnlyStructuralFoundation
+                ? "Structural Foundation"
+                : "Structural Foundation or Floor";
+            return new Result(0,
+                $"Dowels enabled but no {searched} found directly below the column. " +
+                (d.OnlyStructuralFoundation
+                    ? "Either re-categorise the foundation, or set dowels.onlyStructuralFoundation=false to also search Floors."
+                    : "Check that the slab's plan extent includes the column centreline."));
+        }
 
         BoundingBoxXYZ slabBb = slabBelow.get_BoundingBox(null)
             ?? throw new InvalidOperationException(
