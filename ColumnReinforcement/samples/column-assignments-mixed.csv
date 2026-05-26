@@ -1,0 +1,10 @@
+# Mixed schedule — rectangular + round columns. Includes a deliberate size mismatch
+# row (C1.X) to exercise the dialog's validation warnings; the engine still uses
+# the real Revit geometry, the mismatch is informational.
+Mark,ExpectedSection,ExpectedW,ExpectedD,ExpectedDia,LongBarType,LongBarsW,LongBarsD,LongBarsAround,StirrupBarType,StirrupSpacing
+C1.1,Rectangular,20,20,,#10,3,3,,#4,8
+C2.1,Round,,,24,#9,,,8,#4,8
+C3.1,Rectangular,16,12,,#8,3,2,,#4,8
+# Mismatch case — schedule says 16×16, but the Revit model has 18×18.
+# Dialog shows ⚠ size; engine continues with the real 18×18 geometry.
+C1.X,Rectangular,16,16,,#8,3,3,,#4,8

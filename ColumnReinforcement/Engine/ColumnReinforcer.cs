@@ -16,7 +16,24 @@ public class ColumnReinforcer
 
     public ColumnReinforcer(Document doc) => _doc = doc;
 
+    /// <summary>
+    /// Single-config overload — every column in <paramref name="columnIds"/> gets
+    /// the same <paramref name="cfg"/>. Internally builds a uniform mapping and
+    /// delegates to the per-column overload.
+    /// </summary>
     public RunResult Run(IEnumerable<ElementId> columnIds, ColumnReinforcementConfig cfg, bool dryRun)
+    {
+        var mapping = columnIds.ToDictionary<ElementId, ElementId, ColumnReinforcementConfig>(
+            id => id, _ => cfg);
+        return Run(mapping, dryRun);
+    }
+
+    /// <summary>
+    /// Per-column overload. <paramref name="perColumn"/> maps each column's
+    /// <see cref="ElementId"/> to its own <see cref="ColumnReinforcementConfig"/> —
+    /// supports the Phase-4 "From CSV" mode where each Mark has its own settings.
+    /// </summary>
+    public RunResult Run(IDictionary<ElementId, ColumnReinforcementConfig> perColumn, bool dryRun)
     {
         var result        = new RunResult { DryRun = dryRun };
         var longBuilder   = new LongitudinalBarBuilder(_doc);
@@ -24,7 +41,7 @@ public class ColumnReinforcer
         var dowelBuilder  = new FoundationDowelBuilder(_doc);
         var spliceBuilder = new UpperSpliceBuilder(_doc);
 
-        foreach (ElementId id in columnIds)
+        foreach ((ElementId id, ColumnReinforcementConfig cfg) in perColumn)
         {
             if (_doc.GetElement(id) is not FamilyInstance fi)
             {

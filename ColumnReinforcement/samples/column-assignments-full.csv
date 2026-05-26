@@ -1,0 +1,13 @@
+# Full schedule for a 3-storey building with dowels, upper splices, and confinement zones.
+# Mark = "C<id>.<level>", e.g. C1.1 = column #1 at level 1.
+# Empty cells use POCO defaults — only override what differs from the default config.
+Mark,ExpectedSection,ExpectedW,ExpectedD,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing,ConfBotEnabled,ConfBotSpacing,ConfBotZoneFraction,ConfTopEnabled,ConfTopSpacing,ConfTopZoneFraction,DowelsEnabled,DowelForm,DowelBarType,DowelExt,DowelEmbed,DowelLeg,SplicesEnabled,SpliceForm,SpliceLap,SpliceExt,SpliceUpperInset
+# Ground level — dowels from foundation, Cranked splice to smaller column above
+C1.1,Rectangular,20,20,#11,4,4,#5,8,true,4,0.25,true,4,0.25,true,L,#11,30,6,12,true,Cranked,28,28,2
+C2.1,Rectangular,20,20,#11,4,4,#5,8,true,4,0.25,true,4,0.25,true,L,#11,30,6,12,true,Cranked,28,28,2
+# Mid level — straight splice to next column (no dowels, no foundation)
+C1.2,Rectangular,16,16,#8,3,3,#4,8,true,4,0.25,true,4,0.25,false,,,,,,true,Straight,24,24,
+C2.2,Rectangular,16,16,#8,3,3,#4,8,true,4,0.25,true,4,0.25,false,,,,,,true,Straight,24,24,
+# Roof level — bent splice into roof slab, no upper column
+C1.3,Rectangular,12,12,#7,3,3,#4,8,true,4,0.25,false,,,,false,,,,,,true,Bent,24,,12
+C2.3,Rectangular,12,12,#7,3,3,#4,8,true,4,0.25,false,,,,false,,,,,,true,Bent,24,,12
