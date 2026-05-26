@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "name": "corner-only",
+  "units": "Imperial",
+  "_comment": "Minimum-rebar column: just four corner #6 bars and a #3 tie. Useful for small interior columns where ACI minimum reinforcement governs.",
+  "cover": {
+    "sides": "1 1/2\"",
+    "ends": "1 1/2\""
+  },
+  "longitudinal": {
+    "barType": "#6",
+    "cornerOnly": true,
+    "barsAlongWidth": 2,
+    "barsAlongDepth": 2,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#3",
+    "spacing": "6\"",
+    "hookType": "T1 - 90 deg",
+    "rotate45": false
+  },
+  "cleanExisting": true
+}

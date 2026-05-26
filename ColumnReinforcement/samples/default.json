@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "default",
+  "units": "Imperial",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg",
+    "rotate45": false
+  },
+  "cleanExisting": true
+}
