@@ -1,0 +1,6 @@
+# Basic column schedule for a small project — 3 rectangular column types,
+# no dowels / splices / confinement (matches default.json behaviour per row).
+Mark,ExpectedSection,ExpectedW,ExpectedD,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing
+C1.1,Rectangular,20,20,#10,3,3,#4,8
+C1.2,Rectangular,16,16,#8,3,3,#4,8
+C1.3,Rectangular,12,12,#6,2,2,#3,8
