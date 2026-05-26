@@ -97,6 +97,11 @@ public class StirrupBuilder
         {
             IList<Curve> curves = shape.CurvesAt(geom, z);
 
+            // CCW polygon (p1→p2→p3→p4→p1) viewed from +Z has its interior on
+            // the LEFT of the path direction. Hook orientation Left puts both
+            // tails inside the concrete core; Right (the default) would point
+            // them outward, sticking through the cover — the visible bug from
+            // the first smoke run on PR-27.
             RebarFactory.Create(
                 _doc,
                 RebarStyle.StirrupTie,
@@ -106,7 +111,9 @@ public class StirrupBuilder
                 curves,
                 tag,
                 startHook: hook,
-                endHook:   hook);
+                endHook:   hook,
+                startHookOrient: RebarHookOrientation.Left,
+                endHookOrient:   RebarHookOrientation.Left);
             created++;
         }
 
