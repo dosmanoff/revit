@@ -37,5 +37,21 @@ public class App : IExternalApplication
             "Re-running the same config on a column replaces the prior result.";
 
         panel.AddItem(buttonData);
+
+        var calcButton = new PushButtonData(
+            name: "AciCalculator",
+            text: "ACI 318\nCalculator",
+            assemblyName: assemblyPath,
+            className: typeof(AciCalculatorCommand).FullName!)
+        {
+            ToolTip = "Compute ACI 318-19 anchorage and lap-splice lengths.",
+            LongDescription =
+                "Live calculator for ℓd (tension development, §25.4.2.3), " +
+                "ℓst (Class B lap splice, §25.5.2.1), ℓdc (compression " +
+                "development, §25.4.9.2), and ℓsc (compression lap splice, " +
+                "§25.5.5). No model interaction — copy values into a JSON config.",
+        };
+
+        panel.AddItem(calcButton);
     }
 }
