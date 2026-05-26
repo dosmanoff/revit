@@ -65,4 +65,43 @@ public class HostContext
         }
         return best;
     }
+
+    /// <summary>
+    /// Find the lowest slab whose bottom elevation is at or just above the column's top
+    /// and whose plan extent contains the column centreline. Used as the anchor for
+    /// upper splices that bend into the slab above. Only <see cref="BuiltInCategory.OST_Floors"/>
+    /// is searched — foundation slabs are not typically located above a column.
+    /// </summary>
+    public static Element? FindSlabAbove(FamilyInstance column, ColumnGeometry geom)
+    {
+        Document doc = column.Document;
+        double columnTopZ = geom.BaseCenter.Z + geom.Height;
+        XYZ columnXY = geom.BaseCenter;
+
+        const double zTolerance = 1.0 / 96.0;
+
+        Element? best = null;
+        double bestBottomZ = double.PositiveInfinity;
+
+        var elems = new FilteredElementCollector(doc)
+            .OfCategory(BuiltInCategory.OST_Floors)
+            .WhereElementIsNotElementType();
+
+        foreach (Element e in elems)
+        {
+            BoundingBoxXYZ? bb = e.get_BoundingBox(null);
+            if (bb is null) continue;
+
+            if (bb.Min.Z < columnTopZ - zTolerance) continue;
+            if (columnXY.X < bb.Min.X || columnXY.X > bb.Max.X) continue;
+            if (columnXY.Y < bb.Min.Y || columnXY.Y > bb.Max.Y) continue;
+
+            if (bb.Min.Z < bestBottomZ)
+            {
+                bestBottomZ = bb.Min.Z;
+                best = e;
+            }
+        }
+        return best;
+    }
 }
