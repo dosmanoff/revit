@@ -18,8 +18,9 @@ public class ColumnReinforcer
 
     public RunResult Run(IEnumerable<ElementId> columnIds, ColumnReinforcementConfig cfg, bool dryRun)
     {
-        var result    = new RunResult { DryRun = dryRun };
+        var result      = new RunResult { DryRun = dryRun };
         var longBuilder = new LongitudinalBarBuilder(_doc);
+        var tieBuilder  = new StirrupBuilder(_doc);
 
         foreach (ElementId id in columnIds)
         {
@@ -39,8 +40,10 @@ public class ColumnReinforcer
             try
             {
                 ColumnGeometry geom = ColumnGeometry.For(fi);
-                int created = longBuilder.Build(geom, cfg, tag);
-                // Ties (PR-05), splices (PR-09), confinement (PR-07) plug in here.
+                int created = 0;
+                created += longBuilder.Build(geom, cfg, tag);
+                created += tieBuilder.Build(geom, cfg, tag);
+                // Splices (PR-09), confinement zones (PR-07), inner ties (Phase 3) plug in here.
 
                 if (dryRun) tx.RollBack();
                 else        tx.Commit();
