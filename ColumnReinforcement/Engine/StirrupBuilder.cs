@@ -34,14 +34,11 @@ public class StirrupBuilder
         double endCover = cfg.Ft(cfg.Cover.Ends);
         double inset    = cover + dTie / 2.0;     // tie centreline distance from concrete face
 
-        double xMin = -geom.Width / 2.0 + inset;
-        double xMax =  geom.Width / 2.0 - inset;
-        double yMin = -geom.Depth / 2.0 + inset;
-        double yMax =  geom.Depth / 2.0 - inset;
-        if (xMax - xMin <= 0 || yMax - yMin <= 0)
-            throw new InvalidOperationException(
-                $"Cover + tie diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room for a tie inside a " +
-                $"{UnitConv.FtToIn(geom.Width):0.##}\"×{UnitConv.FtToIn(geom.Depth):0.##}\" column.");
+        // Geometry of the tie outline differs by section: rectangle vs circle.
+        // The vertical layout (zMin, zMax, confinement zones) is shared below.
+        TieShape shape = geom.Section == ColumnSection.Round
+            ? TieShape.Round(geom, inset)
+            : TieShape.Rectangular(geom, inset);
 
         // Lowest and highest tie elevations. Explicit offsets override cover.ends so
         // ties can skip a joint zone at the top or bottom of the column.
@@ -98,18 +95,7 @@ public class StirrupBuilder
         int created = 0;
         foreach (double z in CombineIntervals(intervals))
         {
-            XYZ p1 = geom.At(xMin, yMin, z);
-            XYZ p2 = geom.At(xMax, yMin, z);
-            XYZ p3 = geom.At(xMax, yMax, z);
-            XYZ p4 = geom.At(xMin, yMax, z);
-
-            IList<Curve> curves = new List<Curve>
-            {
-                Line.CreateBound(p1, p2),
-                Line.CreateBound(p2, p3),
-                Line.CreateBound(p3, p4),
-                Line.CreateBound(p4, p1),
-            };
+            IList<Curve> curves = shape.CurvesAt(geom, z);
 
             RebarFactory.Create(
                 _doc,
@@ -190,5 +176,74 @@ public class StirrupBuilder
                 result.Add(z);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Section-specific tie outline at a given elevation. Rectangular ties are four
+    /// chained line segments forming a closed rectangle; round ties are two
+    /// 180° arcs joined into a closed circle. Both share Z layout and hook handling.
+    /// </summary>
+    private abstract class TieShape
+    {
+        public abstract IList<Curve> CurvesAt(ColumnGeometry geom, double z);
+
+        public static TieShape Rectangular(ColumnGeometry geom, double inset)
+        {
+            double xMin = -geom.Width / 2.0 + inset;
+            double xMax =  geom.Width / 2.0 - inset;
+            double yMin = -geom.Depth / 2.0 + inset;
+            double yMax =  geom.Depth / 2.0 - inset;
+            if (xMax - xMin <= 0 || yMax - yMin <= 0)
+                throw new InvalidOperationException(
+                    $"Cover + tie diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room for a tie inside a " +
+                    $"{UnitConv.FtToIn(geom.Width):0.##}\"×{UnitConv.FtToIn(geom.Depth):0.##}\" column.");
+            return new Rect(xMin, xMax, yMin, yMax);
+        }
+
+        public static TieShape Round(ColumnGeometry geom, double inset)
+        {
+            double r = geom.Diameter / 2.0 - inset;
+            if (r <= 0)
+                throw new InvalidOperationException(
+                    $"Cover + tie diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room for a tie inside a " +
+                    $"{UnitConv.FtToIn(geom.Diameter):0.##}\" diameter column.");
+            return new Circle(r);
+        }
+
+        private sealed class Rect : TieShape
+        {
+            private readonly double _xMin, _xMax, _yMin, _yMax;
+            public Rect(double xMin, double xMax, double yMin, double yMax)
+            { _xMin = xMin; _xMax = xMax; _yMin = yMin; _yMax = yMax; }
+
+            public override IList<Curve> CurvesAt(ColumnGeometry geom, double z)
+            {
+                XYZ p1 = geom.At(_xMin, _yMin, z);
+                XYZ p2 = geom.At(_xMax, _yMin, z);
+                XYZ p3 = geom.At(_xMax, _yMax, z);
+                XYZ p4 = geom.At(_xMin, _yMax, z);
+                return new List<Curve>
+                {
+                    Line.CreateBound(p1, p2),
+                    Line.CreateBound(p2, p3),
+                    Line.CreateBound(p3, p4),
+                    Line.CreateBound(p4, p1),
+                };
+            }
+        }
+
+        private sealed class Circle : TieShape
+        {
+            private readonly double _radius;
+            public Circle(double radius) { _radius = radius; }
+
+            public override IList<Curve> CurvesAt(ColumnGeometry geom, double z)
+            {
+                XYZ center = geom.At(0, 0, z);
+                Arc arc1 = Arc.Create(center, _radius, 0,         Math.PI,     geom.LocalX, geom.LocalY);
+                Arc arc2 = Arc.Create(center, _radius, Math.PI,   2 * Math.PI, geom.LocalX, geom.LocalY);
+                return new List<Curve> { arc1, arc2 };
+            }
+        }
     }
 }

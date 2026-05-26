@@ -79,11 +79,14 @@ public class LongitudinalConfig
     /// <summary>If true, only the four corner bars are placed (ignores AlongWidth/AlongDepth counts).</summary>
     [JsonPropertyName("cornerOnly")] public bool CornerOnly { get; set; }
 
-    /// <summary>Number of bars along the column width (the "X" face), including the two corner bars. Min 2.</summary>
+    /// <summary>Number of bars along the column width (the "X" face), including the two corner bars. Min 2. Rectangular columns only.</summary>
     [JsonPropertyName("barsAlongWidth")] public int BarsAlongWidth { get; set; } = 3;
 
-    /// <summary>Number of bars along the column depth (the "Y" face), including the two corner bars. Min 2.</summary>
+    /// <summary>Number of bars along the column depth (the "Y" face), including the two corner bars. Min 2. Rectangular columns only.</summary>
     [JsonPropertyName("barsAlongDepth")] public int BarsAlongDepth { get; set; } = 3;
+
+    /// <summary>Number of bars evenly spaced around the circumference. Round columns only. Min 3.</summary>
+    [JsonPropertyName("barsAround")] public int BarsAround { get; set; } = 8;
 
     /// <summary>Optional RebarHookType .Name for the top end of longitudinal bars. <c>null</c> = no hook.</summary>
     [JsonPropertyName("hookTopType")]    public string? HookTopType    { get; set; }

@@ -69,9 +69,7 @@ public class FoundationDowelBuilder
                 $"Dowel embedment ({UnitConv.FtToIn(embedment):0.##}\") exceeds slab thickness " +
                 $"({UnitConv.FtToIn(slabThickness):0.##}\").");
 
-        var bounds = LongitudinalBarBuilder.ComputeCageBounds(_doc, cfg, geom);
-        var positions = LongitudinalBarBuilder.LayoutPositions(
-            cfg.Longitudinal, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax);
+        var positions = LongitudinalBarBuilder.ComputeCagePositions(_doc, cfg, geom);
 
         // Local z (relative to column base) of the slab top and dowel bottom.
         double zLocalSlabTop      = slabTopWorldZ - geom.BaseCenter.Z;
@@ -88,10 +86,10 @@ public class FoundationDowelBuilder
                 _ => throw new InvalidOperationException($"Unknown dowel form: {d.Form}"),
             };
 
-            // Normal: perpendicular to the bar's bending plane. For an L-bend in the
-            // (LocalX, LocalZ) plane the normal is LocalY, and vice versa. For a
-            // straight bar any horizontal direction works — use the leg's perpendicular.
-            XYZ normal = ChooseNormal(geom, x, y, d.Form);
+            // Normal: perpendicular to the bar's bending plane.
+            //   Straight bar: any horizontal direction works.
+            //   L-form: perpendicular to the leg + Z plane = NormalForBendAt.
+            XYZ normal = d.Form == DowelForm.Straight ? geom.LocalX : geom.NormalForBendAt(x, y);
 
             RebarFactory.Create(
                 _doc,
@@ -120,33 +118,18 @@ public class FoundationDowelBuilder
     private static IList<Curve> BuildL(
         ColumnGeometry geom, double x, double y, double zBottom, double zTop, double legLength)
     {
-        // The L's vertical leg sits at (x, y). The horizontal leg extends inward
-        // (toward the column centre) from the corner of the L. For corner bars
-        // (|x| ≈ x_max, |y| ≈ y_max) the leg direction is whichever axis has the
-        // larger magnitude — i.e. the face we are nearest to. Ties between the two
-        // are broken in favour of LocalX so the choice is deterministic.
-        XYZ legDir = Math.Abs(x) >= Math.Abs(y)
-            ? geom.LocalX * -Math.Sign(x == 0 ? 1 : x)
-            : geom.LocalY * -Math.Sign(y == 0 ? 1 : y);
-
-        XYZ pCorner = geom.At(x, y, zBottom);                 // bottom of vertical leg = corner of L
-        XYZ pLegEnd = pCorner + legDir * legLength;           // inside the slab, away from the column face
-        XYZ pTop    = geom.At(x, y, zTop);                    // top of vertical leg, above the slab
+        // Horizontal leg extends inward into the slab — perpendicular to the
+        // nearest face for rectangular columns; radially toward the centre for
+        // round columns. Both rules live in ColumnGeometry.InwardDirection.
+        XYZ legDir  = geom.InwardDirection(x, y);
+        XYZ pCorner = geom.At(x, y, zBottom);
+        XYZ pLegEnd = pCorner + legDir * legLength;
+        XYZ pTop    = geom.At(x, y, zTop);
 
         return new List<Curve>
         {
             Line.CreateBound(pLegEnd, pCorner),
             Line.CreateBound(pCorner, pTop),
         };
-    }
-
-    private static XYZ ChooseNormal(ColumnGeometry geom, double x, double y, DowelForm form)
-    {
-        if (form == DowelForm.Straight)
-            return geom.LocalX;
-
-        // L's two legs lie in a vertical plane spanned by the leg direction and world Z.
-        // The normal of that plane is the in-plan axis perpendicular to the leg.
-        return Math.Abs(x) >= Math.Abs(y) ? geom.LocalY : geom.LocalX;
     }
 }
