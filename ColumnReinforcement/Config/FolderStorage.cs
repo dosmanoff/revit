@@ -4,40 +4,48 @@ using Autodesk.Revit.DB.ExtensibleStorage;
 namespace ColumnReinforcement.Config;
 
 /// <summary>
-/// Persists the user's chosen config folder in <see cref="ProjectInfo"/> via ExtensibleStorage,
-/// so it travels with the .rvt instead of living in a user-machine setting.
-///
-/// Distinct schema GUID from <c>WallReinforcement.Config.FolderStorage</c> — each plugin
-/// keeps its own folder preference independent of the others.
+/// Persists user picks in <see cref="ProjectInfo"/> via ExtensibleStorage so the
+/// dialog can pre-populate them on the next open. Two independent schemas — one
+/// for the JSON config folder (since PR-02), one for the CSV assignments path
+/// (since PR-32 hotfix) — because the Revit ExtensibleStorage API does not
+/// allow adding fields to an existing schema once it has been registered with
+/// the document. Each schema therefore owns exactly one simple string field.
 /// </summary>
 public static class FolderStorage
 {
-    private static readonly Guid SchemaGuid = new("847D1965-6B76-4A6B-A82D-61D0E8948ADF");
-    private const string FieldFolder  = "ConfigFolder";
-    private const string FieldCsvPath = "CsvPath";
+    // v1 — JSON config folder. Shipped in PR-02; do not change the GUID or field name.
+    private static readonly Guid FolderSchemaGuid = new("847D1965-6B76-4A6B-A82D-61D0E8948ADF");
+    private const string FolderFieldName = "ConfigFolder";
 
-    // ── Config folder (single-config mode, unchanged from earlier PRs) ──
+    // Independent schema for the CSV assignments path. New GUID since the original
+    // folder schema is already locked in the wild.
+    private static readonly Guid CsvSchemaGuid = new("8B8E6705-F43C-4AF5-8955-586CF3463718");
+    private const string CsvFieldName = "CsvPath";
 
-    public static string? Get(Document doc) => ReadField(doc, FieldFolder);
+    // ── JSON config folder ──────────────────────────────────────────────
 
-    public static void Set(Document doc, string folder) => WriteField(doc, FieldFolder, folder ?? "");
+    public static string? Get(Document doc) =>
+        Read(doc, FolderSchemaGuid, FolderFieldName, CreateFolderSchema);
 
-    // ── CSV path (per-column "From CSV" mode, new in PR-32) ─────────────
+    public static void Set(Document doc, string folder) =>
+        Write(doc, FolderSchemaGuid, FolderFieldName, folder ?? "", CreateFolderSchema);
 
-    public static string? GetCsvPath(Document doc) => ReadField(doc, FieldCsvPath);
+    // ── CSV assignments path ────────────────────────────────────────────
 
-    public static void SetCsvPath(Document doc, string csvPath) => WriteField(doc, FieldCsvPath, csvPath ?? "");
+    public static string? GetCsvPath(Document doc) =>
+        Read(doc, CsvSchemaGuid, CsvFieldName, CreateCsvSchema);
 
-    // ── Schema + field plumbing ─────────────────────────────────────────
+    public static void SetCsvPath(Document doc, string csvPath) =>
+        Write(doc, CsvSchemaGuid, CsvFieldName, csvPath ?? "", CreateCsvSchema);
 
-    private static string? ReadField(Document doc, string field)
+    // ── Shared plumbing ─────────────────────────────────────────────────
+
+    private static string? Read(Document doc, Guid schemaGuid, string field, Func<Schema> createSchema)
     {
-        Schema schema = Schema.Lookup(SchemaGuid) ?? CreateSchema();
+        Schema schema = Schema.Lookup(schemaGuid) ?? createSchema();
         Entity entity = doc.ProjectInformation.GetEntity(schema);
         if (entity is null || !entity.IsValid()) return null;
 
-        // Entities created under the v1 schema (no CsvPath) throw when reading the
-        // newer field — treat as "not set" rather than blowing up.
         try
         {
             string v = entity.Get<string>(field);
@@ -46,38 +54,31 @@ public static class FolderStorage
         catch { return null; }
     }
 
-    private static void WriteField(Document doc, string field, string value)
+    private static void Write(Document doc, Guid schemaGuid, string field, string value, Func<Schema> createSchema)
     {
-        Schema schema = Schema.Lookup(SchemaGuid) ?? CreateSchema();
-        Entity entity = doc.ProjectInformation.GetEntity(schema);
-        if (entity is null || !entity.IsValid())
-            entity = new Entity(schema);
-
-        // Both fields must be set on the entity. Preserve any value already present
-        // for the OTHER field so writing CsvPath doesn't wipe ConfigFolder.
-        string folder  = field == FieldFolder  ? value : SafeGet(entity, FieldFolder);
-        string csvPath = field == FieldCsvPath ? value : SafeGet(entity, FieldCsvPath);
-
-        var fresh = new Entity(schema);
-        fresh.Set(FieldFolder,  folder  ?? "");
-        fresh.Set(FieldCsvPath, csvPath ?? "");
-        doc.ProjectInformation.SetEntity(fresh);
+        Schema schema = Schema.Lookup(schemaGuid) ?? createSchema();
+        var entity = new Entity(schema);
+        entity.Set(field, value);
+        doc.ProjectInformation.SetEntity(entity);
     }
 
-    private static string SafeGet(Entity entity, string field)
+    private static Schema CreateFolderSchema()
     {
-        try { return entity.Get<string>(field) ?? ""; }
-        catch { return ""; }
-    }
-
-    private static Schema CreateSchema()
-    {
-        var sb = new SchemaBuilder(SchemaGuid);
+        var sb = new SchemaBuilder(FolderSchemaGuid);
         sb.SetSchemaName("ColumnReinforcementSettings");
         sb.SetReadAccessLevel(AccessLevel.Public);
         sb.SetWriteAccessLevel(AccessLevel.Public);
-        sb.AddSimpleField(FieldFolder,  typeof(string));
-        sb.AddSimpleField(FieldCsvPath, typeof(string));
+        sb.AddSimpleField(FolderFieldName, typeof(string));
+        return sb.Finish();
+    }
+
+    private static Schema CreateCsvSchema()
+    {
+        var sb = new SchemaBuilder(CsvSchemaGuid);
+        sb.SetSchemaName("ColumnReinforcementCsvPath");
+        sb.SetReadAccessLevel(AccessLevel.Public);
+        sb.SetWriteAccessLevel(AccessLevel.Public);
+        sb.AddSimpleField(CsvFieldName, typeof(string));
         return sb.Finish();
     }
 }
