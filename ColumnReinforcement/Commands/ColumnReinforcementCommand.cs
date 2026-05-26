@@ -3,6 +3,8 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
 using ColumnReinforcement.Config;
+using ColumnReinforcement.Domain;
+using ColumnReinforcement.Engine;
 using ColumnReinforcement.UI;
 
 namespace ColumnReinforcement.Commands;
@@ -54,16 +56,18 @@ public class ColumnReinforcementCommand : IExternalCommand
 
         ColumnReinforcementConfig cfg = dialog.Config!;
 
-        // Engine arrives in PR-04. For now confirm the round-trip works and report the chosen config.
-        TaskDialog.Show(
-            "Column Reinforcement",
-            $"Ready to reinforce {columnIds.Count} column(s) with config '{cfg.Name}'.\n\n" +
-            $"  Units:        {cfg.Units}\n" +
-            $"  Longitudinal: {cfg.Longitudinal.BarType} ({cfg.Longitudinal.BarsAlongWidth}×{cfg.Longitudinal.BarsAlongDepth}{(cfg.Longitudinal.CornerOnly ? ", corners only" : "")})\n" +
-            $"  Ties:         {(cfg.Stirrups.Enabled ? $"{cfg.Stirrups.BarType} @ {cfg.Stirrups.Spacing}" : "disabled")}\n" +
-            $"  Dry run:      {dialog.DryRun}\n\n" +
-            "Engine arrives in PR-04 (longitudinal bars) and PR-05 (ties).");
+        using var group = new TransactionGroup(doc, $"Column Reinforcement: {cfg.Name}");
+        group.Start();
 
+        var reinforcer = new ColumnReinforcer(doc);
+        RunResult result = reinforcer.Run(columnIds, cfg, dialog.DryRun);
+
+        if (dialog.DryRun)
+            group.RollBack();
+        else
+            group.Assimilate();
+
+        ResultsDialog.Show(result);
         return Result.Succeeded;
     }
 
