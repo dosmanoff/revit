@@ -172,6 +172,17 @@
 
 ---
 
+## Phase 4 — Per-column assignments via external CSV
+
+Подробная спека: [per-column-assignments-spec.md](per-column-assignments-spec.md). Параллельна Phase 3, не зависит.
+
+* **PR-31** — CSV loader + per-column engine mode. `Config/AssignmentCsv.cs`, `Domain/AssignmentTable.cs`, новый overload `ColumnReinforcer.Run(IDictionary<ElementId, ColumnReinforcementConfig>, bool)`, `FolderStorage` расширяется полем `CsvPath`, 3 sample CSV. Без UI — диалог ещё не использует. ⏱ ~4-5 ч
+* **PR-32** — Dialog "From CSV" mode + validation table. RadioGroup `Same for all` / `From CSV`, CSV-pickbox, table с ✓/⚠, "fall back to JSON" checkbox, привязка к новому engine overload'у. Smoke-test в Revit с 3-5 колоннами. ⏱ ~5-7 ч
+
+После Phase 4 (PR-31..32): плагин батч-применяет per-Mark конфиги, выработанные Schedule Analyzer'ом или вручную. Schedule Analyzer сам — отдельный плагин, не в этом наборе PR'ов.
+
+---
+
 ## Решения, под которые сделан план (2026-05-26)
 
 1. **SDC: Non-seismic.** Default hook = 90° standard tie hook (ACI 318 §25.3.2). Confinement/135° — фичи Фазы 3, не дефолт.
