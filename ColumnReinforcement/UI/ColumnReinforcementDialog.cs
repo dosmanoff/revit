@@ -1,4 +1,5 @@
 using ColumnReinforcement.Config;
+using ColumnReinforcement.Domain;
 using Microsoft.Win32;
 using System.IO;
 using System.Windows;
@@ -8,13 +9,23 @@ using WpfGrid = System.Windows.Controls.Grid;
 namespace ColumnReinforcement.UI;
 
 /// <summary>
-/// Code-only WPF editor for column reinforcement configs. Pattern mirrors
-/// <c>WallReinforcement.UI.WallReinforcementDialog</c> — pick a JSON config from a
-/// folder (or create one from a bundled sample), edit values in place, save back
-/// to disk, then Run / Dry-run.
-///
-/// Phase-1 sections: Cover, Longitudinal, Ties. Later phases add Splices,
-/// Dowels, Confinement, Forms — they will appear as additional tabs.
+/// Selected mode of the dialog — determines which mapping the command builds.
+/// </summary>
+public enum RunMode
+{
+    /// <summary>One JSON config applied to every selected column.</summary>
+    Same,
+
+    /// <summary>Per-column configs read from a CSV table, joined on the Mark parameter.</summary>
+    FromCsv,
+}
+
+/// <summary>
+/// Code-only WPF editor for column reinforcement configs. Two modes via the
+/// top-level mode tabs: "Same for all" (a JSON config edited in place and
+/// applied to every column in the selection) and "From CSV" (per-Mark configs
+/// pulled from an external CSV table, with a validation view that flags size
+/// and Mark mismatches).
 /// </summary>
 public class ColumnReinforcementDialog : Window
 {
@@ -24,31 +35,58 @@ public class ColumnReinforcementDialog : Window
     private CheckBox _chkDryRun  = null!;
     private TextBlock _txtStatus = null!;
     private TabControl _tabs     = null!;
+    private TabControl _modeTabs = null!;
+
+    // CSV-mode controls.
+    private TextBox  _txtCsvPath   = null!;
+    private ListView _lvAssignments = null!;
+    private CheckBox _chkFallback  = null!;
+    private TextBlock _txtCsvIssues = null!;
 
     private readonly List<Action>       _refreshers = [];
     private readonly List<Func<bool>>   _collectors = [];
+
+    private readonly IList<ColumnInfo> _selectedColumns;
 
     public string? FolderPath { get; private set; }
     public string? ConfigPath { get; private set; }
     public ColumnReinforcementConfig? Config { get; private set; }
     public bool DryRun => _chkDryRun.IsChecked == true;
 
-    public ColumnReinforcementDialog(string? initialFolder, int selectedColumnCount)
+    public string? CsvPath { get; private set; }
+    public AssignmentTable? Assignments { get; private set; }
+    public bool FallbackToJsonForUnassigned => _chkFallback.IsChecked == true;
+    public RunMode SelectedMode =>
+        _modeTabs.SelectedIndex == 1 ? RunMode.FromCsv : RunMode.Same;
+
+    public ColumnReinforcementDialog(
+        string? initialFolder,
+        string? initialCsvPath,
+        IList<ColumnInfo> selectedColumns)
     {
+        _selectedColumns = selectedColumns;
+
         Title = "Column Reinforcement";
-        Width = 680;
-        Height = 600;
-        MinWidth = 560;
-        MinHeight = 480;
+        Width = 760;
+        Height = 720;
+        MinWidth = 620;
+        MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        BuildUI(selectedColumnCount);
+        BuildUI(selectedColumns.Count);
 
         FolderPath = initialFolder;
         if (!string.IsNullOrEmpty(initialFolder))
         {
             _txtFolder.Text = initialFolder;
             RefreshConfigList();
+        }
+
+        CsvPath = initialCsvPath;
+        if (!string.IsNullOrEmpty(initialCsvPath) && File.Exists(initialCsvPath))
+        {
+            _txtCsvPath.Text = initialCsvPath;
+            TryLoadCsv(initialCsvPath);
         }
     }
 
@@ -57,17 +95,13 @@ public class ColumnReinforcementDialog : Window
     private void BuildUI(int columnCount)
     {
         var root = new WpfGrid { Margin = new Thickness(10) };
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                          // header
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });     // mode tabs
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                          // status
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                          // buttons
 
         AddRow(root, 0, BuildHeaderRow(columnCount));
-        AddRow(root, 1, BuildFolderRow());
-        AddRow(root, 2, BuildConfigPickerRow());
-        AddRow(root, 3, BuildEditorTabs());
+        AddRow(root, 1, BuildModeTabs());
 
         _txtStatus = new TextBlock
         {
@@ -76,11 +110,125 @@ public class ColumnReinforcementDialog : Window
             FontStyle = FontStyles.Italic,
             TextWrapping = TextWrapping.Wrap,
         };
-        AddRow(root, 4, _txtStatus);
+        AddRow(root, 2, _txtStatus);
 
-        AddRow(root, 5, BuildButtonRow());
+        AddRow(root, 3, BuildButtonRow());
 
         Content = root;
+    }
+
+    private UIElement BuildModeTabs()
+    {
+        _modeTabs = new TabControl { Margin = new Thickness(0, 4, 0, 4) };
+
+        var sameForAll = new TabItem
+        {
+            Header  = "Same for all",
+            Content = BuildSameForAllPanel(),
+        };
+        var fromCsv = new TabItem
+        {
+            Header  = "From CSV",
+            Content = BuildFromCsvPanel(),
+        };
+
+        _modeTabs.Items.Add(sameForAll);
+        _modeTabs.Items.Add(fromCsv);
+        return _modeTabs;
+    }
+
+    private UIElement BuildSameForAllPanel()
+    {
+        var grid = new WpfGrid { Margin = new Thickness(6) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        AddRow(grid, 0, BuildFolderRow());
+        AddRow(grid, 1, BuildConfigPickerRow());
+        AddRow(grid, 2, BuildEditorTabs());
+        return grid;
+    }
+
+    private UIElement BuildFromCsvPanel()
+    {
+        var grid = new WpfGrid { Margin = new Thickness(6) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        AddRow(grid, 0, BuildCsvPickerRow());
+        AddRow(grid, 1, BuildAssignmentsTable());
+
+        _txtCsvIssues = new TextBlock
+        {
+            Margin = new Thickness(0, 4, 0, 4),
+            Foreground = System.Windows.Media.Brushes.Firebrick,
+            FontStyle  = FontStyles.Italic,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        AddRow(grid, 2, _txtCsvIssues);
+
+        _chkFallback = new CheckBox
+        {
+            Content = "Fall back to selected JSON config for columns without a CSV assignment",
+            Margin  = new Thickness(0, 4, 0, 4),
+        };
+        AddRow(grid, 3, _chkFallback);
+
+        return grid;
+    }
+
+    private UIElement BuildCsvPickerRow()
+    {
+        _txtCsvPath = new TextBox { Padding = new Thickness(4, 2, 4, 2), IsReadOnly = true };
+        var browse  = new Button { Content = "Browse…", Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(6, 0, 0, 0) };
+        var reload  = new Button { Content = "Reload",  Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(4, 0, 0, 0) };
+        browse.Click += BrowseCsv_Click;
+        reload.Click += (_, _) => { if (!string.IsNullOrEmpty(_txtCsvPath.Text)) TryLoadCsv(_txtCsvPath.Text); };
+
+        var rightBtns = new StackPanel { Orientation = Orientation.Horizontal };
+        rightBtns.Children.Add(browse);
+        rightBtns.Children.Add(reload);
+        DockPanel.SetDock(rightBtns, Dock.Right);
+
+        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
+        dock.Children.Add(rightBtns);
+        dock.Children.Add(_txtCsvPath);
+
+        return new GroupBox
+        {
+            Header  = "Assignments CSV",
+            Content = dock,
+            Padding = new Thickness(8, 4, 8, 6),
+            Margin  = new Thickness(0, 0, 0, 4),
+        };
+    }
+
+    private UIElement BuildAssignmentsTable()
+    {
+        _lvAssignments = new ListView
+        {
+            Margin = new Thickness(0, 0, 0, 4),
+        };
+
+        var gv = new GridView();
+        gv.Columns.Add(new GridViewColumn { Header = "Mark",       Width = 110, DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AssignmentRow.Mark)) });
+        gv.Columns.Add(new GridViewColumn { Header = "In CSV",     Width = 60,  DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AssignmentRow.InCsv)) });
+        gv.Columns.Add(new GridViewColumn { Header = "In Revit",   Width = 70,  DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AssignmentRow.InRevit)) });
+        gv.Columns.Add(new GridViewColumn { Header = "CSV size",   Width = 90,  DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AssignmentRow.CsvSize)) });
+        gv.Columns.Add(new GridViewColumn { Header = "Revit size", Width = 100, DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AssignmentRow.RevitSize)) });
+        gv.Columns.Add(new GridViewColumn { Header = "Status",     Width = 200, DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AssignmentRow.Status)) });
+        _lvAssignments.View = gv;
+
+        return new GroupBox
+        {
+            Header  = "Match: Mark in CSV ↔ Mark in selected columns",
+            Content = _lvAssignments,
+            Padding = new Thickness(8, 4, 8, 6),
+            Margin  = new Thickness(0, 0, 0, 4),
+        };
     }
 
     private static void AddRow(WpfGrid grid, int row, UIElement child)
@@ -559,14 +707,208 @@ public class ColumnReinforcementDialog : Window
 
     private void Run_Click(object sender, RoutedEventArgs e)
     {
-        if (Config is null)
+        if (SelectedMode == RunMode.Same)
         {
-            MessageBox.Show("Pick or create a configuration first, then Run.", "Column Reinforcement", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (Config is null)
+            {
+                MessageBox.Show("Pick or create a configuration first, then Run.",
+                    "Column Reinforcement", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (!CollectAll()) return;
+            FolderPath = _txtFolder.Text;
+        }
+        else // FromCsv
+        {
+            if (Assignments is null)
+            {
+                MessageBox.Show("Pick a CSV file first, then Run.",
+                    "Column Reinforcement", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            // Even in CSV mode, the user may still need a fallback JSON config.
+            // CollectAll is harmless when called without a loaded config; allow it.
+            if (Config is not null && !CollectAll()) return;
+            FolderPath = _txtFolder.Text;
+        }
+        DialogResult = true;
+    }
+
+    // ── CSV mode wiring ─────────────────────────────────────────────────────
+
+    private void BrowseCsv_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter      = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+            Title       = "Pick an assignments CSV",
+            InitialDirectory = string.IsNullOrEmpty(_txtCsvPath.Text) ? "" : Path.GetDirectoryName(_txtCsvPath.Text),
+            CheckFileExists = true,
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        _txtCsvPath.Text = dlg.FileName;
+        TryLoadCsv(dlg.FileName);
+    }
+
+    private void TryLoadCsv(string path)
+    {
+        try
+        {
+            Assignments = AssignmentCsv.Load(path);
+            CsvPath     = path;
+            RebuildAssignmentsTable();
+            _txtCsvIssues.Text = FormatIssues(Assignments.Issues);
+            _txtStatus.Text    = $"Loaded {Assignments.ByMark.Count} assignment(s) from {Path.GetFileName(path)}.";
+        }
+        catch (Exception ex)
+        {
+            Assignments = null;
+            _lvAssignments.ItemsSource = null;
+            _txtCsvIssues.Text = $"Failed to load CSV: {ex.Message}";
+            _txtStatus.Text    = "";
+        }
+    }
+
+    private static string FormatIssues(IReadOnlyList<ParseIssue> issues)
+    {
+        if (issues.Count == 0) return "";
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"{issues.Count} parse issue(s):");
+        int shown = 0;
+        foreach (var i in issues)
+        {
+            if (shown >= 5) { sb.AppendLine($"  … and {issues.Count - shown} more."); break; }
+            string field = string.IsNullOrEmpty(i.Field) ? "" : $" ({i.Field})";
+            sb.AppendLine($"  · line {i.LineNumber}{field}: {i.Message}");
+            shown++;
+        }
+        return sb.ToString();
+    }
+
+    private void RebuildAssignmentsTable()
+    {
+        if (Assignments is null)
+        {
+            _lvAssignments.ItemsSource = null;
             return;
         }
-        if (!CollectAll()) return;
-        FolderPath = _txtFolder.Text;
-        DialogResult = true;
+
+        var rows = new List<AssignmentRow>();
+
+        // Index Revit selection by Mark (case-insensitive). Track duplicates.
+        var revitByMark = new Dictionary<string, ColumnInfo>(StringComparer.OrdinalIgnoreCase);
+        var duplicateMarks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in _selectedColumns)
+        {
+            if (string.IsNullOrWhiteSpace(c.Mark)) continue;
+            if (revitByMark.ContainsKey(c.Mark!)) duplicateMarks.Add(c.Mark!);
+            else revitByMark[c.Mark!] = c;
+        }
+
+        var csvMarks = new HashSet<string>(Assignments.ByMark.Keys, StringComparer.OrdinalIgnoreCase);
+
+        // Union of Marks, alphabetically.
+        var allMarks = revitByMark.Keys.Union(csvMarks, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(m => m, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mark in allMarks)
+        {
+            bool inCsv = csvMarks.Contains(mark);
+            bool inRev = revitByMark.ContainsKey(mark);
+
+            string csvSize = "";
+            string revSize = "";
+            var statuses = new List<string>();
+
+            if (inCsv && Assignments.ExpectedByMark.TryGetValue(mark, out var exp) && exp is not null)
+                csvSize = FormatExpectedSize(exp);
+
+            if (inRev)
+            {
+                var info = revitByMark[mark];
+                revSize = FormatActualSize(info);
+            }
+
+            if (!inRev) statuses.Add("⚠ not in selection");
+            if (!inCsv) statuses.Add("⚠ no CSV assignment");
+            if (duplicateMarks.Contains(mark)) statuses.Add("⚠ duplicate Mark in selection");
+
+            if (inCsv && inRev && Assignments.ExpectedByMark.TryGetValue(mark, out var exp2) && exp2 is not null)
+            {
+                var info = revitByMark[mark];
+                if (exp2.Section != info.Section)
+                    statuses.Add($"⚠ section: CSV={exp2.Section}, Revit={info.Section}");
+                else if (IsSizeMismatch(exp2, info))
+                    statuses.Add("⚠ size mismatch");
+            }
+
+            if (statuses.Count == 0) statuses.Add("OK");
+
+            rows.Add(new AssignmentRow
+            {
+                Mark      = mark,
+                InCsv     = inCsv ? "✓" : "—",
+                InRevit   = inRev ? "✓" : "—",
+                CsvSize   = csvSize,
+                RevitSize = revSize,
+                Status    = string.Join(", ", statuses),
+            });
+        }
+
+        // Selected columns with empty Mark — they can't be matched to any CSV row.
+        foreach (var c in _selectedColumns.Where(c => string.IsNullOrWhiteSpace(c.Mark)))
+        {
+            rows.Add(new AssignmentRow
+            {
+                Mark      = "(empty)",
+                InCsv     = "—",
+                InRevit   = "✓",
+                CsvSize   = "",
+                RevitSize = FormatActualSize(c),
+                Status    = "⚠ no Mark on column",
+            });
+        }
+
+        _lvAssignments.ItemsSource = rows;
+    }
+
+    private static bool IsSizeMismatch(ExpectedGeometry exp, ColumnInfo info)
+    {
+        const double tol = 0.01;  // 0.01 in = 1/100 inch
+        if (exp.Section == ColumnSection.Round)
+        {
+            return exp.DiameterIn is double d && Math.Abs(d - info.WidthIn) > tol;
+        }
+        bool wOk = exp.WidthIn is null || Math.Abs(exp.WidthIn.Value - info.WidthIn) <= tol;
+        bool dOk = exp.DepthIn is null || Math.Abs(exp.DepthIn.Value - info.DepthIn) <= tol;
+        return !(wOk && dOk);
+    }
+
+    private static string FormatExpectedSize(ExpectedGeometry e)
+    {
+        if (e.Section == ColumnSection.Round)
+            return e.DiameterIn is double v ? $"⌀{v:0.##}\"" : "";
+        string w = e.WidthIn is double wv ? $"{wv:0.##}\"" : "?";
+        string d = e.DepthIn is double dv ? $"{dv:0.##}\"" : "?";
+        return $"{w}×{d}";
+    }
+
+    private static string FormatActualSize(ColumnInfo info)
+    {
+        if (info.Section == ColumnSection.Round)
+            return $"⌀{info.WidthIn:0.##}\"";
+        return $"{info.WidthIn:0.##}\"×{info.DepthIn:0.##}\"";
+    }
+
+    /// <summary>Row in the CSV-mode validation table.</summary>
+    public class AssignmentRow
+    {
+        public string Mark      { get; init; } = "";
+        public string InCsv     { get; init; } = "";
+        public string InRevit   { get; init; } = "";
+        public string CsvSize   { get; init; } = "";
+        public string RevitSize { get; init; } = "";
+        public string Status    { get; init; } = "";
     }
 
     private static string BundledSamplesDir() =>
