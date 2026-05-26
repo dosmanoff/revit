@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "name": "dowels",
+  "units": "Imperial",
+  "_comment": "16x16 column with foundation dowels: #8 L-form dowels, 24 in extension above slab (lap with column #8 longitudinal), 6 in embedment into slab, 9 in horizontal leg. Tie spacing 8 in.",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg",
+    "rotate45": false
+  },
+  "dowels": {
+    "enabled": true,
+    "barType": "#8",
+    "form": "L",
+    "extension": 24,
+    "embedment": 6,
+    "legLength": 9,
+    "hookTopType": null,
+    "hookBottomType": null,
+    "onlyStructuralFoundation": true
+  },
+  "cleanExisting": true
+}

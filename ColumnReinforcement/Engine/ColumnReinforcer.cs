@@ -18,9 +18,10 @@ public class ColumnReinforcer
 
     public RunResult Run(IEnumerable<ElementId> columnIds, ColumnReinforcementConfig cfg, bool dryRun)
     {
-        var result      = new RunResult { DryRun = dryRun };
-        var longBuilder = new LongitudinalBarBuilder(_doc);
-        var tieBuilder  = new StirrupBuilder(_doc);
+        var result        = new RunResult { DryRun = dryRun };
+        var longBuilder   = new LongitudinalBarBuilder(_doc);
+        var tieBuilder    = new StirrupBuilder(_doc);
+        var dowelBuilder  = new FoundationDowelBuilder(_doc);
 
         foreach (ElementId id in columnIds)
         {
@@ -44,19 +45,29 @@ public class ColumnReinforcer
                     : 0;
 
                 ColumnGeometry geom = ColumnGeometry.For(fi);
+
+                Element? slabBelow = cfg.Dowels.Enabled
+                    ? HostContext.FindSlabBelow(fi, geom, cfg.Dowels.OnlyStructuralFoundation)
+                    : null;
+
                 int created = 0;
                 created += longBuilder.Build(geom, cfg, tag);
                 created += tieBuilder.Build(geom, cfg, tag);
-                // Splices (PR-09), confinement zones (PR-07), inner ties (Phase 3) plug in here.
+                FoundationDowelBuilder.Result dowelResult = dowelBuilder.Build(geom, cfg, tag, slabBelow);
+                created += dowelResult.Created;
+                // Splices (PR-10), inner ties (Phase 3) plug in here.
 
                 if (dryRun) tx.RollBack();
                 else        tx.Commit();
+
+                string? reason = dowelResult.SkipReason
+                    ?? (created == 0 ? "Nothing to place (check bar types and cover)" : null);
 
                 result.Outcomes.Add(new ColumnOutcome
                 {
                     ColumnId = id,
                     Status   = created > 0 ? ColumnStatus.Success : ColumnStatus.Skipped,
-                    Reason   = created == 0 ? "Nothing to place (check bar types and cover)" : null,
+                    Reason   = reason,
                     Created  = created,
                     Replaced = replaced,
                 });
