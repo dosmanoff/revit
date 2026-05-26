@@ -96,7 +96,7 @@
       "enabled": true,
       "barType": "#4",                    // 0.5" dia tie
       "spacing": 8,                       // 8" max — по ACI 318 §25.7.2 для #8 long: min(16·1=16, 48·0.5=24, h_col)
-      "hookType": "T1 - 90 deg",          // standard tie hook 90° (non-seismic default); lookup по точному .Name в документе, strict
+      "hookType": "Stirrup/Tie - 90 deg.",          // standard tie hook 90° (non-seismic default); lookup по точному .Name в документе, strict
       "rotate45": false                   // Фаза 2
     }
   }
@@ -248,7 +248,7 @@ ColumnReinforcement/
 │  ──── Ties (transverse) ────                       │
 │   ☑ Enabled                                        │
 │   Bar type: [▼ #4 (0.500")]   Spacing: [8] in      │
-│   Hook: [▼ T1 - 90 deg]                            │
+│   Hook: [▼ Stirrup/Tie - 90 deg.]                            │
 │   ☐ Rotate 45° (Phase 2)                           │
 │                                                    │
 │  ☐ Dry run (preview only, do not commit)           │

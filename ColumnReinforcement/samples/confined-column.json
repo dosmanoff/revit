@@ -19,7 +19,7 @@
     "enabled": true,
     "barType": "#4",
     "spacing": 8,
-    "hookType": "T1 - 90 deg",
+    "hookType": "Stirrup/Tie - 90 deg.",
     "rotate45": false,
     "confinement": {
       "bottom": {
