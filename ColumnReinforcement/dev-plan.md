@@ -22,8 +22,9 @@
 **Что сделать:**
 * Создать `ColumnReinforcement.csproj` (копия `WallReinforcement.csproj`, изменить `AssemblyName`/`RootNamespace`).
 * Создать `App.cs` с `IExternalApplication`:
-  * `OnStartup`: создать таб «Reinforcement» **если ещё нет** (общий с будущими wall/slab кнопками); кнопка «Column Rebar».
+  * `OnStartup`: создать **общий таб «SmartTools»** идемпотентно (если уже есть — пропустить, Revit бросает на повторное `CreateRibbonTab`). Внутри — панель `Column Rebar` с одной push-кнопкой. Этот же таб будет использовать `WallReinforcement` и `SlabRebar` в будущих обновлениях.
   * `OnShutdown`: пусто.
+  * **Замечание для будущей миграции:** существующие `WallReinforcement`/`SlabRebar` тоже надо будет вынести в SmartTools — но это отдельный PR, не часть PR-01.
 * Создать `Commands\ColumnReinforcementCommand.cs` с `IExternalCommand` — пока только `TaskDialog.Show("ColumnReinforcement", "Hello")`.
 * Создать `Commands\ColumnSelectionFilter.cs` — `ISelectionFilter`, фильтр по `OST_StructuralColumns` + `OST_Columns(Structural=true)`, отсекает наклонные.
 * Создать `ColumnReinforcement.addin` (новый GUID — `[guid]::NewGuid()` в PowerShell).
@@ -84,8 +85,9 @@
 **Что сделать:**
 * `Engine\UnitConv.cs` — `InToFt`, `MmToFt`, `FtToIn`.
 * `Engine\RebarFactory.cs`:
-  * `GetBarType(Document, string name)` — ищет `RebarBarType` по имени, кидает понятную ошибку если нет.
-  * `GetHookType(Document, string name)` — то же для `RebarHookType` (или `null` если name пуст).
+  * `GetBarType(Document, string name)` — strict lookup по точному `.Name` среди `FilteredElementCollector(doc).OfClass(typeof(RebarBarType))`. Если не найден — выбрасывает `InvalidOperationException` с сообщением `"RebarBarType '#8' not found in document. Available: #4, #5, #6 …"`. **Никакого auto-create.**
+  * `GetHookType(Document, string name)` — то же для `RebarHookType` (или `null` если `name == null`/пусто). Тот же strict-режим.
+  * Ошибки оборачиваются в `RunResult.Errors[columnId]` уровнем выше, не валят весь run.
   * `CreateStraightVerticalBar(Document, ColumnGeometry, XYZ planXY, RebarBarType, ...)` — `Rebar.CreateFromCurves` с одним отрезком.
   * Все созданные `Rebar` помечаются `Comments = "ColumnReinforcement:{runId}"`.
 * `Engine\LongitudinalBarBuilder.cs`:
@@ -170,12 +172,12 @@
 
 ---
 
-## Что нужно от пользователя перед стартом PR-01
+## Решения, под которые сделан план (2026-05-26)
 
-Минимальный список (из открытых вопросов спеки §8):
+1. **SDC: Non-seismic.** Default hook = 90° standard tie hook (ACI 318 §25.3.2). Confinement/135° — фичи Фазы 3, не дефолт.
+2. **Ribbon: общий таб «SmartTools».** Все плагины репо живут в нём; PR-01 создаёт таб идемпотентно. Миграция существующих `WallReinforcement`/`SlabRebar` в SmartTools — отдельный пост-MVP PR.
+3. **`RebarBarType`/`RebarHookType` lookup: strict.** Имена в конфиге → точный `.Name` lookup в документе → ошибка per-column при отсутствии. Никакого auto-create.
 
-1. **SDC проекта** — Phase 1 закладывает non-seismic типы (90° hooks допустимы). Если все проекты SDC D+ — заменим default hook на 135° seismic ещё в PR-02.
-2. **Ленточная вкладка** — общая «Reinforcement» tab или отдельная per-plugin? PR-01 завязан на ответ.
-3. **`RebarBarType`/`RebarHookType` lookup** — strict (как `WallReinforcement`) или auto-create? PR-04 завязан.
+Эти решения зафиксированы в memory как `repo-conventions` и применяются всем плагинам в этом репо.
 
-Остальные вопросы — для Phase 2/3, не блокируют MVP.
+**Блокеров для старта PR-01 нет.** Жду команду «начинай PR-01».
