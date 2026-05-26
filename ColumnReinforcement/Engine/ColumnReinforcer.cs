@@ -39,6 +39,10 @@ public class ColumnReinforcer
             tx.Start();
             try
             {
+                int replaced = cfg.CleanExisting
+                    ? ExistingRebarCleaner.Clean(_doc, id, cfg.Name)
+                    : 0;
+
                 ColumnGeometry geom = ColumnGeometry.For(fi);
                 int created = 0;
                 created += longBuilder.Build(geom, cfg, tag);
@@ -54,6 +58,7 @@ public class ColumnReinforcer
                     Status   = created > 0 ? ColumnStatus.Success : ColumnStatus.Skipped,
                     Reason   = created == 0 ? "Nothing to place (check bar types and cover)" : null,
                     Created  = created,
+                    Replaced = replaced,
                 });
             }
             catch (Exception ex)
