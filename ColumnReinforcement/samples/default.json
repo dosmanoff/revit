@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "name": "default",
+  "units": "Imperial",
+  "_comment": "Imperial defaults: 16 in x 16 in column, #8 longitudinals 3x3, #4 ties at 8 in. Non-seismic (90 deg hook). Schema is fleshed out in PR-02.",
+  "cover": { "sides": 1.5, "ends": 1.5 },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg",
+    "rotate45": false
+  }
+}

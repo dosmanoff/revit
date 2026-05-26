@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>ColumnReinforcement</Name>
+    <Assembly>ColumnReinforcement.dll</Assembly>
+    <FullClassName>ColumnReinforcement.App</FullClassName>
+    <ClientId>47D433A5-8137-4791-8285-F1AD5E563D06</ClientId>
+    <VendorId>ColumnReinforcement</VendorId>
+    <VendorDescription>Column Reinforcement plugin for reinforced-concrete columns in Revit 2025 (ACI 318).</VendorDescription>
+  </AddIn>
+</RevitAddIns>
