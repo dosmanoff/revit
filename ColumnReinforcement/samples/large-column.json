@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "name": "default",
+  "name": "large-column",
   "units": "Imperial",
   "cover": {
-    "sides": 1.5,
-    "ends": 1.5
+    "sides": 2.0,
+    "ends": 2.0
   },
   "longitudinal": {
-    "barType": "#8",
+    "barType": "#11",
     "cornerOnly": false,
-    "barsAlongWidth": 3,
-    "barsAlongDepth": 3,
+    "barsAlongWidth": 4,
+    "barsAlongDepth": 4,
     "hookTopType": null,
     "hookBottomType": null
   },
   "stirrups": {
     "enabled": true,
-    "barType": "#4",
-    "spacing": 8,
+    "barType": "#5",
+    "spacing": 10,
     "hookType": "T1 - 90 deg",
     "rotate45": false
   },
