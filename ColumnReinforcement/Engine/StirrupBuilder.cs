@@ -43,12 +43,14 @@ public class StirrupBuilder
                 $"Cover + tie diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room for a tie inside a " +
                 $"{UnitConv.FtToIn(geom.Width):0.##}\"×{UnitConv.FtToIn(geom.Depth):0.##}\" column.");
 
-        double zMin = endCover;
-        double zMax = geom.Height - endCover;
+        // Lowest and highest tie elevations. Explicit offsets override cover.ends so
+        // ties can skip a joint zone at the top or bottom of the column.
+        double zMin = s.OffsetBottom is { } ob ? cfg.Ft(ob) : endCover;
+        double zMax = geom.Height - (s.OffsetTop is { } ot ? cfg.Ft(ot) : endCover);
         if (zMax - zMin <= 0)
             throw new InvalidOperationException(
-                $"End cover ({UnitConv.FtToIn(endCover):0.###}\" top + bottom) is greater than column height " +
-                $"({UnitConv.FtToIn(geom.Height):0.##}\").");
+                $"Tie placement window collapsed: bottom={UnitConv.FtToIn(zMin):0.##}\", top={UnitConv.FtToIn(zMax):0.##}\". " +
+                $"Check offsetTop/offsetBottom and cover.ends against the column height ({UnitConv.FtToIn(geom.Height):0.##}\").");
 
         double mainSpacing = cfg.Ft(s.Spacing);
         if (mainSpacing <= 0)

@@ -98,6 +98,19 @@ public class StirrupsConfig
     [JsonPropertyName("rotate45")] public bool Rotate45 { get; set; }
 
     /// <summary>
+    /// Distance from the bottom face of the column to the lowest tie. When
+    /// <c>null</c>, defaults to <see cref="CoverConfig.Ends"/>. Useful for
+    /// skipping the joint zone where the slab/beam reinforcement runs.
+    /// </summary>
+    [JsonPropertyName("offsetBottom")] public Length? OffsetBottom { get; set; }
+
+    /// <summary>
+    /// Distance from the top face of the column to the highest tie. When
+    /// <c>null</c>, defaults to <see cref="CoverConfig.Ends"/>.
+    /// </summary>
+    [JsonPropertyName("offsetTop")] public Length? OffsetTop { get; set; }
+
+    /// <summary>
     /// Densified-tie zones at the top and bottom of the column. Each zone overrides
     /// <see cref="Spacing"/> with its own tighter step within a given length. Disabled
     /// by default; when both are disabled the engine behaves exactly as in Phase 1.
