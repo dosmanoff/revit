@@ -96,4 +96,38 @@ public class StirrupsConfig
 
     /// <summary>If true (Phase 2+), the tie is rotated 45° about the column axis (ACI 318 §25.7.2.3 allowed cases).</summary>
     [JsonPropertyName("rotate45")] public bool Rotate45 { get; set; }
+
+    /// <summary>
+    /// Densified-tie zones at the top and bottom of the column. Each zone overrides
+    /// <see cref="Spacing"/> with its own tighter step within a given length. Disabled
+    /// by default; when both are disabled the engine behaves exactly as in Phase 1.
+    /// </summary>
+    [JsonPropertyName("confinement")] public ConfinementZonesConfig Confinement { get; set; } = new();
+}
+
+/// <summary>Top and bottom confinement-zone settings.</summary>
+public class ConfinementZonesConfig
+{
+    [JsonPropertyName("top")]    public ConfinementZoneConfig Top    { get; set; } = new();
+    [JsonPropertyName("bottom")] public ConfinementZoneConfig Bottom { get; set; } = new();
+}
+
+/// <summary>
+/// One confinement zone (either top or bottom). The zone runs from the matching face
+/// inward by <see cref="ZoneLength"/> or by <see cref="ZoneFraction"/>·height; when both
+/// are set, <see cref="ZoneLength"/> wins. Within the zone, ties are placed at
+/// <see cref="Spacing"/> instead of the main spacing.
+/// </summary>
+public class ConfinementZoneConfig
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; set; }
+
+    /// <summary>Densified tie spacing inside the zone, typically tighter than the main spacing.</summary>
+    [JsonPropertyName("spacing")] public Length Spacing { get; set; } = new(4);
+
+    /// <summary>Absolute zone length from the face. Wins over <see cref="ZoneFraction"/> when both are set.</summary>
+    [JsonPropertyName("zoneLength")] public Length? ZoneLength { get; set; }
+
+    /// <summary>Fraction of the column's clear height (0–1). Used only when <see cref="ZoneLength"/> is null.</summary>
+    [JsonPropertyName("zoneFraction")] public double? ZoneFraction { get; set; }
 }

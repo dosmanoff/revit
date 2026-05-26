@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "name": "confined-column",
+  "units": "Imperial",
+  "_comment": "16x16 column with densified confinement zones at top and bottom: 4 in tie spacing in the outer 1/4 of the column height, 8 in spacing in the middle. Useful around floor connections even in non-seismic frames.",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg",
+    "rotate45": false,
+    "confinement": {
+      "bottom": {
+        "enabled": true,
+        "spacing": 4,
+        "zoneFraction": 0.25
+      },
+      "top": {
+        "enabled": true,
+        "spacing": 4,
+        "zoneFraction": 0.25
+      }
+    }
+  },
+  "cleanExisting": true
+}
