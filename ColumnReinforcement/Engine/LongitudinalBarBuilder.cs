@@ -24,37 +24,14 @@ public class LongitudinalBarBuilder
     public int Build(ColumnGeometry geom, ColumnReinforcementConfig cfg, string tag)
     {
         RebarBarType longBar = RebarFactory.GetBarType(_doc, cfg.Longitudinal.BarType);
-        double dLong = longBar.BarModelDiameter;
-
-        // Ties shift the longitudinal bars inward by d_tie. If ties are off,
-        // no shift — the longitudinal cage hugs the cover directly.
-        double dTie = 0;
-        if (cfg.Stirrups.Enabled)
-        {
-            RebarBarType tieBar = RebarFactory.GetBarType(_doc, cfg.Stirrups.BarType);
-            dTie = tieBar.BarModelDiameter;
-        }
 
         RebarHookType? hookTop    = RebarFactory.GetHookType(_doc, cfg.Longitudinal.HookTopType);
         RebarHookType? hookBottom = RebarFactory.GetHookType(_doc, cfg.Longitudinal.HookBottomType);
 
-        double cover     = cfg.Ft(cfg.Cover.Sides);
-        double endCover  = cfg.Ft(cfg.Cover.Ends);
-        double inset     = cover + dTie + dLong / 2.0;
+        double endCover = cfg.Ft(cfg.Cover.Ends);
 
-        // Local-frame coordinates of the bar centres relative to the cross-section centre.
-        double xMin = -geom.Width / 2.0 + inset;
-        double xMax =  geom.Width / 2.0 - inset;
-        double yMin = -geom.Depth / 2.0 + inset;
-        double yMax =  geom.Depth / 2.0 - inset;
-
-        // Sanity: column too thin / cover too large.
-        if (xMax - xMin <= 0 || yMax - yMin <= 0)
-            throw new InvalidOperationException(
-                $"Cover + tie + bar diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room inside a " +
-                $"{UnitConv.FtToIn(geom.Width):0.##}\"×{UnitConv.FtToIn(geom.Depth):0.##}\" column.");
-
-        var positions = LayoutPositions(cfg.Longitudinal, xMin, xMax, yMin, yMax);
+        var bounds = ComputeCageBounds(_doc, cfg, geom);
+        var positions = LayoutPositions(cfg.Longitudinal, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax);
 
         // Each vertical bar runs from base + endCover to top - endCover.
         double zBottom = endCover;
@@ -89,6 +66,40 @@ public class LongitudinalBarBuilder
         }
 
         return created;
+    }
+
+    /// <summary>
+    /// Cross-section bounding rectangle of the longitudinal cage in the column's
+    /// local frame, i.e. the (x, y) extents along which longitudinal bar centres
+    /// lie. Encapsulates the cover + d_tie + d_long / 2 inset formula so dowel
+    /// and splice builders place bars at the same positions as the cage.
+    /// </summary>
+    internal static (double xMin, double xMax, double yMin, double yMax) ComputeCageBounds(
+        Document doc, ColumnReinforcementConfig cfg, ColumnGeometry geom)
+    {
+        RebarBarType longBar = RebarFactory.GetBarType(doc, cfg.Longitudinal.BarType);
+        double dLong = longBar.BarModelDiameter;
+
+        // Ties shift the longitudinal bars inward by d_tie. If ties are off,
+        // no shift — the longitudinal cage hugs the cover directly.
+        double dTie = 0;
+        if (cfg.Stirrups.Enabled)
+            dTie = RebarFactory.GetBarType(doc, cfg.Stirrups.BarType).BarModelDiameter;
+
+        double cover = cfg.Ft(cfg.Cover.Sides);
+        double inset = cover + dTie + dLong / 2.0;
+
+        double xMin = -geom.Width / 2.0 + inset;
+        double xMax =  geom.Width / 2.0 - inset;
+        double yMin = -geom.Depth / 2.0 + inset;
+        double yMax =  geom.Depth / 2.0 - inset;
+
+        if (xMax - xMin <= 0 || yMax - yMin <= 0)
+            throw new InvalidOperationException(
+                $"Cover + tie + bar diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room inside a " +
+                $"{UnitConv.FtToIn(geom.Width):0.##}\"×{UnitConv.FtToIn(geom.Depth):0.##}\" column.");
+
+        return (xMin, xMax, yMin, yMax);
     }
 
     /// <summary>

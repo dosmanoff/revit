@@ -34,6 +34,14 @@ public class ColumnReinforcementConfig
     public StirrupsConfig Stirrups { get; set; } = new();
 
     /// <summary>
+    /// Foundation dowels (starter bars) connecting the column cage to the slab
+    /// below. Disabled by default. When enabled, the engine looks for a slab
+    /// under the column and places one dowel per longitudinal-bar position.
+    /// </summary>
+    [JsonPropertyName("dowels")]
+    public DowelsConfig Dowels { get; set; } = new();
+
+    /// <summary>
     /// When true, before placing new rebar the engine deletes any prior bars
     /// in the same host column that carry the <c>ColumnReinforcement:</c> marker.
     /// Wired up in PR-06.
@@ -143,4 +151,52 @@ public class ConfinementZoneConfig
 
     /// <summary>Fraction of the column's clear height (0–1). Used only when <see cref="ZoneLength"/> is null.</summary>
     [JsonPropertyName("zoneFraction")] public double? ZoneFraction { get; set; }
+}
+
+/// <summary>Shape variants for foundation dowels.</summary>
+public enum DowelForm
+{
+    /// <summary>Single vertical bar from inside the slab up into the column.</summary>
+    Straight,
+
+    /// <summary>90° bend at the bottom; horizontal leg extends inside the slab toward the column centre.</summary>
+    L,
+}
+
+/// <summary>
+/// Foundation dowels (starter bars). Placed at the same (x, y) positions as the
+/// longitudinal cage so the lap splice with the column bars is concentric.
+/// </summary>
+public class DowelsConfig
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; set; }
+
+    /// <summary>RebarBarType .Name, e.g. "#8". Typically matches the longitudinal bar size.</summary>
+    [JsonPropertyName("barType")] public string BarType { get; set; } = "#8";
+
+    [JsonPropertyName("form")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DowelForm Form { get; set; } = DowelForm.L;
+
+    /// <summary>Vertical leg above the slab top — the lap-splice length with the column longitudinal.</summary>
+    [JsonPropertyName("extension")] public Length Extension { get; set; } = new(24);
+
+    /// <summary>Vertical leg below the slab top — embedment into the slab.</summary>
+    [JsonPropertyName("embedment")] public Length Embedment { get; set; } = new(6);
+
+    /// <summary>Horizontal leg length for <see cref="DowelForm.L"/>. Ignored for Straight.</summary>
+    [JsonPropertyName("legLength")] public Length LegLength { get; set; } = new(9);
+
+    /// <summary>Optional RebarHookType .Name applied at the top end of the dowel.</summary>
+    [JsonPropertyName("hookTopType")]    public string? HookTopType    { get; set; }
+
+    /// <summary>Optional RebarHookType .Name applied at the bottom end of the dowel.</summary>
+    [JsonPropertyName("hookBottomType")] public string? HookBottomType { get; set; }
+
+    /// <summary>
+    /// When true, only <see cref="BuiltInCategory.OST_StructuralFoundation"/> elements are
+    /// considered as potential hosts below the column. When false, regular floors
+    /// (<see cref="BuiltInCategory.OST_Floors"/>) also qualify.
+    /// </summary>
+    [JsonPropertyName("onlyStructuralFoundation")] public bool OnlyStructuralFoundation { get; set; } = true;
 }
