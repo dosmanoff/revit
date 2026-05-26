@@ -6,13 +6,14 @@ using ColumnReinforcement.Domain;
 namespace ColumnReinforcement.Engine;
 
 /// <summary>
-/// Places the outer transverse tie (one closed rectangle per spacing step
-/// along the column height). The four sharp corners are auto-rounded to the
-/// tie bar's <c>StirrupTieBendDiameter</c> by Revit; both free ends share the
-/// same corner of the rectangle and turn inward via the configured hook type.
+/// Places the outer transverse tie along the column height. Each tie is a single
+/// closed rectangle whose corners are auto-rounded by Revit to the bar type's
+/// <c>StirrupTieBendDiameter</c>; both free ends share one corner and turn
+/// inward via the configured hook type.
 ///
-/// Confinement zones, inner cross-ties, 45° rotation, and round-column ties
-/// arrive in Phase 2 / 3.
+/// <para>Phase 2 supports densified confinement zones at the top and bottom
+/// (different spacing inside the zones). When neither zone is enabled, the
+/// builder behaves exactly as in Phase 1 — uniform spacing top-to-bottom.</para>
 /// </summary>
 public class StirrupBuilder
 {
@@ -42,10 +43,6 @@ public class StirrupBuilder
                 $"Cover + tie diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room for a tie inside a " +
                 $"{UnitConv.FtToIn(geom.Width):0.##}\"×{UnitConv.FtToIn(geom.Depth):0.##}\" column.");
 
-        double spacing = cfg.Ft(s.Spacing);
-        if (spacing <= 0)
-            throw new InvalidOperationException("Tie spacing must be positive.");
-
         double zMin = endCover;
         double zMax = geom.Height - endCover;
         if (zMax - zMin <= 0)
@@ -53,20 +50,57 @@ public class StirrupBuilder
                 $"End cover ({UnitConv.FtToIn(endCover):0.###}\" top + bottom) is greater than column height " +
                 $"({UnitConv.FtToIn(geom.Height):0.##}\").");
 
+        double mainSpacing = cfg.Ft(s.Spacing);
+        if (mainSpacing <= 0)
+            throw new InvalidOperationException("Tie spacing must be positive.");
+
+        double zBottomZoneEnd = zMin;
+        double zTopZoneStart  = zMax;
+        double bottomSpacing  = mainSpacing;
+        double topSpacing     = mainSpacing;
+
+        if (s.Confinement.Bottom.Enabled)
+        {
+            bottomSpacing  = cfg.Ft(s.Confinement.Bottom.Spacing);
+            if (bottomSpacing <= 0)
+                throw new InvalidOperationException("Bottom confinement spacing must be positive.");
+            zBottomZoneEnd = zMin + ResolveZoneLength(cfg, s.Confinement.Bottom, geom.Height, "bottom");
+        }
+        if (s.Confinement.Top.Enabled)
+        {
+            topSpacing    = cfg.Ft(s.Confinement.Top.Spacing);
+            if (topSpacing <= 0)
+                throw new InvalidOperationException("Top confinement spacing must be positive.");
+            zTopZoneStart = zMax - ResolveZoneLength(cfg, s.Confinement.Top, geom.Height, "top");
+        }
+
+        if (zBottomZoneEnd > zTopZoneStart)
+            throw new InvalidOperationException(
+                $"Top and bottom confinement zones overlap " +
+                $"(bottom ends at {UnitConv.FtToIn(zBottomZoneEnd):0.##}\", top starts at {UnitConv.FtToIn(zTopZoneStart):0.##}\"). " +
+                $"Reduce one of the zone lengths.");
+
+        // Build three back-to-back intervals; empty intervals are skipped.
+        // Boundary ties (zBottomZoneEnd, zTopZoneStart) appear in two intervals and
+        // are de-duplicated by CombineIntervals.
+        var intervals = new List<(double from, double to, double step)>
+        {
+            (zMin,            zBottomZoneEnd, bottomSpacing),
+            (zBottomZoneEnd,  zTopZoneStart,  mainSpacing),
+            (zTopZoneStart,   zMax,           topSpacing),
+        };
+
         // Normal of the tie plane = world Z (the tie sits horizontally).
         XYZ normal = XYZ.BasisZ;
 
         int created = 0;
-        foreach (double z in EvenlySpaced(zMin, zMax, spacing))
+        foreach (double z in CombineIntervals(intervals))
         {
             XYZ p1 = geom.At(xMin, yMin, z);
             XYZ p2 = geom.At(xMax, yMin, z);
             XYZ p3 = geom.At(xMax, yMax, z);
             XYZ p4 = geom.At(xMin, yMax, z);
 
-            // Four chained segments forming a closed rectangle. Hooks at the
-            // start of the first segment and end of the last meet at p1 — the
-            // single corner of the tie where the bar opens.
             IList<Curve> curves = new List<Curve>
             {
                 Line.CreateBound(p1, p2),
@@ -92,17 +126,67 @@ public class StirrupBuilder
     }
 
     /// <summary>
-    /// Inclusive evenly-spaced positions from <paramref name="from"/> to
-    /// <paramref name="to"/>: endpoints always included, and the actual step
-    /// is rounded down from the requested <paramref name="step"/> so the row
-    /// fits exactly between the endpoints.
+    /// Resolve a confinement-zone length: absolute <see cref="ConfinementZoneConfig.ZoneLength"/>
+    /// wins when set; otherwise the <see cref="ConfinementZoneConfig.ZoneFraction"/> times
+    /// the column height. Throws if neither is set or if the result is non-positive.
     /// </summary>
-    private static IEnumerable<double> EvenlySpaced(double from, double to, double step)
+    private static double ResolveZoneLength(
+        ColumnReinforcementConfig cfg, ConfinementZoneConfig zone, double columnHeight, string which)
     {
-        if (to <= from || step <= 0) yield break;
-        double span = to - from;
-        int n = Math.Max(1, (int)Math.Ceiling(span / step));
-        double actualStep = span / n;
-        for (int i = 0; i <= n; i++) yield return from + i * actualStep;
+        double len;
+        if (zone.ZoneLength is { } abs)
+        {
+            len = cfg.Ft(abs);
+        }
+        else if (zone.ZoneFraction is { } frac)
+        {
+            if (frac <= 0 || frac >= 1)
+                throw new InvalidOperationException(
+                    $"{which} confinement zoneFraction must be between 0 and 1 exclusive (got {frac}).");
+            len = frac * columnHeight;
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"{which} confinement is enabled but neither zoneLength nor zoneFraction is set.");
+        }
+
+        if (len <= 0)
+            throw new InvalidOperationException($"{which} confinement zone length is non-positive.");
+        if (len > columnHeight)
+            throw new InvalidOperationException(
+                $"{which} confinement zone length ({UnitConv.FtToIn(len):0.##}\") exceeds column height " +
+                $"({UnitConv.FtToIn(columnHeight):0.##}\").");
+
+        return len;
+    }
+
+    /// <summary>
+    /// Walk each <c>(from, to, step)</c> interval, emit evenly-spaced positions with
+    /// endpoints included, then sort and deduplicate (a single boundary position
+    /// between two adjacent intervals collapses to one tie).
+    /// </summary>
+    internal static IReadOnlyList<double> CombineIntervals(
+        IEnumerable<(double from, double to, double step)> intervals)
+    {
+        var all = new List<double>();
+        foreach (var (from, to, step) in intervals)
+        {
+            if (to - from < 1e-9 || step <= 0) continue;
+            double span = to - from;
+            int n = Math.Max(1, (int)Math.Ceiling(span / step));
+            double actualStep = span / n;
+            for (int i = 0; i <= n; i++) all.Add(from + i * actualStep);
+        }
+        all.Sort();
+
+        const double tolerance = 1e-6;
+        var result = new List<double>(all.Count);
+        foreach (double z in all)
+        {
+            if (result.Count == 0 || z - result[^1] > tolerance)
+                result.Add(z);
+        }
+        return result;
     }
 }
