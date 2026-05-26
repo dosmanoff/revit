@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "name": "full-splices",
+  "units": "Imperial",
+  "_comment": "16x16 interior column at an intermediate floor: dowels from the foundation below, straight upper splices into the column above. Tie spacing 8 in, no confinement.",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg",
+    "rotate45": false
+  },
+  "dowels": {
+    "enabled": true,
+    "barType": "#8",
+    "form": "L",
+    "extension": 24,
+    "embedment": 6,
+    "legLength": 9,
+    "onlyStructuralFoundation": true
+  },
+  "upperSplices": {
+    "enabled": true,
+    "barType": "#8",
+    "form": "Straight",
+    "lapInsideColumn": 24,
+    "extension": 24,
+    "ignoreSlabAbove": false
+  },
+  "cleanExisting": true
+}

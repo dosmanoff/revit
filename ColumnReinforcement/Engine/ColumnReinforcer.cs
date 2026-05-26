@@ -22,6 +22,7 @@ public class ColumnReinforcer
         var longBuilder   = new LongitudinalBarBuilder(_doc);
         var tieBuilder    = new StirrupBuilder(_doc);
         var dowelBuilder  = new FoundationDowelBuilder(_doc);
+        var spliceBuilder = new UpperSpliceBuilder(_doc);
 
         foreach (ElementId id in columnIds)
         {
@@ -49,18 +50,23 @@ public class ColumnReinforcer
                 Element? slabBelow = cfg.Dowels.Enabled
                     ? HostContext.FindSlabBelow(fi, geom, cfg.Dowels.OnlyStructuralFoundation)
                     : null;
+                Element? slabAbove = cfg.UpperSplices.Enabled
+                    ? HostContext.FindSlabAbove(fi, geom)
+                    : null;
 
                 int created = 0;
                 created += longBuilder.Build(geom, cfg, tag);
                 created += tieBuilder.Build(geom, cfg, tag);
-                FoundationDowelBuilder.Result dowelResult = dowelBuilder.Build(geom, cfg, tag, slabBelow);
+                FoundationDowelBuilder.Result dowelResult  = dowelBuilder.Build(geom, cfg, tag, slabBelow);
+                UpperSpliceBuilder.Result     spliceResult = spliceBuilder.Build(geom, cfg, tag, slabAbove);
                 created += dowelResult.Created;
-                // Splices (PR-10), inner ties (Phase 3) plug in here.
+                created += spliceResult.Created;
+                // Inner ties (Phase 3) plug in here.
 
                 if (dryRun) tx.RollBack();
                 else        tx.Commit();
 
-                string? reason = dowelResult.SkipReason
+                string? reason = JoinReasons(dowelResult.SkipReason, spliceResult.SkipReason)
                     ?? (created == 0 ? "Nothing to place (check bar types and cover)" : null);
 
                 result.Outcomes.Add(new ColumnOutcome
@@ -85,5 +91,11 @@ public class ColumnReinforcer
         }
 
         return result;
+    }
+
+    private static string? JoinReasons(params string?[] reasons)
+    {
+        var nonEmpty = reasons.Where(r => !string.IsNullOrEmpty(r)).ToList();
+        return nonEmpty.Count == 0 ? null : string.Join(" | ", nonEmpty);
     }
 }

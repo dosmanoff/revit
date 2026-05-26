@@ -42,6 +42,13 @@ public class ColumnReinforcementConfig
     public DowelsConfig Dowels { get; set; } = new();
 
     /// <summary>
+    /// Upper splices (continuation bars) extending the column cage into the
+    /// column / slab above. Disabled by default.
+    /// </summary>
+    [JsonPropertyName("upperSplices")]
+    public UpperSplicesConfig UpperSplices { get; set; } = new();
+
+    /// <summary>
     /// When true, before placing new rebar the engine deletes any prior bars
     /// in the same host column that carry the <c>ColumnReinforcement:</c> marker.
     /// Wired up in PR-06.
@@ -199,4 +206,60 @@ public class DowelsConfig
     /// (<see cref="BuiltInCategory.OST_Floors"/>) also qualify.
     /// </summary>
     [JsonPropertyName("onlyStructuralFoundation")] public bool OnlyStructuralFoundation { get; set; } = true;
+}
+
+/// <summary>Shape variants for upper splices.</summary>
+public enum UpperSpliceForm
+{
+    /// <summary>Single vertical bar continuing the column longitudinal into the column / slab above.</summary>
+    Straight,
+
+    /// <summary>Vertical leg up to near the slab top, then 90° bend with a horizontal leg anchoring inside the slab above.</summary>
+    Bent,
+}
+
+/// <summary>
+/// Upper splices — bars that lap with the column longitudinal near the top of the
+/// column and extend above the column top. At intermediate floors a straight splice
+/// continues into the column above; at a roof level a bent splice anchors into the
+/// slab above.
+/// </summary>
+public class UpperSplicesConfig
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; set; }
+
+    /// <summary>RebarBarType .Name. Typically matches the longitudinal bar size.</summary>
+    [JsonPropertyName("barType")] public string BarType { get; set; } = "#8";
+
+    [JsonPropertyName("form")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public UpperSpliceForm Form { get; set; } = UpperSpliceForm.Straight;
+
+    /// <summary>
+    /// Length of the splice that sits INSIDE the column near the top, overlapping
+    /// the column longitudinal — the lap-splice length per ACI 318 §25.5.
+    /// </summary>
+    [JsonPropertyName("lapInsideColumn")] public Length LapInsideColumn { get; set; } = new(24);
+
+    /// <summary>
+    /// Straight form only: vertical extension above the column top (or above the
+    /// slab top, when a slab is above and <see cref="IgnoreSlabAbove"/> is false).
+    /// </summary>
+    [JsonPropertyName("extension")] public Length Extension { get; set; } = new(24);
+
+    /// <summary>Bent form only: horizontal leg length anchored inside the slab above.</summary>
+    [JsonPropertyName("bentLegLength")] public Length BentLegLength { get; set; } = new(12);
+
+    /// <summary>
+    /// Straight form only: when true, measure <see cref="Extension"/> from the column
+    /// top regardless of whether a slab is above. Useful when the joint hasn't been
+    /// modelled yet or the slab is on a separate workshare.
+    /// </summary>
+    [JsonPropertyName("ignoreSlabAbove")] public bool IgnoreSlabAbove { get; set; }
+
+    /// <summary>Optional RebarHookType .Name applied at the top end.</summary>
+    [JsonPropertyName("hookTopType")]    public string? HookTopType    { get; set; }
+
+    /// <summary>Optional RebarHookType .Name applied at the bottom end (inside the column).</summary>
+    [JsonPropertyName("hookBottomType")] public string? HookBottomType { get; set; }
 }

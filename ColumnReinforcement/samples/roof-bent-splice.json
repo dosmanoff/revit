@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "name": "roof-bent-splice",
+  "units": "Imperial",
+  "_comment": "16x16 column at a roof level: bent splice anchors into the roof slab. Lap 24 in inside the column, then vertical to slab top minus cover, then 12 in horizontal leg.",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg"
+  },
+  "upperSplices": {
+    "enabled": true,
+    "barType": "#8",
+    "form": "Bent",
+    "lapInsideColumn": 24,
+    "bentLegLength": 12,
+    "ignoreSlabAbove": false
+  },
+  "cleanExisting": true
+}
