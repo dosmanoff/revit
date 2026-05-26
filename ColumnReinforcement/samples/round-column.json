@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "name": "round-column",
+  "units": "Imperial",
+  "_comment": "24 in diameter round column with 8 #8 longitudinals around the cage and a closed #4 circular tie at 8 in spacing. Note barsAround is ignored on rectangular columns; barsAlongWidth/Depth are ignored on round.",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "barsAround": 8,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "T1 - 90 deg",
+    "rotate45": false
+  },
+  "cleanExisting": true
+}

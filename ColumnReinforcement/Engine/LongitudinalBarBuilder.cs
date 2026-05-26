@@ -6,10 +6,12 @@ using ColumnReinforcement.Domain;
 namespace ColumnReinforcement.Engine;
 
 /// <summary>
-/// Places the perimeter longitudinal bars in a rectangular/square column:
-/// always the four corners, plus evenly-spaced intermediates along each face
-/// when <see cref="LongitudinalConfig.BarsAlongWidth"/> /
-/// <see cref="LongitudinalConfig.BarsAlongDepth"/> exceed 2.
+/// Places the perimeter longitudinal bars. For rectangular columns: four corners
+/// always, plus evenly-spaced intermediates along each face when
+/// <see cref="LongitudinalConfig.BarsAlongWidth"/> /
+/// <see cref="LongitudinalConfig.BarsAlongDepth"/> exceed 2. For round columns:
+/// <see cref="LongitudinalConfig.BarsAround"/> bars evenly spaced around the cage
+/// circumference.
 ///
 /// Bars are placed at the geometric centre of each rebar:
 /// <c>cover_to_outer_face + d_tie + d_long / 2</c> from the face when ties are
@@ -29,20 +31,17 @@ public class LongitudinalBarBuilder
         RebarHookType? hookBottom = RebarFactory.GetHookType(_doc, cfg.Longitudinal.HookBottomType);
 
         double endCover = cfg.Ft(cfg.Cover.Ends);
-
-        var bounds = ComputeCageBounds(_doc, cfg, geom);
-        var positions = LayoutPositions(cfg.Longitudinal, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax);
-
-        // Each vertical bar runs from base + endCover to top - endCover.
-        double zBottom = endCover;
-        double zTop    = geom.Height - endCover;
+        double zBottom  = endCover;
+        double zTop     = geom.Height - endCover;
         if (zTop - zBottom <= 0)
             throw new InvalidOperationException(
                 $"End cover ({UnitConv.FtToIn(endCover):0.###}\" top + bottom) is greater than column height " +
                 $"({UnitConv.FtToIn(geom.Height):0.##}\").");
 
-        // Normal for CreateFromCurves: perpendicular to the bar axis. Any horizontal direction
-        // works for a straight vertical bar; we use the column's local X for stability.
+        var positions = ComputeCagePositions(_doc, cfg, geom);
+
+        // Normal for CreateFromCurves: perpendicular to the bar axis. Any horizontal
+        // direction works for a straight vertical bar; we use the column's local X for stability.
         XYZ normal = geom.LocalX;
 
         int created = 0;
@@ -69,25 +68,31 @@ public class LongitudinalBarBuilder
     }
 
     /// <summary>
-    /// Cross-section bounding rectangle of the longitudinal cage in the column's
-    /// local frame, i.e. the (x, y) extents along which longitudinal bar centres
-    /// lie. Encapsulates the cover + d_tie + d_long / 2 inset formula so dowel
-    /// and splice builders place bars at the same positions as the cage.
+    /// Local-frame (x, y) bar centres for the entire perimeter cage. Dispatches on
+    /// <see cref="ColumnGeometry.Section"/>: rectangular columns use the inset
+    /// rectangle from <see cref="ComputeRectangularCageBounds"/> + <see cref="LayoutRectangular"/>;
+    /// round columns use the cage radius from <see cref="ComputeRoundCageRadius"/> +
+    /// <see cref="LayoutRound"/>. Shared by dowel and splice builders.
     /// </summary>
-    internal static (double xMin, double xMax, double yMin, double yMax) ComputeCageBounds(
+    internal static List<(double x, double y)> ComputeCagePositions(
         Document doc, ColumnReinforcementConfig cfg, ColumnGeometry geom)
     {
-        RebarBarType longBar = RebarFactory.GetBarType(doc, cfg.Longitudinal.BarType);
-        double dLong = longBar.BarModelDiameter;
+        if (geom.Section == ColumnSection.Round)
+        {
+            double r = ComputeRoundCageRadius(doc, cfg, geom);
+            return LayoutRound(cfg.Longitudinal, r);
+        }
+        var bounds = ComputeRectangularCageBounds(doc, cfg, geom);
+        return LayoutRectangular(cfg.Longitudinal, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax);
+    }
 
-        // Ties shift the longitudinal bars inward by d_tie. If ties are off,
-        // no shift — the longitudinal cage hugs the cover directly.
-        double dTie = 0;
-        if (cfg.Stirrups.Enabled)
-            dTie = RebarFactory.GetBarType(doc, cfg.Stirrups.BarType).BarModelDiameter;
-
-        double cover = cfg.Ft(cfg.Cover.Sides);
-        double inset = cover + dTie + dLong / 2.0;
+    /// <summary>
+    /// Rectangular cage bounds in the column's local frame — bar-centre extents.
+    /// </summary>
+    internal static (double xMin, double xMax, double yMin, double yMax) ComputeRectangularCageBounds(
+        Document doc, ColumnReinforcementConfig cfg, ColumnGeometry geom)
+    {
+        double inset = ComputeCageInset(doc, cfg);
 
         double xMin = -geom.Width / 2.0 + inset;
         double xMax =  geom.Width / 2.0 - inset;
@@ -103,11 +108,41 @@ public class LongitudinalBarBuilder
     }
 
     /// <summary>
-    /// Compute (x, y) bar centres in the column local frame. Returns four corners
-    /// when <see cref="LongitudinalConfig.CornerOnly"/> is set; otherwise a
-    /// perimeter ring with evenly-spaced intermediates on each face.
+    /// Round cage radius (centre-of-bar) in feet.
     /// </summary>
-    internal static List<(double x, double y)> LayoutPositions(
+    internal static double ComputeRoundCageRadius(
+        Document doc, ColumnReinforcementConfig cfg, ColumnGeometry geom)
+    {
+        double inset = ComputeCageInset(doc, cfg);
+        double cageRadius = geom.Diameter / 2.0 - inset;
+        if (cageRadius <= 0)
+            throw new InvalidOperationException(
+                $"Cover + tie + bar diameter ({UnitConv.FtToIn(inset):0.###}\") leaves no room inside a " +
+                $"{UnitConv.FtToIn(geom.Diameter):0.##}\" diameter column.");
+        return cageRadius;
+    }
+
+    /// <summary>Common inset from the concrete face to the longitudinal-bar centre.</summary>
+    private static double ComputeCageInset(Document doc, ColumnReinforcementConfig cfg)
+    {
+        RebarBarType longBar = RebarFactory.GetBarType(doc, cfg.Longitudinal.BarType);
+        double dLong = longBar.BarModelDiameter;
+
+        double dTie = 0;
+        if (cfg.Stirrups.Enabled)
+            dTie = RebarFactory.GetBarType(doc, cfg.Stirrups.BarType).BarModelDiameter;
+
+        double cover = cfg.Ft(cfg.Cover.Sides);
+        return cover + dTie + dLong / 2.0;
+    }
+
+    /// <summary>
+    /// Rectangular layout: four corners (always), plus evenly-spaced intermediates
+    /// on each face when <see cref="LongitudinalConfig.BarsAlongWidth"/> /
+    /// <see cref="LongitudinalConfig.BarsAlongDepth"/> exceed 2. Honours
+    /// <see cref="LongitudinalConfig.CornerOnly"/>.
+    /// </summary>
+    internal static List<(double x, double y)> LayoutRectangular(
         LongitudinalConfig cfg, double xMin, double xMax, double yMin, double yMax)
     {
         var pts = new List<(double x, double y)>();
@@ -127,17 +162,30 @@ public class LongitudinalBarBuilder
         double[] xs = LinSpace(xMin, xMax, nx);
         double[] ys = LinSpace(yMin, yMax, ny);
 
-        // Bottom face (y = yMin): every x.
         for (int i = 0; i < nx; i++) pts.Add((xs[i], yMin));
-        // Top face (y = yMax): every x.
         for (int i = 0; i < nx; i++) pts.Add((xs[i], yMax));
-        // Left and right faces: only the intermediates (corners already placed).
         for (int j = 1; j < ny - 1; j++)
         {
             pts.Add((xMin, ys[j]));
             pts.Add((xMax, ys[j]));
         }
+        return pts;
+    }
 
+    /// <summary>
+    /// Round layout: <see cref="LongitudinalConfig.BarsAround"/> bars equally spaced
+    /// around the circle of radius <paramref name="radius"/>. First bar at angle 0
+    /// (along <see cref="ColumnGeometry.LocalX"/>); subsequent bars walk CCW.
+    /// </summary>
+    internal static List<(double x, double y)> LayoutRound(LongitudinalConfig cfg, double radius)
+    {
+        int n = Math.Max(3, cfg.BarsAround);
+        var pts = new List<(double x, double y)>(n);
+        for (int i = 0; i < n; i++)
+        {
+            double angle = 2 * Math.PI * i / n;
+            pts.Add((radius * Math.Cos(angle), radius * Math.Sin(angle)));
+        }
         return pts;
     }
 

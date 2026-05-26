@@ -64,9 +64,7 @@ public class UpperSpliceBuilder
         if (u.Form == UpperSpliceForm.Bent && bentLeg <= 0)
             throw new InvalidOperationException("Bent upper splice leg length must be positive.");
 
-        var bounds = LongitudinalBarBuilder.ComputeCageBounds(_doc, cfg, geom);
-        var positions = LongitudinalBarBuilder.LayoutPositions(
-            cfg.Longitudinal, bounds.xMin, bounds.xMax, bounds.yMin, bounds.yMax);
+        var positions = LongitudinalBarBuilder.ComputeCagePositions(_doc, cfg, geom);
 
         // Splice starts inside the column for the lap.
         double zLocalSpliceBottom = geom.Height - lap;
@@ -114,7 +112,7 @@ public class UpperSpliceBuilder
                 _ => throw new InvalidOperationException($"Unknown upper-splice form: {u.Form}"),
             };
 
-            XYZ normal = ChooseNormal(geom, x, y, u.Form);
+            XYZ normal = u.Form == UpperSpliceForm.Straight ? geom.LocalX : geom.NormalForBendAt(x, y);
 
             RebarFactory.Create(
                 _doc,
@@ -143,26 +141,17 @@ public class UpperSpliceBuilder
     private static IList<Curve> BuildBent(
         ColumnGeometry geom, double x, double y, double zBottom, double zBend, double legLength)
     {
-        // Horizontal leg direction: away from the nearest face, into the column /
-        // slab interior. Same convention as the L-form foundation dowel.
-        XYZ legDir = Math.Abs(x) >= Math.Abs(y)
-            ? geom.LocalX * -Math.Sign(x == 0 ? 1 : x)
-            : geom.LocalY * -Math.Sign(y == 0 ? 1 : y);
-
-        XYZ pBottom  = geom.At(x, y, zBottom);
-        XYZ pCorner  = geom.At(x, y, zBend);
-        XYZ pLegEnd  = pCorner + legDir * legLength;
+        // Horizontal leg direction lives in ColumnGeometry: rectangular → perpendicular
+        // to nearest face; round → radially toward the centre.
+        XYZ legDir  = geom.InwardDirection(x, y);
+        XYZ pBottom = geom.At(x, y, zBottom);
+        XYZ pCorner = geom.At(x, y, zBend);
+        XYZ pLegEnd = pCorner + legDir * legLength;
 
         return new List<Curve>
         {
             Line.CreateBound(pBottom, pCorner),
             Line.CreateBound(pCorner, pLegEnd),
         };
-    }
-
-    private static XYZ ChooseNormal(ColumnGeometry geom, double x, double y, UpperSpliceForm form)
-    {
-        if (form == UpperSpliceForm.Straight) return geom.LocalX;
-        return Math.Abs(x) >= Math.Abs(y) ? geom.LocalY : geom.LocalX;
     }
 }
