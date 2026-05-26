@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "name": "cranked-splice",
+  "units": "Imperial",
+  "_comment": "Lower column 20x20 in with #8 cage; upper column is 16x16 (2 in inset on each side). Cranked splice bends each bar inward to align with the smaller upper cage. ACI 318-19 slope = 1:6, 24 in lap inside the upper column. Use this for column-size changes at a floor; for same-size columns use Straight instead.",
+  "cover": {
+    "sides": 1.5,
+    "ends": 1.5
+  },
+  "longitudinal": {
+    "barType": "#8",
+    "cornerOnly": false,
+    "barsAlongWidth": 3,
+    "barsAlongDepth": 3,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "stirrups": {
+    "enabled": true,
+    "barType": "#4",
+    "spacing": 8,
+    "hookType": "Stirrup/Tie - 90 deg.",
+    "rotate45": false,
+    "offsetTop": 6,
+    "confinement": {
+      "bottom": { "enabled": true, "spacing": 4, "zoneFraction": 0.25 },
+      "top":    { "enabled": true, "spacing": 4, "zoneFraction": 0.25 }
+    }
+  },
+  "upperSplices": {
+    "enabled": true,
+    "barType": "#8",
+    "form": "Cranked",
+    "lapInsideColumn": 24,
+    "extension": 24,
+    "upperCageInset": 2,
+    "crankedSlopeRatio": 6,
+    "lowerBendOffsetFromTop": 6,
+    "hookTopType": null,
+    "hookBottomType": null
+  },
+  "cleanExisting": true
+}

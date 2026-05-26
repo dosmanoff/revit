@@ -221,6 +221,14 @@ public enum UpperSpliceForm
 
     /// <summary>Vertical leg up to near the slab top, then 90° bend with a horizontal leg anchoring inside the slab above.</summary>
     Bent,
+
+    /// <summary>
+    /// Three-segment cranked bar for splicing into a smaller upper column: a
+    /// vertical leg inside the lower column, a diagonal leg that offsets to the
+    /// upper column's (smaller) cage position, and a vertical leg inside the
+    /// upper column. Slope of the diagonal segment ≤ 1:6 per ACI 318-19 §10.7.4.1.
+    /// </summary>
+    Cranked,
 }
 
 /// <summary>
@@ -254,6 +262,28 @@ public class UpperSplicesConfig
 
     /// <summary>Bent form only: horizontal leg length anchored inside the slab above.</summary>
     [JsonPropertyName("bentLegLength")] public Length BentLegLength { get; set; } = new(12);
+
+    /// <summary>
+    /// Cranked form only: how much the upper column's cage is inset from the
+    /// lower cage on each side. E.g. <c>2"</c> for an upper column 4" smaller in
+    /// width and depth (assuming both columns centred). Each lower bar at
+    /// <c>(x, y)</c> in the lower frame maps to <c>(x − sign(x)·inset, y − sign(y)·inset)</c>
+    /// in the upper frame.
+    /// </summary>
+    [JsonPropertyName("upperCageInset")] public Length UpperCageInset { get; set; } = new(2);
+
+    /// <summary>
+    /// Cranked form only: vertical-over-horizontal slope ratio of the diagonal
+    /// segment. ACI 318-19 §10.7.4.1: "slope shall not exceed 1 in 6 with respect
+    /// to the axis of the member", so the default 6.0 is the steepest allowed.
+    /// </summary>
+    [JsonPropertyName("crankedSlopeRatio")] public double CrankedSlopeRatio { get; set; } = 6.0;
+
+    /// <summary>
+    /// Cranked form only: distance from the column top down to the first bend
+    /// (the top of the lower vertical leg). Typical value 4–6 inches.
+    /// </summary>
+    [JsonPropertyName("lowerBendOffsetFromTop")] public Length LowerBendOffsetFromTop { get; set; } = new(6);
 
     /// <summary>
     /// Straight form only: when true, measure <see cref="Extension"/> from the column
