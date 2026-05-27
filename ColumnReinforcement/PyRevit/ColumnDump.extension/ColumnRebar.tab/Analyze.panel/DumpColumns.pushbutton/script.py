@@ -22,6 +22,7 @@ import traceback
 from Autodesk.Revit.DB import (
     BuiltInCategory,
     BuiltInParameter,
+    Element,
     FamilyInstance,
     FilteredElementCollector,
     Options,
@@ -73,10 +74,23 @@ def get_param_string(elem, bip):
 
 
 def get_element_name(elem):
-    try:
-        return elem.Name
-    except Exception:
+    """Robust `Element.Name` access.
+
+    In Revit 2024+ the `Name` property on several Element subclasses
+    (RebarBarType, Level, ElementType, …) is exposed in a way that IronPython
+    can't reach via plain `elem.Name` — the attribute lookup raises
+    `AttributeError: Name`. Calling the .NET property getter directly via
+    `Element.Name.GetValue(elem)` works regardless.
+    """
+    if elem is None:
         return None
+    try:
+        return Element.Name.GetValue(elem)
+    except Exception:
+        try:
+            return elem.Name
+        except Exception:
+            return None
 
 
 def safe_round(x, n=4):
@@ -603,7 +617,7 @@ def levels_list():
     for lv in col:
         out.append({
             "id": eid_value(lv.Id),
-            "name": lv.Name,
+            "name": get_element_name(lv),
             "elevation_ft": safe_round(lv.Elevation),
         })
     out.sort(key=lambda l: l["elevation_ft"] if l["elevation_ft"] is not None else 0)
@@ -637,7 +651,7 @@ def available_bar_types():
         except AttributeError:
             diam_ft = None
         out.append({
-            "name": bt.Name,
+            "name": get_element_name(bt),
             "nominal_diameter_in": safe_round(diam_ft * FT_TO_IN, 4) if diam_ft else None,
         })
     out.sort(key=lambda x: x["name"])
@@ -648,7 +662,7 @@ def available_hook_types():
     col = FilteredElementCollector(doc).OfClass(RebarHookType)
     out = []
     for ht in col:
-        out.append({"name": ht.Name})
+        out.append({"name": get_element_name(ht)})
     out.sort(key=lambda x: x["name"])
     return out
 
@@ -660,13 +674,13 @@ def available_column_family_types():
     out = []
     for sym in col:
         try:
-            fam_name = sym.Family.Name
+            fam_name = get_element_name(sym.Family)
         except Exception:
             fam_name = None
         out.append({
             "id": eid_value(sym.Id),
             "family": fam_name,
-            "type": sym.Name,
+            "type": get_element_name(sym),
         })
     out.sort(key=lambda x: (x["family"] or "", x["type"] or ""))
     return out
@@ -700,11 +714,11 @@ def collect_columns():
             mark = mark.strip() or None
 
         try:
-            fam_name = inst.Symbol.Family.Name
+            fam_name = get_element_name(inst.Symbol.Family)
         except Exception:
             fam_name = None
         try:
-            type_name = inst.Symbol.Name
+            type_name = get_element_name(inst.Symbol)
         except Exception:
             type_name = None
 
