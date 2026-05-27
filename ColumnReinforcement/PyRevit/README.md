@@ -24,11 +24,14 @@ Revit model ──[pyRevit: Dump Columns]──► columns.json
 
 Per column:
 
-- `mark`, `family`, `type`, `element_id`
+- `mark`, `family`, `type`, `type_id`, `element_id`
 - `section` (`Rectangular` / `Round`), `width_in` / `depth_in` (or `diameter_in`), `rotation_deg`
 - `base`: level name, elevation (ft), plan X/Y (ft)
 - `top`: level name, elevation (ft)
 - `height_ft`
+- `comments` — the Revit **Comments** instance parameter. Structural engineers commonly encode the rebar schedule inline here, e.g. `12#7 + #4@10" STIRRUP + #4@10" TIE`. **Read this first** when generating the CSV — it's the most direct source of truth.
+- `rebar_cover.{top, bottom, other}` — Revit's native per-face `RebarCoverType` overrides as `{name, distance_in}` or `null`. When set, **use these instead of the plugin's 1.5″ default** for `CoverSides` / `CoverEnds`.
+- `parameters` — dict of every instance parameter with a non-null value, keyed by display name. Catches custom shared parameters like `Corner Mark`, `Column.Reaction`, etc. that vary by project. Doubles render as `{raw, display}`; ElementId references as `{id, name}`.
 - `context.slab_below` — `StructuralFoundation` or `Floor`, with thickness (drives `DowelOnlyFoundation`)
 - `context.slab_above` — `Floor` (drives `SpliceForm=Bent`)
 - `context.column_above` / `column_below` — neighbour column **with its true geometric relation** to this column:
@@ -50,7 +53,8 @@ Plus document-level info that helps the agent only emit valid CSV:
 - `levels` — names + elevations
 - `available_rebar_bar_types` — every `RebarBarType.Name` actually loaded (e.g. `#3`, `#4`, … `#11`)
 - `available_rebar_hook_types` — every `RebarHookType.Name`
-- `available_column_family_types` — every column type symbol present
+- `available_column_family_types` — every column type symbol present (id + family + type only — reference catalogue)
+- `column_types_in_use` — keyed by stringified `type_id`. Every column type that at least one dumped column uses, with **all type-level parameters**. Per-column records carry `type_id` for cross-reference; type params aren't duplicated on every column.
 - `warnings` — duplicate Marks, columns with no Mark, geometry errors, …
 
 Sections in inches; elevations and plan offsets in feet (Revit internal). See `units_note` in the file.

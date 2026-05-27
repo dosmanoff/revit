@@ -42,7 +42,7 @@ output = script.get_output()
 FT_TO_IN = 12.0
 Z_TOLERANCE_FT = 1.0 / 96.0          # 1/8" — same as the C# HostContext
 XY_NEIGHBOUR_TOL_FT = 1.5            # 18" — columns "in the same stack"; insets resolve true offsets
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # ACI 318 §10.7.4.1: maximum crank slope = 1:6 (inward shift per unit vertical).
 ACI_MAX_CRANK_SLOPE = 1.0 / 6.0
@@ -125,6 +125,106 @@ def safe_round(x, n=4):
         return None
     try:
         return round(float(x), n)
+    except Exception:
+        return None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Parameter serialisation — generic dump of every readable parameter, so the
+# downstream agent sees Comments, custom shared parameters (e.g. "Corner Mark",
+# "Column.Reaction"), schedule notes encoded as text, etc. Without this the
+# dump only carries what the script explicitly extracts, which is brittle.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def serialize_param(p):
+    """Convert a Revit Parameter to a JSON-friendly value, or None if empty."""
+    if p is None or not p.HasValue:
+        return None
+    try:
+        st = p.StorageType
+    except Exception:
+        return None
+    try:
+        if st == StorageType.String:
+            s = p.AsString()
+            return s if s else None
+        if st == StorageType.Integer:
+            return int(p.AsInteger())
+        if st == StorageType.Double:
+            raw = safe_round(p.AsDouble(), 6)
+            display = None
+            try:
+                display = p.AsValueString()
+            except Exception:
+                pass
+            if display:
+                return {"raw": raw, "display": display}
+            return raw
+        if st == StorageType.ElementId:
+            eid = p.AsElementId()
+            v = eid_value(eid)
+            if v is None or v == -1:
+                return None
+            ref = doc.GetElement(eid)
+            if ref is None:
+                return {"id": v}
+            return {"id": v, "name": get_element_name(ref)}
+    except Exception:
+        return None
+    return None
+
+
+def dump_parameters(elem):
+    """Dict of every parameter on elem with a non-null value. Keyed by display name."""
+    out = {}
+    if elem is None:
+        return out
+    try:
+        params = elem.Parameters
+    except Exception:
+        return out
+    for p in params:
+        try:
+            name = p.Definition.Name
+        except Exception:
+            continue
+        value = serialize_param(p)
+        if value is None:
+            continue
+        # Two parameters can technically share a name (shared + builtin); keep the first.
+        if name not in out:
+            out[name] = value
+    return out
+
+
+def cover_info(elem, bip_name):
+    """Extract a RebarHostCover-style parameter (CLEAR_COVER_TOP / BOTTOM / OTHER).
+
+    Returns {name, distance_in} or None when not set.
+    """
+    bip = getattr(BuiltInParameter, bip_name, None)
+    if bip is None:
+        return None
+    p = elem.get_Parameter(bip)
+    if p is None or not p.HasValue:
+        return None
+    try:
+        cover_type_id = p.AsElementId()
+    except Exception:
+        return None
+    if cover_type_id is None:
+        return None
+    v = eid_value(cover_type_id)
+    if v is None or v == -1:
+        return None
+    cover_type = doc.GetElement(cover_type_id)
+    if cover_type is None:
+        return None
+    try:
+        return {
+            "name": get_element_name(cover_type),
+            "distance_in": safe_round(cover_type.CoverDistance * FT_TO_IN, 3),
+        }
     except Exception:
         return None
 
@@ -694,6 +794,42 @@ def available_hook_types():
     return out
 
 
+def column_types_in_use(entries):
+    """Dump every column type used by at least one dumped column, once.
+
+    Keyed by string-form type_id (JSON object keys must be strings). Per-column
+    records carry `type_id` so the agent can cross-reference into this map
+    without duplicating type-level parameters on every column.
+    """
+    seen = {}
+    for e in entries:
+        try:
+            type_id = e["_inst"].GetTypeId()
+        except Exception:
+            continue
+        v = eid_value(type_id)
+        if v is None or v == -1:
+            continue
+        key = str(v)
+        if key in seen:
+            continue
+        sym = doc.GetElement(type_id)
+        if sym is None:
+            continue
+        try:
+            fam = sym.Family
+            fam_name = get_element_name(fam) if fam is not None else None
+        except Exception:
+            fam_name = None
+        seen[key] = {
+            "id": v,
+            "family": fam_name,
+            "type": get_element_name(sym),
+            "parameters": dump_parameters(sym),
+        }
+    return seen
+
+
 def available_column_family_types():
     col = (FilteredElementCollector(doc)
            .OfCategory(BuiltInCategory.OST_StructuralColumns)
@@ -913,16 +1049,29 @@ def build_record(entry, levels, all_entries):
     base_lvl_param = get_param_string(inst, BuiltInParameter.FAMILY_BASE_LEVEL_PARAM)
     top_lvl_param = get_param_string(inst, BuiltInParameter.FAMILY_TOP_LEVEL_PARAM)
 
+    # Engineering schedule notes live in the Comments parameter — first-class
+    # input for the agent. Also surface Revit's native rebar cover overrides
+    # (per-face RebarCoverType ElementId), so the agent uses the engineer's
+    # actual cover values instead of the plugin's 1.5" default.
+    comments = get_param_string(inst, BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)
+
     record = {
         "element_id": eid_value(inst.Id),
         "mark": entry["mark"],
         "family": entry["family"],
         "type": entry["type"],
+        "type_id": eid_value(inst.GetTypeId()),
         "section": section,
         "width_in": width_in if not is_round else None,
         "depth_in": depth_in if not is_round else None,
         "diameter_in": width_in if is_round else None,
         "rotation_deg": safe_round(g["rotation_deg"], 2),
+        "comments": comments,
+        "rebar_cover": {
+            "top": cover_info(inst, "CLEAR_COVER_TOP"),
+            "bottom": cover_info(inst, "CLEAR_COVER_BOTTOM"),
+            "other": cover_info(inst, "CLEAR_COVER_OTHER"),
+        },
         "base": {
             "level_name": base_lvl_param or base_lvl,
             "elevation_ft": safe_round(g["base_center"].Z),
@@ -941,6 +1090,7 @@ def build_record(entry, levels, all_entries):
             "column_below": below,
         },
         "hints": hints,
+        "parameters": dump_parameters(inst),
     }
     return record
 
@@ -1010,6 +1160,7 @@ def main():
         "available_rebar_bar_types": bar_types,
         "available_rebar_hook_types": hook_types,
         "available_column_family_types": fam_types,
+        "column_types_in_use": column_types_in_use(entries),
         "warnings": warnings,
         "columns": records,
     }
