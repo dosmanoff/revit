@@ -64,17 +64,21 @@ public class ColumnReinforcer
 
                 ColumnGeometry geom = ColumnGeometry.For(fi);
 
-                Element? slabBelow = cfg.Dowels.Enabled
-                    ? HostContext.FindSlabBelow(fi, geom, cfg.Dowels.OnlyStructuralFoundation)
-                    : null;
-                Element? slabAbove = cfg.UpperSplices.Enabled
-                    ? HostContext.FindSlabAbove(fi, geom)
+                // Resolve hosts once per column — both for dowels (below) and for the
+                // longitudinal "bent into slab above" termination and the upper splices.
+                (Element host, DowelHost kind)? dowelHostInfo = cfg.Dowels.Enabled
+                    ? HostContext.ResolveDowelHost(fi, geom, cfg.Dowels.Host, cfg.Dowels.OnlyStructuralFoundation)
                     : null;
 
+                bool needsSlabAbove =
+                    cfg.UpperSplices.Enabled ||
+                    cfg.Longitudinal.TopTermination != LongTopTermination.None;
+                Element? slabAbove = needsSlabAbove ? HostContext.FindSlabAbove(fi, geom) : null;
+
                 int created = 0;
-                created += longBuilder.Build(geom, cfg, tag);
+                created += longBuilder.Build(geom, cfg, tag, slabAbove);
                 created += tieBuilder.Build(geom, cfg, tag);
-                FoundationDowelBuilder.Result dowelResult  = dowelBuilder.Build(geom, cfg, tag, slabBelow);
+                FoundationDowelBuilder.Result dowelResult  = dowelBuilder.Build(geom, cfg, tag, dowelHostInfo);
                 UpperSpliceBuilder.Result     spliceResult = spliceBuilder.Build(geom, cfg, tag, slabAbove);
                 created += dowelResult.Created;
                 created += spliceResult.Created;

@@ -1,0 +1,20 @@
+# Section-change scenario: 24x24 ground column transitions to 12x12 at level 2.
+# Cranked splice can't fit (12 in offset would need 72 in rise per ACI 1:6),
+# so we terminate the lower cage with 90° bends into the slab above, and
+# place fresh dowels from the lower column UP into the smaller upper column.
+#
+# Row C1.1 — the larger lower column:
+#   - All 16 #11 bars terminate with 90° hook into the floor slab above
+#     (LongTopTermination=All, LongTopBentLeg=18)
+#   - Foundation dowels from the footing below (DowelsEnabled, L-form)
+#   - No upper splices needed (the bars don't continue up)
+#
+# Row C1.2 — the smaller upper column:
+#   - Standard cage continuing up
+#   - "Dowels" from the lower column via DowelHost=Column, position offset
+#     by 1*d_bar along the face from each cage position so the lap is
+#     non-contact (ACI 318 §25.5.1.3)
+#   - Bent splice into the roof slab above (if this is the top level)
+Mark, ExpectedW, ExpectedD, LongBarType, LongBarsW, LongBarsD, StirrupBarType, StirrupSpacing, LongTopTermination, LongTopBentLeg, DowelsEnabled, DowelForm, DowelHost, DowelBarType, DowelExt, DowelEmbed, SplicesEnabled, SpliceForm, SpliceLap, SpliceBentLeg
+C1.1, 24, 24, #11, 4, 4, #5, 6, All,  18, true, L,        Auto,   #11, 36, 8,  false, ,        ,
+C1.2, 12, 12, #8,  3, 3, #4, 8, None, ,   true, Straight, Column, #8,  36, 36, true,  Bent,    24,  12
