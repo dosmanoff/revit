@@ -56,12 +56,39 @@ CRANK_LAP_BUDGET_IN = 30.0
 # ──────────────────────────────────────────────────────────────────────────────
 
 def eid_value(eid):
-    """ElementId → number, working on Revit 2024+ (Value) and older (IntegerValue)."""
+    """ElementId → JSON-safe integer.
+
+    Revit 2024+ exposes `ElementId.Value` as .NET `Int64` → Python `long` in
+    IronPython 2.7. The bundled json encoder only treats Python `int` as a
+    JSON number (long falls through to `default` and raises), so we coerce.
+    For IDs that don't fit in `Int32` we fall back to a string — the spec
+    doesn't promise ElementIds will be numeric, and a string is safer than a
+    silent overflow.
+    """
     if eid is None:
         return None
-    if hasattr(eid, "Value"):
-        return eid.Value
-    return eid.IntegerValue
+    raw = eid.Value if hasattr(eid, "Value") else eid.IntegerValue
+    try:
+        coerced = int(raw)
+        # Python 2 / IronPython 2.7: `int(huge_long)` returns long again. The
+        # encoder still wouldn't accept it — stringify.
+        if type(coerced).__name__ == "long":
+            return str(raw)
+        return coerced
+    except Exception:
+        return str(raw)
+
+
+def _json_default(obj):
+    """Last-resort encoder for values json doesn't recognise — mostly IronPython
+    `long`s sneaking in from Revit API integer properties we haven't coerced."""
+    try:
+        coerced = int(obj)
+        if type(coerced).__name__ == "long":
+            return str(obj)
+        return coerced
+    except Exception:
+        return str(obj)
 
 
 def get_param_string(elem, bip):
@@ -997,7 +1024,8 @@ def main():
         return
 
     with io.open(out_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(dump, indent=2, ensure_ascii=False, sort_keys=False))
+        f.write(json.dumps(dump, indent=2, ensure_ascii=False, sort_keys=False,
+                           default=_json_default))
 
     output.print_md("### Dumped {0} columns".format(len(records)))
     output.print_md("**File:** `{0}`".format(out_path))
