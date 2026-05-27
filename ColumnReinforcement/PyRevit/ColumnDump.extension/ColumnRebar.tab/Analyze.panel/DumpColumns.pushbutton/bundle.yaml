@@ -1,0 +1,5 @@
+title: Dump Columns
+tooltip: Export all structural columns (geometry, levels, neighbouring slabs and columns)
+  to a JSON file. Hand that file to Claude — it can read the dump and write
+  assignments.csv for the ColumnReinforcement plugin.
+author: ColumnReinforcement

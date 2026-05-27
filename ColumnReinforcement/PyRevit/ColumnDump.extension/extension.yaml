@@ -1,0 +1,4 @@
+title: Column Dump
+author: ColumnReinforcement
+description: pyRevit companion for the ColumnReinforcement plugin.
+  Exports column model data to JSON so Claude (or another tool) can generate assignments.csv.
