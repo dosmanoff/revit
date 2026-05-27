@@ -117,6 +117,8 @@ Rectangular columns use `LongBarsW` and `LongBarsD`. Round columns use `LongBars
 | `LongCornersOnly` | bool | `false` | Rectangular only. If true, places exactly 4 corner bars and ignores `LongBarsW`/`LongBarsD`. |
 | `LongHookTop` | string? | `null` | Optional `RebarHookType.Name` for the top end of longitudinals. `null` (empty cell) = no hook. |
 | `LongHookBot` | string? | `null` | Same for the bottom end. |
+| `LongTopTermination` | enum: `None` \| `All` \| `Corners` \| `Edges` | `None` | Which bars terminate with a 90° bend into the slab above. `None` = all straight to column top (Phase-1). `All` = every bar bent. `Corners` = only the 4 corner bars bent; mid-face bars continue straight. `Edges` = only non-corner perimeter bars bent. Requires `OST_Floors` slab above when any bar is selected. Used when the upper column is much smaller than the lower and a Cranked splice would violate ACI 1:6. |
+| `LongTopBentLeg` | length | `12` in | Horizontal leg length inside the slab above for bars selected by `LongTopTermination`. Direction is inward toward the column centre. |
 
 ### 2.6 Ties (transverse reinforcement)
 
@@ -151,10 +153,11 @@ The engine searches for a slab directly below the column at the right elevation 
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `DowelsEnabled` | bool | `false` | Master toggle. |
-| `DowelForm` | enum: `Straight` \| `L` | `L` | `Straight` = single vertical bar. `L` = 90° bend at the bottom with a horizontal leg inside the slab. |
-| `DowelBarType` | string | `#8` | Typically matches `LongBarType`. |
-| `DowelExt` | length | `24` in | Vertical leg above the slab top — the lap-splice length with the column longitudinal. Compute via ACI calculator (`ℓst`, Class B). |
-| `DowelEmbed` | length | `6` in | Vertical leg below the slab top — embedment into the slab. |
+| `DowelForm` | enum: `Straight` \| `L` | `L` | `Straight` = single vertical bar. `L` = 90° bend at the bottom with a horizontal leg inside the slab. **L-form is only valid with slab/foundation/floor hosts**; for `DowelHost=Column` use `Straight`. |
+| `DowelHost` | enum: `Auto` \| `Foundation` \| `Floor` \| `Column` \| `Beam` | `Auto` | Which structural element below the column to anchor into. `Auto` (default) respects `DowelOnlyFoundation`: searches `OST_StructuralFoundation` first, then `OST_Floors` if the flag is `false`. Explicit values force a single host kind. **`Column`** is for the big-section-change case where the lower column is so much larger than the current one that a Cranked splice can't fit — the dowel laps inside the lower column for `DowelEmbed` and extends up by `DowelExt` into the current cage; bar type matches the current cage (use empty `DowelBarType` to inherit `LongBarType`); positions sit 1·d_bar offset along the face from the cage positions, leaving the cage bar slot free. **`Beam`** is for columns landing on a transfer beam — geometry like Floor. |
+| `DowelBarType` | string | `#8` | Typically matches `LongBarType`. **For `DowelHost=Column`**: leave matching `LongBarType` (or empty in a sparse CSV) so the dowel is the same size as the upper cage. |
+| `DowelExt` | length | `24` in | Vertical leg above the host top — the lap-splice length with the current column's cage. Compute via ACI calculator (`ℓst`, Class B). |
+| `DowelEmbed` | length | `6` in | Slab/Foundation/Floor/Beam host: vertical embedment into the host. **Column host**: lap length INSIDE the lower column (typically `ℓst` = `1.3·ℓd`). |
 | `DowelLeg` | length | `9` in | L-form only: horizontal leg length inside the slab. Ignored for Straight. |
 | `DowelOnlyFoundation` | bool | `true` | If false, regular `OST_Floors` slabs also qualify as the host. Set to false if your foundations are modelled as structural floors. |
 | `DowelHookTop` | string? | `null` | Optional top-end hook. |
@@ -252,6 +255,26 @@ Just corner bars, smallest legal tie, no extras.
 Mark,LongBarType,LongCornersOnly,StirrupBarType,StirrupSpacing
 C4.1,#6,true,#3,6
 ```
+
+### 4.6 Big section change between floors (Cranked won't fit)
+
+Upper column much smaller than lower (e.g., 24″→12″, 12″ offset per side). At 1:6 slope per ACI 318 §10.7.4.1 the Cranked diagonal would need 72″ of vertical rise, which doesn't fit in a typical lap zone. Workaround: terminate the lower cage with 90° bends into the slab above, then place fresh dowels from the lower column up into the upper column.
+
+```csv
+Mark,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing,LongTopTermination,LongTopBentLeg,DowelsEnabled,DowelForm,DowelHost,DowelBarType,DowelExt,DowelEmbed,SplicesEnabled,SpliceForm,SpliceLap,SpliceBentLeg
+C1.1,#11,4,4,#5,6,All,18,true,L,Auto,#11,36,8,false,,,
+C1.2,#8,3,3,#4,8,None,,true,Straight,Column,#8,36,36,true,Bent,24,12
+```
+
+Row C1.1 (the 24×24 ground column):
+- Foundation dowels from the footing below (`DowelHost=Auto`, found as `OST_StructuralFoundation`)
+- All 16 `#11` bars bend 90° into the floor slab above (`LongTopTermination=All`, 18″ leg)
+- No upper splice — the bars don't continue up
+
+Row C1.2 (the 12×12 upper column):
+- Dowels from the lower column (`DowelHost=Column`), positions offset 1·db along the face from the upper cage, 36″ lap inside lower column, 36″ extension into upper cage
+- Standard `#8` cage continues straight to the next floor (or roof)
+- Bent splice into the roof slab if this is the top level
 
 ---
 

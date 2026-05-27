@@ -1,3 +1,4 @@
+using Autodesk.Revit.DB;
 using System.Text.Json.Serialization;
 
 namespace ColumnReinforcement.Config;
@@ -70,6 +71,28 @@ public class CoverConfig
     [JsonPropertyName("ends")]  public Length Ends  { get; set; } = new(1.5);
 }
 
+/// <summary>
+/// Which subset of the longitudinal cage terminates with a 90° bend into the
+/// slab above, instead of continuing straight to the column top. Used when the
+/// upper column is so much smaller (or absent) that a Cranked splice would
+/// violate the ACI 1:6 slope cap — terminate the lower cage bars in the slab
+/// and start fresh dowels for the upper column instead (via DowelHost=Column).
+/// </summary>
+public enum LongTopTermination
+{
+    /// <summary>All bars run straight to the column top (Phase-1 behaviour).</summary>
+    None,
+
+    /// <summary>Every bar gets a 90° bend into the slab above.</summary>
+    All,
+
+    /// <summary>Only the four corner bars terminate with the bend; mid-face bars continue straight.</summary>
+    Corners,
+
+    /// <summary>Only the non-corner perimeter bars (mid-face) terminate with the bend.</summary>
+    Edges,
+}
+
 /// <summary>Longitudinal (vertical) reinforcement layout.</summary>
 public class LongitudinalConfig
 {
@@ -93,6 +116,21 @@ public class LongitudinalConfig
 
     /// <summary>Optional RebarHookType .Name for the bottom end of longitudinal bars. <c>null</c> = no hook.</summary>
     [JsonPropertyName("hookBottomType")] public string? HookBottomType { get; set; }
+
+    /// <summary>
+    /// Subset of bars that terminate with a 90° bend into the slab above
+    /// (see <see cref="LongTopTermination"/>). Requires a slab above for the
+    /// selected bars; non-selected bars continue straight to the column top.
+    /// </summary>
+    [JsonPropertyName("topTermination")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public LongTopTermination TopTermination { get; set; } = LongTopTermination.None;
+
+    /// <summary>
+    /// Horizontal leg length inside the slab above for bars selected by
+    /// <see cref="TopTermination"/>. Direction is inward (toward column centre).
+    /// </summary>
+    [JsonPropertyName("topBentLeg")] public Length TopBentLeg { get; set; } = new(12);
 }
 
 /// <summary>Transverse (tie) reinforcement.</summary>
@@ -168,11 +206,39 @@ public class ConfinementZoneConfig
 /// <summary>Shape variants for foundation dowels.</summary>
 public enum DowelForm
 {
-    /// <summary>Single vertical bar from inside the slab up into the column.</summary>
+    /// <summary>Single vertical bar from inside the host element up into the column.</summary>
     Straight,
 
-    /// <summary>90° bend at the bottom; horizontal leg extends inside the slab toward the column centre.</summary>
+    /// <summary>90° bend at the bottom; horizontal leg extends inside the slab toward the column centre. Slab/foundation hosts only.</summary>
     L,
+}
+
+/// <summary>Kind of host element from which dowels are extracted.</summary>
+public enum DowelHost
+{
+    /// <summary>Search foundation, then floors (legacy behaviour; respects <see cref="DowelsConfig.OnlyStructuralFoundation"/>).</summary>
+    Auto,
+
+    /// <summary><see cref="BuiltInCategory.OST_StructuralFoundation"/> only.</summary>
+    Foundation,
+
+    /// <summary><see cref="BuiltInCategory.OST_Floors"/> only.</summary>
+    Floor,
+
+    /// <summary>
+    /// <see cref="BuiltInCategory.OST_StructuralColumns"/> below — used when the upper column has a
+    /// section so much smaller than the lower that a Cranked splice would violate the ACI 1:6 slope.
+    /// Dowels run from inside the lower column up into the current column; bar type matches the
+    /// current cage; positions sit 1·d_bar offset along the face from each cage position so the
+    /// dowel and the cage bar lap non-contact.
+    /// </summary>
+    Column,
+
+    /// <summary>
+    /// <see cref="BuiltInCategory.OST_StructuralFraming"/> below — beams. Rare; used when the
+    /// column lands on a transfer beam.
+    /// </summary>
+    Beam,
 }
 
 /// <summary>
@@ -206,11 +272,21 @@ public class DowelsConfig
     [JsonPropertyName("hookBottomType")] public string? HookBottomType { get; set; }
 
     /// <summary>
-    /// When true, only <see cref="BuiltInCategory.OST_StructuralFoundation"/> elements are
-    /// considered as potential hosts below the column. When false, regular floors
-    /// (<see cref="BuiltInCategory.OST_Floors"/>) also qualify.
+    /// Only relevant when <see cref="Host"/> is <see cref="DowelHost.Auto"/>. When true, only
+    /// <see cref="BuiltInCategory.OST_StructuralFoundation"/> elements are considered as
+    /// potential hosts; when false, regular floors (<see cref="BuiltInCategory.OST_Floors"/>) also qualify.
     /// </summary>
     [JsonPropertyName("onlyStructuralFoundation")] public bool OnlyStructuralFoundation { get; set; } = true;
+
+    /// <summary>
+    /// Which structural element the dowels are extracted from. <see cref="DowelHost.Auto"/>
+    /// (default) preserves the original behaviour driven by <see cref="OnlyStructuralFoundation"/>;
+    /// the explicit values force a single host kind. <see cref="DowelHost.Column"/> is for
+    /// the column-section-change case where Cranked splice doesn't fit.
+    /// </summary>
+    [JsonPropertyName("host")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DowelHost Host { get; set; } = DowelHost.Auto;
 }
 
 /// <summary>Shape variants for upper splices.</summary>

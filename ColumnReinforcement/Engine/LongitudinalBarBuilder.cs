@@ -23,7 +23,7 @@ public class LongitudinalBarBuilder
 
     public LongitudinalBarBuilder(Document doc) => _doc = doc;
 
-    public int Build(ColumnGeometry geom, ColumnReinforcementConfig cfg, string tag)
+    public int Build(ColumnGeometry geom, ColumnReinforcementConfig cfg, string tag, Element? slabAbove = null)
     {
         RebarBarType longBar = RebarFactory.GetBarType(_doc, cfg.Longitudinal.BarType);
 
@@ -39,17 +39,52 @@ public class LongitudinalBarBuilder
                 $"({UnitConv.FtToIn(geom.Height):0.##}\").");
 
         var positions = ComputeCagePositions(_doc, cfg, geom);
+        bool[] terminate = ResolveTerminationMask(cfg.Longitudinal, positions);
 
-        // Normal for CreateFromCurves: perpendicular to the bar axis. Any horizontal
-        // direction works for a straight vertical bar; we use the column's local X for stability.
-        XYZ normal = geom.LocalX;
+        // Bent-into-slab geometry needs a slab above and the bend elevation inside it.
+        double zLocalBend = 0;
+        double bentLeg    = 0;
+        bool hasBent      = terminate.Any(t => t);
+        if (hasBent)
+        {
+            if (slabAbove is null)
+                throw new InvalidOperationException(
+                    $"longitudinal.topTermination={cfg.Longitudinal.TopTermination} requires an OST_Floors slab above the column; none found.");
+            BoundingBoxXYZ slabBb = slabAbove.get_BoundingBox(null)
+                ?? throw new InvalidOperationException("Slab above the column has no bounding box.");
+            zLocalBend = (slabBb.Max.Z - endCover) - geom.BaseCenter.Z;
+            bentLeg = cfg.Ft(cfg.Longitudinal.TopBentLeg);
+            if (bentLeg <= 0)
+                throw new InvalidOperationException("longitudinal.topBentLeg must be positive when topTermination is set.");
+            if (zLocalBend <= zBottom)
+                throw new InvalidOperationException(
+                    $"Bent termination bend point ({UnitConv.FtToIn(zLocalBend):0.##}\") is at or below the bar bottom " +
+                    $"({UnitConv.FtToIn(zBottom):0.##}\"). Check end cover and slab elevation.");
+        }
 
         int created = 0;
-        foreach ((double x, double y) in positions)
+        for (int i = 0; i < positions.Count; i++)
         {
-            XYZ p0 = geom.At(x, y, zBottom);
-            XYZ p1 = geom.At(x, y, zTop);
-            IList<Curve> curves = new List<Curve> { Line.CreateBound(p0, p1) };
+            (double x, double y) = positions[i];
+
+            IList<Curve> curves;
+            XYZ normal;
+            if (terminate[i])
+            {
+                // Vertical leg up into the slab + 90° bend with horizontal leg inward.
+                XYZ p0 = geom.At(x, y, zBottom);
+                XYZ pCorner = geom.At(x, y, zLocalBend);
+                XYZ pLegEnd = pCorner + geom.InwardDirection(x, y) * bentLeg;
+                curves = new List<Curve> { Line.CreateBound(p0, pCorner), Line.CreateBound(pCorner, pLegEnd) };
+                normal = geom.NormalForBendAt(x, y);
+            }
+            else
+            {
+                XYZ p0 = geom.At(x, y, zBottom);
+                XYZ p1 = geom.At(x, y, zTop);
+                curves = new List<Curve> { Line.CreateBound(p0, p1) };
+                normal = geom.LocalX;
+            }
 
             RebarFactory.Create(
                 _doc,
@@ -60,11 +95,67 @@ public class LongitudinalBarBuilder
                 curves,
                 tag,
                 startHook: hookBottom,
-                endHook:   hookTop);
+                endHook:   terminate[i] ? null : hookTop);
             created++;
         }
 
         return created;
+    }
+
+    /// <summary>
+    /// For each position, decide whether that bar terminates with a 90° bend into the
+    /// slab above (true) or runs straight to the column top (false), according to
+    /// <see cref="LongitudinalConfig.TopTermination"/>. Position layout matches the
+    /// rectangular case in <see cref="LayoutRectangular"/>: the first 2·nx entries are
+    /// the bottom and top faces (in that order), followed by the (ny−2) interior
+    /// positions on each side face.
+    /// </summary>
+    internal static bool[] ResolveTerminationMask(LongitudinalConfig cfg, IReadOnlyList<(double x, double y)> positions)
+    {
+        var mask = new bool[positions.Count];
+        switch (cfg.TopTermination)
+        {
+            case LongTopTermination.None:
+                return mask;
+
+            case LongTopTermination.All:
+                for (int i = 0; i < mask.Length; i++) mask[i] = true;
+                return mask;
+
+            case LongTopTermination.Corners:
+                // Geometrically: the 4 corners of a rectangular cage are positions where
+                // |x| is at its max AND |y| is at its max. For round columns Corners maps
+                // to "none" (no notion of corners).
+                MarkExtremalPositions(positions, mask, cornersOnly: true);
+                return mask;
+
+            case LongTopTermination.Edges:
+                MarkExtremalPositions(positions, mask, cornersOnly: false);
+                // Subtract corners — Edges means "non-corner perimeter bars".
+                var cornerMask = new bool[positions.Count];
+                MarkExtremalPositions(positions, cornerMask, cornersOnly: true);
+                for (int i = 0; i < mask.Length; i++) mask[i] = mask[i] && !cornerMask[i];
+                return mask;
+
+            default:
+                return mask;
+        }
+    }
+
+    private static void MarkExtremalPositions(IReadOnlyList<(double x, double y)> positions, bool[] mask, bool cornersOnly)
+    {
+        if (positions.Count == 0) return;
+        double maxAbsX = positions.Max(p => Math.Abs(p.x));
+        double maxAbsY = positions.Max(p => Math.Abs(p.y));
+        const double tol = 1e-9;
+
+        for (int i = 0; i < positions.Count; i++)
+        {
+            var (x, y) = positions[i];
+            bool onMaxX = Math.Abs(Math.Abs(x) - maxAbsX) < tol;
+            bool onMaxY = Math.Abs(Math.Abs(y) - maxAbsY) < tol;
+            mask[i] = cornersOnly ? (onMaxX && onMaxY) : (onMaxX || onMaxY);
+        }
     }
 
     /// <summary>
