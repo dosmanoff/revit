@@ -18,17 +18,31 @@ public class ColumnViewsCommand : IExternalCommand
         Document doc = uidoc.Document;
 
         ColumnViewsConfig config = ColumnViewsConfigStore.Load(doc);
+        IReadOnlyList<string> titleBlocks = TitleBlockNames(doc);
 
-        var dialog = new ColumnViewsDialog(config);
-        if (dialog.ShowDialog() != true)
-            return Result.Cancelled;
+        // Start from whatever columns are already selected; the dialog lets the user re-pick.
+        IList<ElementId> columnIds = ColumnsInSelection(uidoc);
 
-        config = dialog.Config;
-        ColumnViewsConfigStore.Save(doc, config);
+        while (true)
+        {
+            var dialog = new ColumnViewsDialog(config, titleBlocks, columnIds.Count);
+            if (dialog.ShowDialog() != true)
+                return Result.Cancelled;
 
-        IList<ElementId> columnIds = GetColumnSelection(uidoc);
+            config = dialog.Config;
+
+            if (!dialog.ReselectRequested)
+                break;
+
+            IList<ElementId> picked = PickColumns(uidoc);
+            if (picked.Count > 0)
+                columnIds = picked;
+        }
+
         if (columnIds.Count == 0)
             return Result.Cancelled;
+
+        ColumnViewsConfigStore.Save(doc, config);
 
         var engine = new ColumnViewsEngine(doc, config);
 
@@ -48,25 +62,32 @@ public class ColumnViewsCommand : IExternalCommand
         return Result.Succeeded;
     }
 
-    /// <summary>
-    /// Returns the structural columns in the current selection; if none are selected,
-    /// prompts the user to pick them. Returns an empty list when the user cancels.
-    /// </summary>
-    private static IList<ElementId> GetColumnSelection(UIDocument uidoc)
-    {
-        var filter = new ColumnSelectionFilter();
-
-        List<ElementId> fromSelection = uidoc.Selection.GetElementIds()
-            .Where(id => filter.AllowElement(uidoc.Document.GetElement(id)))
+    private static IReadOnlyList<string> TitleBlockNames(Document doc) =>
+        new FilteredElementCollector(doc)
+            .OfCategory(BuiltInCategory.OST_TitleBlocks)
+            .OfClass(typeof(FamilySymbol))
+            .Cast<FamilySymbol>()
+            .Select(t => t.Name)
+            .Distinct()
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (fromSelection.Count > 0)
-            return fromSelection;
+    /// <summary>Structural columns already selected in the document (no prompt).</summary>
+    private static IList<ElementId> ColumnsInSelection(UIDocument uidoc)
+    {
+        var filter = new ColumnSelectionFilter();
+        return uidoc.Selection.GetElementIds()
+            .Where(id => filter.AllowElement(uidoc.Document.GetElement(id)))
+            .ToList();
+    }
 
+    /// <summary>Prompts the user to pick structural columns. Empty list when cancelled.</summary>
+    private static IList<ElementId> PickColumns(UIDocument uidoc)
+    {
         try
         {
             IList<Reference> picked = uidoc.Selection.PickObjects(
-                ObjectType.Element, filter, "Select structural columns to document.");
+                ObjectType.Element, new ColumnSelectionFilter(), "Select structural columns to document.");
             return picked.Select(r => r.ElementId).ToList();
         }
         catch (Autodesk.Revit.Exceptions.OperationCanceledException)

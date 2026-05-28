@@ -18,6 +18,10 @@ public sealed class ColumnViewsEngine
     private readonly HashSet<string> _existingViewNames;
     private readonly HashSet<string> _existingSheetNumbers;
 
+    // (generated view, names of that column's own elevations to keep) — section markers are
+    // hidden in a final pass once every column's sections exist, so order can't leak markers.
+    private readonly List<(ElementId ViewId, HashSet<string> KeepNames)> _markerCleanup = new();
+
     public ColumnViewsEngine(Document doc, ColumnViewsConfig cfg)
     {
         _doc = doc;
@@ -57,7 +61,37 @@ public sealed class ColumnViewsEngine
             }
         }
 
+        FinalizeSectionMarkers(result);
         return result;
+    }
+
+    /// <summary>
+    /// After every column's views and sections exist, hides each generated view's foreign
+    /// section markers (those whose view name isn't in that view's keep-set).
+    /// </summary>
+    private void FinalizeSectionMarkers(ViewCreationResult result)
+    {
+        if (_markerCleanup.Count == 0)
+            return;
+
+        try
+        {
+            using var tx = new Transaction(_doc, "Column Views — hide foreign sections");
+            tx.Start();
+            _doc.Regenerate();
+
+            foreach ((ElementId viewId, HashSet<string> keep) in _markerCleanup)
+            {
+                if (_doc.GetElement(viewId) is View view)
+                    HideForeignSectionMarkers(view, keep);
+            }
+
+            tx.Commit();
+        }
+        catch (Exception ex)
+        {
+            result.RecordError($"Hiding foreign sections: {ex.Message}");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -77,30 +111,64 @@ public sealed class ColumnViewsEngine
         using var tx = new Transaction(_doc, $"Column Views — {mark}");
         tx.Start();
 
+        // Rebar hosted by this column drives the elevation extents (dowels reaching above/
+        // below the column) and the end-plan cut planes (first/last stirrup).
+        List<Rebar> hostRebar = HostRebar(fi.Id);
+        BoundingBoxXYZ rebarBox = CombineBoundingBoxes(bbox, hostRebar);
+        (double? topStirrupZ, double? bottomStirrupZ) = StirrupZExtents(hostRebar);
+
+        // World Z of each end-plan cut plane (above the relevant stirrup, else a face inset).
+        double topCutZ = topStirrupZ.HasValue
+            ? topStirrupZ.Value + _cfg.PlanCutAboveStirrup
+            : bbox.Max.Z - _cfg.PlanCutInset;
+        double bottomCutZ = bottomStirrupZ.HasValue
+            ? bottomStirrupZ.Value + _cfg.PlanCutAboveStirrup
+            : bbox.Min.Z + _cfg.PlanCutInset;
+        var planCuts = new[] { (Z: topCutZ, Label: "Top Plan"), (Z: bottomCutZ, Label: "Bottom Plan") };
+
         var created = new List<View>();
 
-        // Two perpendicular elevations (look along the column's two in-plan axes).
-        View? front = CreateElevation(bbox, lookDir: fwd, mark, "Front");
+        // Two perpendicular elevations, sized to enclose all of the column's rebar, with the
+        // plan cut levels drawn across them.
+        View? front = CreateElevation(rebarBox, lookDir: fwd, mark, "Front", planCuts);
         if (front is not null) created.Add(front);
 
-        View? side = CreateElevation(bbox, lookDir: rgt, mark, "Side");
+        View? side = CreateElevation(rebarBox, lookDir: rgt, mark, "Side", planCuts);
         if (side is not null) created.Add(side);
 
-        // Two end plans cut near the top and bottom faces of the column.
-        View? topPlan = CreatePlan(fi, bbox, mark, isTop: true);
+        // Two end plans cut at the computed levels.
+        View? topPlan = CreatePlan(fi, bbox, mark, isTop: true, topCutZ);
         if (topPlan is not null) created.Add(topPlan);
 
-        View? botPlan = CreatePlan(fi, bbox, mark, isTop: false);
+        View? botPlan = CreatePlan(fi, bbox, mark, isTop: false, bottomCutZ);
         if (botPlan is not null) created.Add(botPlan);
+
+        // Optional isometric 3D view of just this column and its rebar.
+        View3D? view3d = _cfg.Create3DView ? Create3D(rebarBox, mark) : null;
+        if (view3d is not null) created.Add(view3d);
+
+        foreach (View v in created)
+            ApplyAppearance(v);
 
         // Visibility computed from the new crops before we query what's visible.
         _doc.Regenerate();
 
+        // This column's own elevation markers; foreign markers are hidden in the final pass.
+        HashSet<string> keepMarkerNames = created.OfType<ViewSection>()
+            .Select(v => v.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         foreach (View v in created)
         {
             ApplyForeignRebarTreatment(v, mark, result);
+            _markerCleanup.Add((v.Id, keepMarkerNames));
             result.RecordCreated();
         }
+
+        if (view3d is not null)
+            Isolate3D(view3d, fi.Id, hostRebar);
+
+        AssignScheduleMarks(hostRebar);
 
         List<ViewSchedule> schedules = BuildSchedules(mark, result);
 
@@ -113,37 +181,22 @@ public sealed class ColumnViewsEngine
     private List<ViewSchedule> BuildSchedules(string mark, ViewCreationResult result)
     {
         var schedules = new List<ViewSchedule>();
-        if (string.IsNullOrWhiteSpace(mark))
+        if (string.IsNullOrWhiteSpace(mark) || !_cfg.CreateRebarSchedule)
             return schedules;
 
-        var builder = new ColumnScheduleBuilder(_doc);
-
-        if (_cfg.CreateRebarSchedule)
+        try
         {
-            try
-            {
-                ViewSchedule? s = builder.BuildRebarSchedule(
-                    mark, UniqueName(Token(_cfg.RebarScheduleNameTemplate, mark)));
-                if (s is not null) { schedules.Add(s); result.RecordCreated(); }
-            }
-            catch (Exception ex)
-            {
-                result.RecordError($"Rebar schedule for {mark}: {ex.Message}");
-            }
+            var builder = new ColumnScheduleBuilder(_doc);
+            ViewSchedule s = builder.BuildRebarSchedule(
+                mark,
+                UniqueName(Token(_cfg.RebarScheduleNameTemplate, mark)),
+                _cfg.BendingDetailGraphics);
+            schedules.Add(s);
+            result.RecordCreated();
         }
-
-        if (_cfg.CreateBendingSchedule)
+        catch (Exception ex)
         {
-            try
-            {
-                ViewSchedule? s = builder.BuildBendingSchedule(
-                    mark, UniqueName(Token(_cfg.BendingScheduleNameTemplate, mark)));
-                if (s is not null) { schedules.Add(s); result.RecordCreated(); }
-            }
-            catch (Exception ex)
-            {
-                result.RecordError($"Bending schedule for {mark}: {ex.Message}");
-            }
+            result.RecordError($"Rebar schedule for {mark}: {ex.Message}");
         }
 
         return schedules;
@@ -177,7 +230,9 @@ public sealed class ColumnViewsEngine
     // Elevations
     // -----------------------------------------------------------------------
 
-    private View? CreateElevation(BoundingBoxXYZ bbox, XYZ lookDir, string mark, string direction)
+    private View? CreateElevation(
+        BoundingBoxXYZ bbox, XYZ lookDir, string mark, string direction,
+        IReadOnlyList<(double Z, string Label)> planCuts)
     {
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.Section, _cfg.SectionViewTypeName);
 
@@ -206,17 +261,51 @@ public sealed class ColumnViewsEngine
         };
 
         ViewSection view = ViewSection.CreateSection(_doc, vft.Id, sectionBox);
+        view.CropBoxActive = true;
+        view.CropBoxVisible = false;
 
         Name(view, _cfg.ElevationNameTemplate, mark, direction: direction, end: null);
         ApplyTemplate(view, _cfg.ElevationViewTemplate);
+
+        DrawPlanCutLines(view, center, basisX, halfWidth: hLocal + half, planCuts);
         return view;
+    }
+
+    /// <summary>
+    /// Draws a horizontal detail line (with a label) across the elevation at each plan cut
+    /// level, so the elevation shows where the top/bottom plans are taken. Best-effort.
+    /// </summary>
+    private void DrawPlanCutLines(
+        View view, XYZ center, XYZ basisX, double halfWidth,
+        IReadOnlyList<(double Z, string Label)> planCuts)
+    {
+        ElementId textTypeId = _doc.GetDefaultElementTypeId(ElementTypeGroup.TextNoteType);
+
+        foreach ((double z, string label) in planCuts)
+        {
+            XYZ rise = XYZ.BasisZ * (z - center.Z);
+            XYZ p1 = center - basisX * halfWidth + rise;
+            XYZ p2 = center + basisX * halfWidth + rise;
+
+            try
+            {
+                _doc.Create.NewDetailCurve(view, Line.CreateBound(p1, p2));
+                if (textTypeId != ElementId.InvalidElementId)
+                    TextNote.Create(_doc, view.Id, p2, label, textTypeId);
+            }
+            catch (Exception)
+            {
+                // Annotation is non-critical — skip this cut line if Revit rejects it.
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
     // End plans
     // -----------------------------------------------------------------------
 
-    private View? CreatePlan(FamilyInstance fi, BoundingBoxXYZ bbox, string mark, bool isTop)
+    private View? CreatePlan(
+        FamilyInstance fi, BoundingBoxXYZ bbox, string mark, bool isTop, double cutWorldZ)
     {
         Level? level = ResolveLevel(fi);
         if (level is null)
@@ -228,19 +317,15 @@ public sealed class ColumnViewsEngine
         double pad = _cfg.CropPadding;
         BoundingBoxXYZ existing = plan.CropBox;
         plan.CropBoxActive = true;
-        plan.CropBoxVisible = true;
+        plan.CropBoxVisible = false;
         plan.CropBox = new BoundingBoxXYZ
         {
             Min = new XYZ(bbox.Min.X - pad, bbox.Min.Y - pad, existing.Min.Z),
             Max = new XYZ(bbox.Max.X + pad, bbox.Max.Y + pad, existing.Max.Z),
         };
 
-        // Cut plane near the relevant face, expressed as an offset from the level.
         double levelElev = level.ProjectElevation;
-        double cut = isTop
-            ? (bbox.Max.Z - levelElev) - _cfg.PlanCutInset
-            : (bbox.Min.Z - levelElev) + _cfg.PlanCutInset;
-
+        double cut = cutWorldZ - levelElev;
         double top = cut + 0.1;
         double bottom = cut - _cfg.PlanViewDepth;
 
@@ -273,6 +358,42 @@ public sealed class ColumnViewsEngine
     }
 
     // -----------------------------------------------------------------------
+    // 3D view (default isometric orientation, isolated to the column + its rebar)
+    // -----------------------------------------------------------------------
+
+    private View3D Create3D(BoundingBoxXYZ box, string mark)
+    {
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.ThreeDimensional, null);
+        View3D view = View3D.CreateIsometric(_doc, vft.Id);
+
+        double p = _cfg.CropPadding;
+        view.SetSectionBox(new BoundingBoxXYZ
+        {
+            Min = new XYZ(box.Min.X - p, box.Min.Y - p, box.Min.Z - p),
+            Max = new XYZ(box.Max.X + p, box.Max.Y + p, box.Max.Z + p),
+        });
+        view.IsSectionBoxActive = true;
+
+        Name(view, _cfg.View3DNameTemplate, mark, direction: null, end: null);
+        return view;
+    }
+
+    /// <summary>Hides everything in the 3D view except the column and its own rebar.</summary>
+    private void Isolate3D(View3D view, ElementId columnId, IReadOnlyList<Rebar> hostRebar)
+    {
+        var keep = new HashSet<ElementId>(hostRebar.Select(r => r.Id)) { columnId };
+
+        List<ElementId> toHide = new FilteredElementCollector(_doc, view.Id)
+            .WhereElementIsNotElementType()
+            .Where(e => !keep.Contains(e.Id) && e.CanBeHidden(view))
+            .Select(e => e.Id)
+            .ToList();
+
+        if (toHide.Count > 0)
+            HideSafely(view, toHide);
+    }
+
+    // -----------------------------------------------------------------------
     // Foreign rebar treatment (hide / halftone bars hosted by other columns)
     // -----------------------------------------------------------------------
 
@@ -288,12 +409,12 @@ public sealed class ColumnViewsEngine
             return;
         }
 
-        List<ElementId> foreign = new FilteredElementCollector(_doc, view.Id)
+        HashSet<ElementId> foreign = new FilteredElementCollector(_doc, view.Id)
             .OfCategory(BuiltInCategory.OST_Rebar)
             .WhereElementIsNotElementType()
             .Where(e => IsForeignRebar(e, targetMark))
             .Select(e => e.Id)
-            .ToList();
+            .ToHashSet();
 
         if (foreign.Count == 0)
             return;
@@ -307,18 +428,79 @@ public sealed class ColumnViewsEngine
         }
         else // Hide
         {
-            try
+            HideSafely(view, foreign.ToList());
+        }
+
+        // Always drop annotations (tags / dimensions) that point at foreign rebar.
+        HideForeignAnnotations(view, foreign);
+    }
+
+    /// <summary>
+    /// Hides section/elevation markers in the view whose view name is not in
+    /// <paramref name="keepNames"/> — i.e. the markers belonging to other columns. A marker
+    /// element's Name is its view's name, so this keeps this column's own elevation cut lines.
+    /// </summary>
+    private void HideForeignSectionMarkers(View view, HashSet<string> keepNames)
+    {
+        List<ElementId> toHide = new FilteredElementCollector(_doc, view.Id)
+            .OfCategory(BuiltInCategory.OST_Viewers)
+            .WhereElementIsNotElementType()
+            .Where(e => !keepNames.Contains(e.Name))
+            .Select(e => e.Id)
+            .ToList();
+
+        if (toHide.Count > 0)
+            HideSafely(view, toHide);
+    }
+
+    /// <summary>Hides tags and dimensions in the view that reference any of <paramref name="foreignRebar"/>.</summary>
+    private void HideForeignAnnotations(View view, HashSet<ElementId> foreignRebar)
+    {
+        var toHide = new List<ElementId>();
+
+        foreach (IndependentTag tag in new FilteredElementCollector(_doc, view.Id)
+                     .OfClass(typeof(IndependentTag)).Cast<IndependentTag>())
+        {
+            if (tag.GetTaggedLocalElementIds().Any(foreignRebar.Contains))
+                toHide.Add(tag.Id);
+        }
+
+        foreach (Dimension dim in new FilteredElementCollector(_doc, view.Id)
+                     .OfClass(typeof(Dimension)).Cast<Dimension>())
+        {
+            if (ReferencesForeign(dim, foreignRebar))
+                toHide.Add(dim.Id);
+        }
+
+        if (toHide.Count > 0)
+            HideSafely(view, toHide);
+    }
+
+    private static bool ReferencesForeign(Dimension dim, HashSet<ElementId> foreignRebar)
+    {
+        ReferenceArray? refs = dim.References;
+        if (refs is null) return false;
+
+        foreach (Reference r in refs)
+            if (r is not null && foreignRebar.Contains(r.ElementId))
+                return true;
+
+        return false;
+    }
+
+    private static void HideSafely(View view, IList<ElementId> ids)
+    {
+        try
+        {
+            view.HideElements(ids);
+        }
+        catch (Autodesk.Revit.Exceptions.ArgumentException)
+        {
+            // One or more elements refused hiding — hide what we can, one at a time.
+            foreach (ElementId id in ids)
             {
-                view.HideElements(foreign);
-            }
-            catch (Autodesk.Revit.Exceptions.ArgumentException)
-            {
-                // One or more elements refused hiding — hide what we can, one at a time.
-                foreach (ElementId id in foreign)
-                {
-                    try { view.HideElements(new List<ElementId> { id }); }
-                    catch (Autodesk.Revit.Exceptions.ArgumentException) { /* skip */ }
-                }
+                try { view.HideElements(new List<ElementId> { id }); }
+                catch (Autodesk.Revit.Exceptions.ArgumentException) { /* skip */ }
             }
         }
     }
@@ -370,6 +552,129 @@ public sealed class ColumnViewsEngine
 
     private string MarkOf(Element e) =>
         e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? string.Empty;
+
+    private List<Rebar> HostRebar(ElementId columnId) =>
+        new FilteredElementCollector(_doc)
+            .OfCategory(BuiltInCategory.OST_Rebar)
+            .WhereElementIsNotElementType()
+            .OfType<Rebar>()
+            .Where(r => r.GetHostId() == columnId)
+            .ToList();
+
+    /// <summary>World AABB enclosing <paramref name="seed"/> and every rebar's bounding box.</summary>
+    private static BoundingBoxXYZ CombineBoundingBoxes(BoundingBoxXYZ seed, IEnumerable<Rebar> rebar)
+    {
+        double minX = seed.Min.X, minY = seed.Min.Y, minZ = seed.Min.Z;
+        double maxX = seed.Max.X, maxY = seed.Max.Y, maxZ = seed.Max.Z;
+
+        foreach (Rebar r in rebar)
+        {
+            BoundingBoxXYZ? bb = r.get_BoundingBox(null);
+            if (bb is null) continue;
+
+            minX = Math.Min(minX, bb.Min.X); minY = Math.Min(minY, bb.Min.Y); minZ = Math.Min(minZ, bb.Min.Z);
+            maxX = Math.Max(maxX, bb.Max.X); maxY = Math.Max(maxY, bb.Max.Y); maxZ = Math.Max(maxZ, bb.Max.Z);
+        }
+
+        return new BoundingBoxXYZ
+        {
+            Min = new XYZ(minX, minY, minZ),
+            Max = new XYZ(maxX, maxY, maxZ),
+        };
+    }
+
+    /// <summary>
+    /// World Z of the highest and lowest stirrup/tie centres hosted by the column, or
+    /// (null, null) when none are found. The 2025 API exposes no rebar-style accessor, so
+    /// ties are detected geometrically: a tie is a flat horizontal loop whose vertical
+    /// extent is well under its in-plan width, which excludes vertical longitudinals/dowels.
+    /// </summary>
+    private static (double? TopZ, double? BottomZ) StirrupZExtents(IEnumerable<Rebar> rebar)
+    {
+        double? top = null, bottom = null;
+
+        foreach (Rebar r in rebar)
+        {
+            BoundingBoxXYZ? bb = r.get_BoundingBox(null);
+            if (bb is null) continue;
+
+            double zExt = bb.Max.Z - bb.Min.Z;
+            double maxHoriz = Math.Max(bb.Max.X - bb.Min.X, bb.Max.Y - bb.Min.Y);
+            if (maxHoriz <= 0 || zExt >= 0.5 * maxHoriz) continue; // not a flat loop → skip
+
+            double z = (bb.Min.Z + bb.Max.Z) / 2.0;
+            top = top is null ? z : Math.Max(top.Value, z);
+            bottom = bottom is null ? z : Math.Min(bottom.Value, z);
+        }
+
+        return (top, bottom);
+    }
+
+    /// <summary>
+    /// Numbers the column's rebar Schedule Mark 1..N over unique (Type, Shape, Total Bar
+    /// Length) groups, ordered by those keys. Best-effort: when the Schedule Mark parameter
+    /// is read-only (Revit reinforcement numbering is automatic), the existing values are
+    /// left untouched.
+    /// </summary>
+    private void AssignScheduleMarks(IReadOnlyList<Rebar> hostRebar)
+    {
+        if (hostRebar.Count == 0)
+            return;
+
+        var groups = hostRebar
+            .Select(r => (Bar: r, Type: BarTypeName(r), Shape: BarShapeName(r), Len: BarTotalLength(r)))
+            .GroupBy(x => (x.Type, x.Shape, Math.Round(x.Len, 4)))
+            .OrderBy(g => g.Key.Item1, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.Item2, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.Item3)
+            .ToList();
+
+        int mark = 0;
+        foreach (var group in groups)
+        {
+            mark++;
+            foreach (var x in group)
+                SetScheduleMark(x.Bar, mark);
+        }
+    }
+
+    private static void SetScheduleMark(Rebar rebar, int mark)
+    {
+        Parameter? p = rebar.LookupParameter("Schedule Mark");
+        if (p is null || p.IsReadOnly)
+            return;
+
+        if (p.StorageType == StorageType.Integer)
+            p.Set(mark);
+        else if (p.StorageType == StorageType.String)
+            p.Set(mark.ToString());
+    }
+
+    private string BarTypeName(Rebar rebar) =>
+        _doc.GetElement(rebar.GetTypeId())?.Name ?? string.Empty;
+
+    private static string BarShapeName(Rebar rebar) =>
+        rebar.LookupParameter("Shape")?.AsValueString() ?? string.Empty;
+
+    private static double BarTotalLength(Rebar rebar) =>
+        rebar.LookupParameter("Total Bar Length")?.AsDouble()
+        ?? rebar.LookupParameter("Bar Length")?.AsDouble()
+        ?? 0.0;
+
+    private void ApplyAppearance(View view)
+    {
+        if (_cfg.ViewScale > 0)
+            TrySet(() => view.Scale = _cfg.ViewScale);
+        TrySet(() => view.DetailLevel = _cfg.DetailLevel);
+        TrySet(() => view.DisplayStyle = _cfg.VisualStyle);
+    }
+
+    /// <summary>Applies a view setting, ignoring failures (e.g. when a view template owns it).</summary>
+    private static void TrySet(Action set)
+    {
+        try { set(); }
+        catch (Autodesk.Revit.Exceptions.ApplicationException) { }
+    }
 
     private void Name(View view, string template, string mark, string? direction, string? end)
     {

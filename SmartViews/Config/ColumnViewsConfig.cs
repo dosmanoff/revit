@@ -1,3 +1,4 @@
+using Autodesk.Revit.DB;
 using System.Text.Json.Serialization;
 
 namespace SmartViews.Config;
@@ -25,13 +26,19 @@ public sealed class ColumnViewsConfig
     public double ElevationDepth { get; set; } = 0.5;
 
     /// <summary>
-    /// Distance the top/bottom end-plan cut plane is moved into the column from its
-    /// extreme face (ft). The top plan cuts this far below the top face; the bottom plan
-    /// this far above the bottom face.
+    /// Offset above the relevant stirrup the end-plan cut plane sits at (ft). The top plan
+    /// cuts this far above the topmost stirrup; the bottom plan this far above the bottommost
+    /// stirrup, so each plan slices through reinforced section rather than the bare end.
+    /// </summary>
+    public double PlanCutAboveStirrup { get; set; } = 0.1;
+
+    /// <summary>
+    /// Fallback cut inset from the column's extreme face (ft), used only when no stirrups are
+    /// found hosted by the column.
     /// </summary>
     public double PlanCutInset { get; set; } = 0.25;
 
-    /// <summary>Vertical view-depth of each end plan, measured from the cut plane (ft).</summary>
+    /// <summary>Vertical view-depth of each end plan, measured down from the cut plane (ft).</summary>
     public double PlanViewDepth { get; set; } = 0.5;
 
     // ---- Rebar from neighbouring columns ----
@@ -39,6 +46,17 @@ public sealed class ColumnViewsConfig
     /// <summary>How to treat rebar hosted by a column other than the target column.</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ForeignRebarMode ForeignRebar { get; set; } = ForeignRebarMode.Hide;
+
+    // ---- View appearance (applied to every generated graphical view) ----
+
+    /// <summary>View scale denominator. 12 = 1"=1'-0", 48 = 1/4"=1'-0", etc.</summary>
+    public int ViewScale { get; set; } = 12;
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ViewDetailLevel DetailLevel { get; set; } = ViewDetailLevel.Fine;
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public DisplayStyle VisualStyle { get; set; } = DisplayStyle.HLR;
 
     // ---- Naming ----
 
@@ -48,11 +66,8 @@ public sealed class ColumnViewsConfig
     /// <summary>Tokens: {Mark} {End} {Level} {Type}. End = Top/Bottom.</summary>
     public string PlanNameTemplate { get; set; } = "{Mark} - Plan {End}";
 
-    /// <summary>Tokens: {Mark}. Name of the generated rebar quantity schedule.</summary>
+    /// <summary>Tokens: {Mark}. Name of the generated rebar schedule.</summary>
     public string RebarScheduleNameTemplate { get; set; } = "{Mark} - Rebar Schedule";
-
-    /// <summary>Tokens: {Mark}. Name of the generated bending-detail schedule.</summary>
-    public string BendingScheduleNameTemplate { get; set; } = "{Mark} - Bending Details";
 
     // ---- View family types / templates (optional; fall back to first available) ----
 
@@ -64,7 +79,21 @@ public sealed class ColumnViewsConfig
     // ---- Schedules ----
 
     public bool CreateRebarSchedule { get; set; } = true;
-    public bool CreateBendingSchedule { get; set; } = true;
+
+    /// <summary>
+    /// When true, also creates an isometric 3D view (default orientation) per column showing
+    /// only that column and its own rebar, and places it on the sheet.
+    /// </summary>
+    public bool Create3DView { get; set; } = true;
+
+    /// <summary>Tokens: {Mark} {Level}. Name of the generated 3D view.</summary>
+    public string View3DNameTemplate { get; set; } = "{Mark} - 3D";
+
+    /// <summary>
+    /// When true, the schedule includes the rebar Shape Image column (the bend-shape diagram),
+    /// i.e. "generate bending-detail graphics". When false, only the tabular fields are shown.
+    /// </summary>
+    public bool BendingDetailGraphics { get; set; } = true;
 
     // ---- Sheet auto-placement ----
 
