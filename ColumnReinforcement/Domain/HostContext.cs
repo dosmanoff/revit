@@ -80,8 +80,15 @@ public class HostContext
 
         const double zTolerance = 1.0 / 96.0;
 
+        // The slab "above" is the one the column connects to at its top — its TOP must
+        // reach at least the column top (so a bent bar can develop inside it), and it
+        // must overlap the column in plan. A column modelled up to the top of the slab
+        // (or partway into it) has that slab's bottom BELOW its top — so we must NOT
+        // require slab.Min.Z >= columnTop, or the connecting slab is skipped and the
+        // NEXT slab up gets picked (bent bars then fly to the storey above). Choose the
+        // nearest qualifying slab = smallest top elevation.
         Element? best = null;
-        double bestBottomZ = double.PositiveInfinity;
+        double bestTopZ = double.PositiveInfinity;
 
         var elems = new FilteredElementCollector(doc)
             .OfCategory(BuiltInCategory.OST_Floors)
@@ -92,13 +99,13 @@ public class HostContext
             BoundingBoxXYZ? bb = e.get_BoundingBox(null);
             if (bb is null) continue;
 
-            if (bb.Min.Z < columnTopZ - zTolerance) continue;
+            if (bb.Max.Z < columnTopZ - zTolerance) continue;                 // slab top is below the column top — it's not above
             if (columnXY.X < bb.Min.X || columnXY.X > bb.Max.X) continue;
             if (columnXY.Y < bb.Min.Y || columnXY.Y > bb.Max.Y) continue;
 
-            if (bb.Min.Z < bestBottomZ)
+            if (bb.Max.Z < bestTopZ)
             {
-                bestBottomZ = bb.Min.Z;
+                bestTopZ = bb.Max.Z;
                 best = e;
             }
         }
