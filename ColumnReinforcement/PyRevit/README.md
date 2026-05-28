@@ -26,6 +26,11 @@ Per column:
 
 - `mark`, `family`, `type`, `type_id`, `element_id`
 - `section` (`Rectangular` / `Round`), `width_in` / `depth_in` (or `diameter_in`), `rotation_deg`
+  - **Canonical orientation:** for rectangular columns the local frame is canonicalised so **LocalX is always the shorter in-plan side** (`width_in ≤ depth_in`), exactly mirroring `Domain/ColumnGeometry.cs`. When the modelled column is wider than deep the script rotates the frame +90° about Z (`newX = oldY`, `newY = −oldX`, right-handedness preserved) and swaps width/depth. `rotation_deg` is reported for this canonical frame, so it can differ by 90° from the raw Revit instance rotation. Everything below — `faces`, neighbour `face_insets_in`, `relative.offset_local_*` — is expressed in this same canonical frame.
+- `faces` — explicit per-face geometry in the canonical frame, keyed `+x` / `-x` / `+y` / `-y` (**`null` for round columns**). These keys are **exactly the engine's `LongTopModes` face selectors** — what the agent writes as `+x:BentToSlab` lands on the bars along that face. Each face carries:
+  - `plan_length_in` — length of that face in plan
+  - `kind` — `long` (the ±X faces, perpendicular to the short LocalX, spanning the depth) or `short` (the ±Y faces, spanning the width)
+  - `outward_normal_world_deg` — the outward normal direction in world degrees, so the agent can correlate a face with a neighbour's overhang or a slab edge
 - `base`: level name, elevation (ft), plan X/Y (ft)
 - `top`: level name, elevation (ft)
 - `height_ft`

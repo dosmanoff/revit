@@ -42,7 +42,7 @@ output = script.get_output()
 FT_TO_IN = 12.0
 Z_TOLERANCE_FT = 1.0 / 96.0          # 1/8" — same as the C# HostContext
 XY_NEIGHBOUR_TOL_FT = 1.5            # 18" — columns "in the same stack"; insets resolve true offsets
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # ACI 318 §10.7.4.1: maximum crank slope = 1:6 (inward shift per unit vertical).
 ACI_MAX_CRANK_SLOPE = 1.0 / 6.0
@@ -381,13 +381,23 @@ def column_geometry(inst):
     cross = analyse_cross_section(inst, tr) or fallback_aabb(bb, tr)
     width, depth, section = cross
 
-    rot_rad = math.atan2(tr.BasisX.Y, tr.BasisX.X)
-    rot_deg = math.degrees(rot_rad)
-
-    # Save 2D basis vectors (XY components) so non-coaxial neighbour analysis can
-    # project relative positions into this column's local frame.
     basis_x_xy = (tr.BasisX.X, tr.BasisX.Y)
     basis_y_xy = (tr.BasisY.X, tr.BasisY.Y)
+
+    # Canonicalise so LocalX is always the SHORTER in-plan side (width <= depth),
+    # mirroring Domain/ColumnGeometry.cs. This keeps the dump's local frame — and
+    # therefore the +x/-x/+y/-y face semantics, the neighbour offsets, and the
+    # per-face insets below — identical to what the C# engine builds, so the
+    # face selectors the agent emits land on the right bars. Rotating +90° about
+    # Z (newX = oldY, newY = -oldX) preserves right-handedness.
+    if section == "Rectangular" and width > depth:
+        width, depth = depth, width
+        new_x = basis_y_xy
+        new_y = (-basis_x_xy[0], -basis_x_xy[1])
+        basis_x_xy, basis_y_xy = new_x, new_y
+
+    rot_rad = math.atan2(basis_x_xy[1], basis_x_xy[0])
+    rot_deg = math.degrees(rot_rad)
 
     return {
         "section": section,
@@ -399,6 +409,33 @@ def column_geometry(inst):
         "rotation_deg": rot_deg,
         "basis_x_xy": basis_x_xy,
         "basis_y_xy": basis_y_xy,
+    }
+
+
+def faces_block(g):
+    """Explicit per-face semantics for the agent, in the canonical frame.
+
+    Keys +x / -x / +y / -y are EXACTLY the engine's LongTopModes face selectors.
+    After canonicalisation LocalX is the short side, so the ±X faces (perpendicular
+    to LocalX, spanning the depth) are the LONG faces, and the ±Y faces are SHORT.
+    `face_insets_in` on the neighbour columns is measured against these same faces.
+    """
+    if g["section"] == "Round":
+        return None
+    width_in = g["width_ft"] * FT_TO_IN     # short (along LocalX)
+    depth_in = g["depth_ft"] * FT_TO_IN     # long  (along LocalY)
+    bx = g["basis_x_xy"]
+    by = g["basis_y_xy"]
+    deg = lambda vx, vy: safe_round(math.degrees(math.atan2(vy, vx)), 1)
+    return {
+        "+x": {"plan_length_in": safe_round(depth_in, 3), "kind": "long",
+               "outward_normal_world_deg": deg(bx[0], bx[1])},
+        "-x": {"plan_length_in": safe_round(depth_in, 3), "kind": "long",
+               "outward_normal_world_deg": deg(-bx[0], -bx[1])},
+        "+y": {"plan_length_in": safe_round(width_in, 3), "kind": "short",
+               "outward_normal_world_deg": deg(by[0], by[1])},
+        "-y": {"plan_length_in": safe_round(width_in, 3), "kind": "short",
+               "outward_normal_world_deg": deg(-by[0], -by[1])},
     }
 
 
@@ -1066,6 +1103,7 @@ def build_record(entry, levels, all_entries):
         "depth_in": depth_in if not is_round else None,
         "diameter_in": width_in if is_round else None,
         "rotation_deg": safe_round(g["rotation_deg"], 2),
+        "faces": faces_block(g),
         "comments": comments,
         "rebar_cover": {
             "top": cover_info(inst, "CLEAR_COVER_TOP"),
