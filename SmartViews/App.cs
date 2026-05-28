@@ -57,6 +57,56 @@ public class App : IExternalApplication
         buttonData.Image = LoadIcon("SmartViews.Resources.icon_16.png");
 
         panel.AddItem(buttonData);
+
+        CreateColumnViewsButton(application, assemblyPath);
+    }
+
+    /// <summary>
+    /// Adds the "Column Views" button to the shared "Smart Tools" tab (the same tab the
+    /// reinforcement tools live on), separate from the "SmartViews" tab above.
+    /// </summary>
+    private static void CreateColumnViewsButton(UIControlledApplication application, string assemblyPath)
+    {
+        const string tabName = "Smart Tools";
+
+        try
+        {
+            application.CreateRibbonTab(tabName);
+        }
+        catch (Autodesk.Revit.Exceptions.ArgumentException)
+        {
+            // Tab already created by another add-in — safe to continue.
+        }
+
+        RibbonPanel panel = GetOrCreatePanel(application, tabName, "Columns");
+
+        var buttonData = new PushButtonData(
+            name: "ColumnViews",
+            text: "Column\nViews",
+            assemblyName: assemblyPath,
+            className: typeof(ColumnViewsCommand).FullName!);
+
+        buttonData.ToolTip = "Generate elevations, end plans, and rebar schedules for selected columns.";
+        buttonData.LongDescription =
+            "For each selected structural column, creates two perpendicular elevations and two " +
+            "end plans (top/bottom), hides or half-tones rebar hosted by other columns, and " +
+            "(optionally) builds rebar/bending schedules and a sheet.";
+        buttonData.LargeImage = LoadIcon("SmartViews.Resources.icon_32.png");
+        buttonData.Image = LoadIcon("SmartViews.Resources.icon_16.png");
+
+        panel.AddItem(buttonData);
+    }
+
+    private static RibbonPanel GetOrCreatePanel(
+        UIControlledApplication application, string tabName, string panelName)
+    {
+        foreach (RibbonPanel existing in application.GetRibbonPanels(tabName))
+        {
+            if (string.Equals(existing.Name, panelName, StringComparison.Ordinal))
+                return existing;
+        }
+
+        return application.CreateRibbonPanel(tabName, panelName);
     }
 
     private static BitmapImage? LoadIcon(string resourcePath)
