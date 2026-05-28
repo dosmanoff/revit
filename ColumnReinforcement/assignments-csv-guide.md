@@ -154,6 +154,24 @@ Two independent zones (top, bottom). Each can be enabled separately. Inside the 
 | `ConfTopZoneLength` | length? | `null` | |
 | `ConfTopZoneFraction` | number (0–1)? | `null` | |
 
+### 2.7a Crossties (interior шпильки)
+
+Single bars hooked at both ends that span between two opposite faces at an interior
+longitudinal-bar line, laterally supporting interior bars per ACI 318-19 §25.7.2.3.
+Placed at the same elevations as the outer tie. **Rectangular columns only.**
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `CrosstiesEnabled` | bool | `false` | Master switch for interior crossties. |
+| `CrosstiesAuto` | bool | `true` | When true and `CrosstiesManual` is empty, the engine auto-places crossties: walking each face out from the (tie-supported) corners, a bar gets a crosstie once its clear distance from the last supported bar exceeds `CrosstiesMaxClear`. |
+| `CrosstiesMaxClear` | length | `6` in | ACI 318-19 §25.7.2.3 limit (6″ clear). Drives auto placement. |
+| `CrosstiesBarType` | string? | `null` | Bar type; `null` = same as the outer tie (`StirrupBarType`). |
+| `CrosstiesHookType` | string? | `null` | Hook at both ends; `null` = same as the outer tie hook. |
+| `CrosstiesManual` | string | (empty) | Override. When non-empty, `CrosstiesAuto` is ignored. Space/`;`/`,`-separated `axis:line` tokens: `x:<i>` = a crosstie spanning X (joining the ±X faces) at Y bar-row `i`; `y:<j>` = spanning Y at X bar-column `j`. Indices 0-based into the cage bar lines (interior = 1 … count−2); `x:all`/`y:all` = every interior line. **No commas inside the cell** (use spaces). Example: `x:1 y:1`. |
+
+> Inner closed sub-ties (вложенные хомуты — smaller rectangles enclosing a subset of
+> bars) are a separate feature; this section covers single-bar crossties only.
+
 ### 2.8 Foundation dowels (starter bars from slab below)
 
 The engine searches for a slab directly below the column at the right elevation and plan position. If `DowelOnlyFoundation` is true (default), only `OST_StructuralFoundation` elements qualify; set to false to also search `OST_Floors`.

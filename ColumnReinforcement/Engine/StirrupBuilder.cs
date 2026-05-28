@@ -92,6 +92,14 @@ public class StirrupBuilder
         // Normal of the tie plane = world Z (the tie sits horizontally).
         XYZ normal = XYZ.BasisZ;
 
+        // Interior crossties (single bars, hooks both ends) — resolved once, placed at
+        // every tie elevation alongside the outer tie. Rectangular columns only.
+        var crossties = ResolveCrossties(_doc, geom, cfg);
+        RebarBarType? ctBar = crossties.Count == 0 ? null
+            : RebarFactory.GetBarType(_doc, cfg.Stirrups.Crossties.BarType ?? s.BarType);
+        RebarHookType? ctHook = crossties.Count == 0 ? null
+            : RebarFactory.GetHookType(_doc, cfg.Stirrups.Crossties.HookType ?? s.HookType);
+
         int created = 0;
         foreach (double z in CombineIntervals(intervals))
         {
@@ -115,9 +123,105 @@ public class StirrupBuilder
                 startHookOrient: RebarHookOrientation.Left,
                 endHookOrient:   RebarHookOrientation.Left);
             created++;
+
+            // Crossties at this elevation: one straight bar per (a, b) span, hooked at
+            // both ends to wrap the longitudinal bars it crosses.
+            foreach (var (a, b) in crossties)
+            {
+                RebarFactory.Create(
+                    _doc,
+                    RebarStyle.StirrupTie,
+                    ctBar!,
+                    geom.Instance,
+                    normal,
+                    new List<Curve> { Line.CreateBound(geom.At(a.x, a.y, z), geom.At(b.x, b.y, z)) },
+                    tag,
+                    startHook: ctHook,
+                    endHook:   ctHook,
+                    startHookOrient: RebarHookOrientation.Left,
+                    endHookOrient:   RebarHookOrientation.Left);
+                created++;
+            }
         }
 
         return created;
+    }
+
+    /// <summary>
+    /// Resolve the interior crossties as local-frame end-point pairs. Each crosstie spans
+    /// between two opposite faces at a longitudinal-bar line. Auto mode follows ACI 318-19
+    /// §25.7.2.3; the <see cref="CrosstiesConfig.Manual"/> override lists exact lines.
+    /// Returns an empty list when crossties are disabled or the column is round.
+    /// </summary>
+    private static List<((double x, double y) a, (double x, double y) b)> ResolveCrossties(
+        Document doc, ColumnGeometry geom, ColumnReinforcementConfig cfg)
+    {
+        var result = new List<((double x, double y), (double x, double y))>();
+        CrosstiesConfig c = cfg.Stirrups.Crossties;
+        if (!c.Enabled || geom.Section == ColumnSection.Round) return result;
+
+        var (xMin, xMax, yMin, yMax) =
+            LongitudinalBarBuilder.ComputeRectangularCageBounds(doc, cfg, geom);
+        int nx = Math.Max(2, cfg.Longitudinal.BarsAlongWidth);
+        int ny = Math.Max(2, cfg.Longitudinal.BarsAlongDepth);
+        double[] xs = LongitudinalBarBuilder.LinSpace(xMin, xMax, nx);
+        double[] ys = LongitudinalBarBuilder.LinSpace(yMin, yMax, ny);
+
+        // Lines that get a crosstie, expressed as bar-line indices on each axis.
+        // spanXAtY[i] true → a crosstie joining the ±X faces at ys[i]; spanYAtX[j] → ±Y faces at xs[j].
+        var spanXAtY = new HashSet<int>();   // interior Y-rows  (1 … ny-2)
+        var spanYAtX = new HashSet<int>();   // interior X-cols  (1 … nx-2)
+
+        if (!string.IsNullOrWhiteSpace(c.Manual))
+        {
+            foreach (string raw in c.Manual.Split([' ', ';', ','], StringSplitOptions.RemoveEmptyEntries))
+            {
+                int colon = raw.IndexOf(':');
+                if (colon <= 0 || colon == raw.Length - 1) continue;
+                string axis = raw[..colon].Trim().ToLowerInvariant();
+                string val  = raw[(colon + 1)..].Trim();
+                var target = axis == "x" ? spanXAtY : axis == "y" ? spanYAtX : null;
+                if (target is null) continue;
+                int count = axis == "x" ? ny : nx;
+                if (val.Equals("all", StringComparison.OrdinalIgnoreCase))
+                    for (int i = 1; i <= count - 2; i++) target.Add(i);
+                else if (int.TryParse(val, out int idx) && idx >= 1 && idx <= count - 2)
+                    target.Add(idx);
+            }
+        }
+        else if (c.Auto)
+        {
+            double dLong = RebarFactory.GetBarType(doc, cfg.Longitudinal.BarType).BarModelDiameter;
+            double maxClear = cfg.Ft(c.MaxClearSpacing);
+            foreach (int i in AutoSupportIndices(ys, dLong, maxClear)) spanXAtY.Add(i);
+            foreach (int j in AutoSupportIndices(xs, dLong, maxClear)) spanYAtX.Add(j);
+        }
+
+        foreach (int i in spanXAtY) result.Add(((xMin, ys[i]), (xMax, ys[i])));
+        foreach (int j in spanYAtX) result.Add(((xs[j], yMin), (xs[j], yMax)));
+        return result;
+    }
+
+    /// <summary>
+    /// Interior bar indices that need a crosstie so no bar is more than <paramref name="maxClear"/>
+    /// clear from a laterally-supported bar (ACI 318-19 §25.7.2.3). Corners (indices 0 and
+    /// n−1) are supported by the outer tie. Greedy walk from each corner; a final back-check
+    /// covers the gap to the far corner.
+    /// </summary>
+    internal static List<int> AutoSupportIndices(double[] pos, double barDia, double maxClear)
+    {
+        var need = new List<int>();
+        int n = pos.Length;
+        if (n <= 2) return need;                 // only corners — nothing interior to support
+
+        double lastSup = pos[0];
+        for (int i = 1; i <= n - 2; i++)
+        {
+            if ((pos[i] - lastSup) - barDia > maxClear) { need.Add(i); lastSup = pos[i]; }
+        }
+        if ((pos[n - 1] - lastSup) - barDia > maxClear && (need.Count == 0 || need[^1] != n - 2))
+            need.Add(n - 2);
+        return need;
     }
 
     /// <summary>

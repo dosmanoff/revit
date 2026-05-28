@@ -124,6 +124,7 @@ public static class AssignmentCsv
         "StirrupBarType", "StirrupSpacing", "StirrupHookType", "StirrupOffsetTop", "StirrupOffsetBot", "StirrupRotate45",
         "ConfBotEnabled", "ConfBotSpacing", "ConfBotZoneFraction", "ConfBotZoneLength",
         "ConfTopEnabled", "ConfTopSpacing", "ConfTopZoneFraction", "ConfTopZoneLength",
+        "CrosstiesEnabled", "CrosstiesAuto", "CrosstiesBarType", "CrosstiesHookType", "CrosstiesMaxClear", "CrosstiesManual",
         "DowelsEnabled", "DowelForm", "DowelHost", "DowelBarType", "DowelExt", "DowelEmbed", "DowelLeg", "DowelOnlyFoundation", "DowelHookTop", "DowelHookBot", "DowelPositions",
         "SplicesEnabled", "SpliceForm", "SpliceBarType", "SpliceLap", "SpliceExt", "SpliceBentLeg",
         "SpliceUpperInset", "SpliceCrankedSlope", "SpliceLowerBendOffset", "SpliceIgnoreSlabAbove", "SpliceHookTop", "SpliceHookBot",
@@ -176,6 +177,13 @@ public static class AssignmentCsv
         SetLength(fields, idx, "ConfTopSpacing",      v => cfg.Stirrups.Confinement.Top.Spacing = v, issues, lineNo);
         SetOptDbl(fields, idx, "ConfTopZoneFraction", v => cfg.Stirrups.Confinement.Top.ZoneFraction = v, issues, lineNo);
         SetOptLen(fields, idx, "ConfTopZoneLength",   v => cfg.Stirrups.Confinement.Top.ZoneLength = v, issues, lineNo);
+
+        SetBool  (fields, idx, "CrosstiesEnabled",  v => cfg.Stirrups.Crossties.Enabled = v, issues, lineNo);
+        SetBool  (fields, idx, "CrosstiesAuto",     v => cfg.Stirrups.Crossties.Auto    = v, issues, lineNo);
+        SetOptStr(fields, idx, "CrosstiesBarType",  v => cfg.Stirrups.Crossties.BarType = v);
+        SetOptStr(fields, idx, "CrosstiesHookType", v => cfg.Stirrups.Crossties.HookType = v);
+        SetLength(fields, idx, "CrosstiesMaxClear", v => cfg.Stirrups.Crossties.MaxClearSpacing = v, issues, lineNo);
+        SetOptStr(fields, idx, "CrosstiesManual",   v => cfg.Stirrups.Crossties.Manual = v);
 
         SetBool         (fields, idx, "DowelsEnabled",       v => cfg.Dowels.Enabled   = v, issues, lineNo);
         SetEnum<DowelForm>(fields, idx, "DowelForm",         v => cfg.Dowels.Form      = v, issues, lineNo);
@@ -482,6 +490,13 @@ public static class AssignmentCsv
             "ConfTopSpacing"      => c.Stirrups.Confinement.Top.Spacing.ToString(),
             "ConfTopZoneFraction" => c.Stirrups.Confinement.Top.ZoneFraction?.ToString("G", CultureInfo.InvariantCulture) ?? "",
             "ConfTopZoneLength"   => c.Stirrups.Confinement.Top.ZoneLength?.ToString() ?? "",
+
+            "CrosstiesEnabled"  => c.Stirrups.Crossties.Enabled.ToString().ToLowerInvariant(),
+            "CrosstiesAuto"     => c.Stirrups.Crossties.Auto.ToString().ToLowerInvariant(),
+            "CrosstiesBarType"  => c.Stirrups.Crossties.BarType  ?? "",
+            "CrosstiesHookType" => c.Stirrups.Crossties.HookType ?? "",
+            "CrosstiesMaxClear" => c.Stirrups.Crossties.MaxClearSpacing.ToString(),
+            "CrosstiesManual"   => c.Stirrups.Crossties.Manual ?? "",
 
             "DowelsEnabled"       => c.Dowels.Enabled.ToString().ToLowerInvariant(),
             "DowelForm"           => c.Dowels.Form.ToString(),
