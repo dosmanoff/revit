@@ -119,7 +119,7 @@ public static class AssignmentCsv
         "Units",
         "CoverSides", "CoverEnds",
         "LongBarType", "LongBarsW", "LongBarsD", "LongBarsAround", "LongCornersOnly", "LongHookTop", "LongHookBot",
-        "LongTopDefault", "LongTopModes", "LongTopBentLeg",
+        "LongTopDefault", "LongTopModes", "LongTopBentLeg", "LongTopBentOutward",
         "LongCrankUpperInset", "LongCrankSlope", "LongCrankLowerBendOffset", "LongCrankPenetration",
         "StirrupBarType", "StirrupSpacing", "StirrupHookType", "StirrupOffsetTop", "StirrupOffsetBot", "StirrupRotate45",
         "ConfBotEnabled", "ConfBotSpacing", "ConfBotZoneFraction", "ConfBotZoneLength",
@@ -153,6 +153,7 @@ public static class AssignmentCsv
         SetEnum<BarTopMode>(fields, idx, "LongTopDefault", v => cfg.Longitudinal.TopDefault = v, issues, lineNo);
         SetOptStr(fields, idx, "LongTopModes", v => cfg.Longitudinal.TopModes = v);
         SetLength(fields, idx, "LongTopBentLeg", v => cfg.Longitudinal.TopBentLeg = v, issues, lineNo);
+        SetBool  (fields, idx, "LongTopBentOutward", v => cfg.Longitudinal.TopBentOutward = v, issues, lineNo);
         SetLength(fields, idx, "LongCrankUpperInset",      v => cfg.Longitudinal.CrankUpperInset      = v, issues, lineNo);
         SetDouble(fields, idx, "LongCrankSlope",           v => cfg.Longitudinal.CrankSlope           = v, issues, lineNo);
         SetLength(fields, idx, "LongCrankLowerBendOffset", v => cfg.Longitudinal.CrankLowerBendOffset = v, issues, lineNo);
@@ -458,6 +459,7 @@ public static class AssignmentCsv
             "LongTopDefault"     => c.Longitudinal.TopDefault.ToString(),
             "LongTopModes"       => c.Longitudinal.TopModes ?? "",
             "LongTopBentLeg"     => c.Longitudinal.TopBentLeg.ToString(),
+            "LongTopBentOutward" => c.Longitudinal.TopBentOutward.ToString().ToLowerInvariant(),
             "LongCrankUpperInset"      => c.Longitudinal.CrankUpperInset.ToString(),
             "LongCrankSlope"           => c.Longitudinal.CrankSlope.ToString("G", CultureInfo.InvariantCulture),
             "LongCrankLowerBendOffset" => c.Longitudinal.CrankLowerBendOffset.ToString(),
