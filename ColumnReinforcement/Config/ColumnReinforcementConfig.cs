@@ -176,12 +176,14 @@ public class StirrupsConfig
     [JsonPropertyName("spacing")] public Length Spacing { get; set; } = new(8);
 
     /// <summary>
-    /// RebarHookType .Name applied to both ends of the tie. Non-seismic default is a 90° standard
-    /// hook per ACI 318 §25.3.2 — matches Revit's OOTB <c>"Stirrup/Tie - 90 deg."</c> hook type
-    /// (note the trailing period). Set to <c>"Stirrup/Tie - 135 deg."</c> for seismic detailing,
+    /// RebarHookType .Name applied to both ends of the tie (and inherited by crossties unless
+    /// <see cref="CrosstiesConfig.HookType"/> overrides). Default is a 135° tie hook —
+    /// matches Revit's OOTB <c>"Stirrup/Tie - 135 deg."</c> (note the trailing period); 135°
+    /// hooks wrap the longitudinal bar more fully than 90° and are the common column-tie
+    /// detail. Set to <c>"Stirrup/Tie - 90 deg."</c> or <c>"Stirrup/Tie Seismic - 135 deg."</c>,
     /// or any other RebarHookType .Name present in the active document.
     /// </summary>
-    [JsonPropertyName("hookType")] public string? HookType { get; set; } = "Stirrup/Tie - 90 deg.";
+    [JsonPropertyName("hookType")] public string? HookType { get; set; } = "Stirrup/Tie - 135 deg.";
 
     /// <summary>If true (Phase 2+), the tie is rotated 45° about the column axis (ACI 318 §25.7.2.3 allowed cases).</summary>
     [JsonPropertyName("rotate45")] public bool Rotate45 { get; set; }
