@@ -10,26 +10,40 @@ using Panel = System.Windows.Controls.Panel;
 using TextBox = System.Windows.Controls.TextBox;
 using Orientation = System.Windows.Controls.Orientation;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using RvtDetailLevel = Autodesk.Revit.DB.ViewDetailLevel;
+using RvtDisplayStyle = Autodesk.Revit.DB.DisplayStyle;
 
 namespace SmartViews.UI;
 
 /// <summary>
-/// Code-only options dialog for the Column Views tool. Surfaces the main settings —
-/// naming templates, foreign-rebar treatment, and the schedule/sheet toggles — and
-/// writes them back into <see cref="Config"/> on OK.
+/// Code-only options dialog for the Column Views tool. Surfaces naming templates, view
+/// appearance (scale / detail level / visual style), foreign-rebar treatment, and the
+/// schedule/graphics/sheet toggles, writing them back into <see cref="Config"/> on OK.
 /// </summary>
 public sealed class ColumnViewsDialog : Window
 {
-    private readonly ComboBox _foreignRebar;
+    private static readonly string[] DetailLevels = { "Coarse", "Medium", "Fine" };
+
+    private static readonly (string Label, RvtDisplayStyle Style)[] VisualStyles =
+    {
+        ("Wireframe", RvtDisplayStyle.Wireframe),
+        ("Hidden Line", RvtDisplayStyle.HLR),
+        ("Shaded", RvtDisplayStyle.Shading),
+        ("Shaded with Edges", RvtDisplayStyle.ShadingWithEdges),
+    };
+
     private readonly TextBox _elevationName;
     private readonly TextBox _planName;
     private readonly TextBox _rebarScheduleName;
-    private readonly TextBox _bendingScheduleName;
     private readonly TextBox _sheetNumber;
     private readonly TextBox _sheetName;
     private readonly TextBox _titleBlock;
+    private readonly ComboBox _foreignRebar;
+    private readonly TextBox _viewScale;
+    private readonly ComboBox _detailLevel;
+    private readonly ComboBox _visualStyle;
     private readonly CheckBox _createRebarSchedule;
-    private readonly CheckBox _createBendingSchedule;
+    private readonly CheckBox _bendingGraphics;
     private readonly CheckBox _placeOnSheet;
 
     public ColumnViewsConfig Config { get; }
@@ -47,21 +61,27 @@ public sealed class ColumnViewsDialog : Window
         var root = new StackPanel { Margin = new Thickness(16) };
 
         root.Children.Add(SectionHeader("Naming templates  (tokens: {Mark} {Direction} {End} {Level})"));
-        _elevationName       = AddTextRow(root, "Elevation view", config.ElevationNameTemplate);
-        _planName            = AddTextRow(root, "End plan view", config.PlanNameTemplate);
-        _rebarScheduleName   = AddTextRow(root, "Rebar schedule", config.RebarScheduleNameTemplate);
-        _bendingScheduleName = AddTextRow(root, "Bending schedule", config.BendingScheduleNameTemplate);
-        _sheetNumber         = AddTextRow(root, "Sheet number", config.SheetNumberTemplate);
-        _sheetName           = AddTextRow(root, "Sheet name", config.SheetNameTemplate);
+        _elevationName     = AddTextRow(root, "Elevation view", config.ElevationNameTemplate);
+        _planName          = AddTextRow(root, "End plan view", config.PlanNameTemplate);
+        _rebarScheduleName = AddTextRow(root, "Rebar schedule", config.RebarScheduleNameTemplate);
+        _sheetNumber       = AddTextRow(root, "Sheet number", config.SheetNumberTemplate);
+        _sheetName         = AddTextRow(root, "Sheet name", config.SheetNameTemplate);
+
+        root.Children.Add(SectionHeader("View appearance"));
+        _viewScale   = AddTextRow(root, "Scale denominator  (12 = 1\"=1'-0\", 48 = 1/4\"=1'-0\")",
+            config.ViewScale.ToString());
+        _detailLevel = AddComboRow(root, "Detail level", DetailLevels, config.DetailLevel.ToString());
+        _visualStyle = AddComboRow(root, "Visual style",
+            VisualStyles.Select(v => v.Label).ToArray(), LabelFor(config.VisualStyle));
 
         root.Children.Add(SectionHeader("Options"));
         _foreignRebar = AddComboRow(root, "Rebar from other columns",
             new[] { "Hide", "Halftone", "Show" }, config.ForeignRebar.ToString());
         _titleBlock = AddTextRow(root, "Title block (blank = first available)", config.TitleBlockName ?? string.Empty);
 
-        _createRebarSchedule   = AddCheckRow(root, "Create rebar schedule", config.CreateRebarSchedule);
-        _createBendingSchedule = AddCheckRow(root, "Create bending-detail schedule", config.CreateBendingSchedule);
-        _placeOnSheet          = AddCheckRow(root, "Place views and schedules on a sheet", config.PlaceOnSheet);
+        _createRebarSchedule = AddCheckRow(root, "Create rebar schedule", config.CreateRebarSchedule);
+        _bendingGraphics     = AddCheckRow(root, "Generate bending-detail graphics (Shape Image column)", config.BendingDetailGraphics);
+        _placeOnSheet        = AddCheckRow(root, "Place views and schedule on a sheet", config.PlaceOnSheet);
 
         root.Children.Add(BuildButtonRow());
 
@@ -72,25 +92,43 @@ public sealed class ColumnViewsDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        Config.ElevationNameTemplate       = _elevationName.Text.Trim();
-        Config.PlanNameTemplate            = _planName.Text.Trim();
-        Config.RebarScheduleNameTemplate   = _rebarScheduleName.Text.Trim();
-        Config.BendingScheduleNameTemplate = _bendingScheduleName.Text.Trim();
-        Config.SheetNumberTemplate         = _sheetNumber.Text.Trim();
-        Config.SheetNameTemplate           = _sheetName.Text.Trim();
+        Config.ElevationNameTemplate     = _elevationName.Text.Trim();
+        Config.PlanNameTemplate          = _planName.Text.Trim();
+        Config.RebarScheduleNameTemplate = _rebarScheduleName.Text.Trim();
+        Config.SheetNumberTemplate       = _sheetNumber.Text.Trim();
+        Config.SheetNameTemplate         = _sheetName.Text.Trim();
 
         string titleBlock = _titleBlock.Text.Trim();
         Config.TitleBlockName = string.IsNullOrEmpty(titleBlock) ? null : titleBlock;
 
-        Config.ForeignRebar = Enum.TryParse((_foreignRebar.SelectedItem as string), out ForeignRebarMode mode)
+        Config.ForeignRebar = Enum.TryParse(_foreignRebar.SelectedItem as string, out ForeignRebarMode mode)
             ? mode
             : ForeignRebarMode.Hide;
 
+        if (int.TryParse(_viewScale.Text.Trim(), out int scale) && scale > 0)
+            Config.ViewScale = scale;
+
+        if (Enum.TryParse(_detailLevel.SelectedItem as string, out RvtDetailLevel detail))
+            Config.DetailLevel = detail;
+
+        Config.VisualStyle = StyleFor(_visualStyle.SelectedItem as string);
+
         Config.CreateRebarSchedule   = _createRebarSchedule.IsChecked == true;
-        Config.CreateBendingSchedule = _createBendingSchedule.IsChecked == true;
+        Config.BendingDetailGraphics = _bendingGraphics.IsChecked == true;
         Config.PlaceOnSheet          = _placeOnSheet.IsChecked == true;
 
         DialogResult = true;
+    }
+
+    private static string LabelFor(RvtDisplayStyle style) =>
+        VisualStyles.FirstOrDefault(v => v.Style == style).Label ?? "Hidden Line";
+
+    private static RvtDisplayStyle StyleFor(string? label)
+    {
+        foreach ((string Label, RvtDisplayStyle Style) v in VisualStyles)
+            if (string.Equals(v.Label, label, StringComparison.Ordinal))
+                return v.Style;
+        return RvtDisplayStyle.HLR;
     }
 
     // -----------------------------------------------------------------------

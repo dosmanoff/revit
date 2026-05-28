@@ -77,21 +77,30 @@ public sealed class ColumnViewsEngine
         using var tx = new Transaction(_doc, $"Column Views — {mark}");
         tx.Start();
 
+        // Rebar hosted by this column drives the elevation extents (dowels reaching above/
+        // below the column) and the end-plan cut planes (first/last stirrup).
+        List<Rebar> hostRebar = HostRebar(fi.Id);
+        BoundingBoxXYZ rebarBox = CombineBoundingBoxes(bbox, hostRebar);
+        (double? topStirrupZ, double? bottomStirrupZ) = StirrupZExtents(hostRebar);
+
         var created = new List<View>();
 
-        // Two perpendicular elevations (look along the column's two in-plan axes).
-        View? front = CreateElevation(bbox, lookDir: fwd, mark, "Front");
+        // Two perpendicular elevations, sized to enclose all of the column's rebar.
+        View? front = CreateElevation(rebarBox, lookDir: fwd, mark, "Front");
         if (front is not null) created.Add(front);
 
-        View? side = CreateElevation(bbox, lookDir: rgt, mark, "Side");
+        View? side = CreateElevation(rebarBox, lookDir: rgt, mark, "Side");
         if (side is not null) created.Add(side);
 
-        // Two end plans cut near the top and bottom faces of the column.
-        View? topPlan = CreatePlan(fi, bbox, mark, isTop: true);
+        // Two end plans cut just above the topmost / bottommost stirrup.
+        View? topPlan = CreatePlan(fi, bbox, mark, isTop: true, topStirrupZ, bottomStirrupZ);
         if (topPlan is not null) created.Add(topPlan);
 
-        View? botPlan = CreatePlan(fi, bbox, mark, isTop: false);
+        View? botPlan = CreatePlan(fi, bbox, mark, isTop: false, topStirrupZ, bottomStirrupZ);
         if (botPlan is not null) created.Add(botPlan);
+
+        foreach (View v in created)
+            ApplyAppearance(v);
 
         // Visibility computed from the new crops before we query what's visible.
         _doc.Regenerate();
@@ -113,37 +122,22 @@ public sealed class ColumnViewsEngine
     private List<ViewSchedule> BuildSchedules(string mark, ViewCreationResult result)
     {
         var schedules = new List<ViewSchedule>();
-        if (string.IsNullOrWhiteSpace(mark))
+        if (string.IsNullOrWhiteSpace(mark) || !_cfg.CreateRebarSchedule)
             return schedules;
 
-        var builder = new ColumnScheduleBuilder(_doc);
-
-        if (_cfg.CreateRebarSchedule)
+        try
         {
-            try
-            {
-                ViewSchedule? s = builder.BuildRebarSchedule(
-                    mark, UniqueName(Token(_cfg.RebarScheduleNameTemplate, mark)));
-                if (s is not null) { schedules.Add(s); result.RecordCreated(); }
-            }
-            catch (Exception ex)
-            {
-                result.RecordError($"Rebar schedule for {mark}: {ex.Message}");
-            }
+            var builder = new ColumnScheduleBuilder(_doc);
+            ViewSchedule s = builder.BuildRebarSchedule(
+                mark,
+                UniqueName(Token(_cfg.RebarScheduleNameTemplate, mark)),
+                _cfg.BendingDetailGraphics);
+            schedules.Add(s);
+            result.RecordCreated();
         }
-
-        if (_cfg.CreateBendingSchedule)
+        catch (Exception ex)
         {
-            try
-            {
-                ViewSchedule? s = builder.BuildBendingSchedule(
-                    mark, UniqueName(Token(_cfg.BendingScheduleNameTemplate, mark)));
-                if (s is not null) { schedules.Add(s); result.RecordCreated(); }
-            }
-            catch (Exception ex)
-            {
-                result.RecordError($"Bending schedule for {mark}: {ex.Message}");
-            }
+            result.RecordError($"Rebar schedule for {mark}: {ex.Message}");
         }
 
         return schedules;
@@ -216,7 +210,9 @@ public sealed class ColumnViewsEngine
     // End plans
     // -----------------------------------------------------------------------
 
-    private View? CreatePlan(FamilyInstance fi, BoundingBoxXYZ bbox, string mark, bool isTop)
+    private View? CreatePlan(
+        FamilyInstance fi, BoundingBoxXYZ bbox, string mark, bool isTop,
+        double? topStirrupZ, double? bottomStirrupZ)
     {
         Level? level = ResolveLevel(fi);
         if (level is null)
@@ -235,12 +231,18 @@ public sealed class ColumnViewsEngine
             Max = new XYZ(bbox.Max.X + pad, bbox.Max.Y + pad, existing.Max.Z),
         };
 
-        // Cut plane near the relevant face, expressed as an offset from the level.
-        double levelElev = level.ProjectElevation;
-        double cut = isTop
-            ? (bbox.Max.Z - levelElev) - _cfg.PlanCutInset
-            : (bbox.Min.Z - levelElev) + _cfg.PlanCutInset;
+        // Cut just above the topmost / bottommost stirrup so the plan slices through the
+        // reinforced section; fall back to an inset from the column face if no stirrups exist.
+        double cutWorldZ = isTop
+            ? (topStirrupZ.HasValue
+                ? topStirrupZ.Value + _cfg.PlanCutAboveStirrup
+                : bbox.Max.Z - _cfg.PlanCutInset)
+            : (bottomStirrupZ.HasValue
+                ? bottomStirrupZ.Value + _cfg.PlanCutAboveStirrup
+                : bbox.Min.Z + _cfg.PlanCutInset);
 
+        double levelElev = level.ProjectElevation;
+        double cut = cutWorldZ - levelElev;
         double top = cut + 0.1;
         double bottom = cut - _cfg.PlanViewDepth;
 
@@ -370,6 +372,78 @@ public sealed class ColumnViewsEngine
 
     private string MarkOf(Element e) =>
         e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? string.Empty;
+
+    private List<Rebar> HostRebar(ElementId columnId) =>
+        new FilteredElementCollector(_doc)
+            .OfCategory(BuiltInCategory.OST_Rebar)
+            .WhereElementIsNotElementType()
+            .OfType<Rebar>()
+            .Where(r => r.GetHostId() == columnId)
+            .ToList();
+
+    /// <summary>World AABB enclosing <paramref name="seed"/> and every rebar's bounding box.</summary>
+    private static BoundingBoxXYZ CombineBoundingBoxes(BoundingBoxXYZ seed, IEnumerable<Rebar> rebar)
+    {
+        double minX = seed.Min.X, minY = seed.Min.Y, minZ = seed.Min.Z;
+        double maxX = seed.Max.X, maxY = seed.Max.Y, maxZ = seed.Max.Z;
+
+        foreach (Rebar r in rebar)
+        {
+            BoundingBoxXYZ? bb = r.get_BoundingBox(null);
+            if (bb is null) continue;
+
+            minX = Math.Min(minX, bb.Min.X); minY = Math.Min(minY, bb.Min.Y); minZ = Math.Min(minZ, bb.Min.Z);
+            maxX = Math.Max(maxX, bb.Max.X); maxY = Math.Max(maxY, bb.Max.Y); maxZ = Math.Max(maxZ, bb.Max.Z);
+        }
+
+        return new BoundingBoxXYZ
+        {
+            Min = new XYZ(minX, minY, minZ),
+            Max = new XYZ(maxX, maxY, maxZ),
+        };
+    }
+
+    /// <summary>
+    /// World Z of the highest and lowest stirrup/tie centres hosted by the column, or
+    /// (null, null) when none are found. The 2025 API exposes no rebar-style accessor, so
+    /// ties are detected geometrically: a tie is a flat horizontal loop whose vertical
+    /// extent is well under its in-plan width, which excludes vertical longitudinals/dowels.
+    /// </summary>
+    private static (double? TopZ, double? BottomZ) StirrupZExtents(IEnumerable<Rebar> rebar)
+    {
+        double? top = null, bottom = null;
+
+        foreach (Rebar r in rebar)
+        {
+            BoundingBoxXYZ? bb = r.get_BoundingBox(null);
+            if (bb is null) continue;
+
+            double zExt = bb.Max.Z - bb.Min.Z;
+            double maxHoriz = Math.Max(bb.Max.X - bb.Min.X, bb.Max.Y - bb.Min.Y);
+            if (maxHoriz <= 0 || zExt >= 0.5 * maxHoriz) continue; // not a flat loop → skip
+
+            double z = (bb.Min.Z + bb.Max.Z) / 2.0;
+            top = top is null ? z : Math.Max(top.Value, z);
+            bottom = bottom is null ? z : Math.Min(bottom.Value, z);
+        }
+
+        return (top, bottom);
+    }
+
+    private void ApplyAppearance(View view)
+    {
+        if (_cfg.ViewScale > 0)
+            TrySet(() => view.Scale = _cfg.ViewScale);
+        TrySet(() => view.DetailLevel = _cfg.DetailLevel);
+        TrySet(() => view.DisplayStyle = _cfg.VisualStyle);
+    }
+
+    /// <summary>Applies a view setting, ignoring failures (e.g. when a view template owns it).</summary>
+    private static void TrySet(Action set)
+    {
+        try { set(); }
+        catch (Autodesk.Revit.Exceptions.ApplicationException) { }
+    }
 
     private void Name(View view, string template, string mark, string? direction, string? end)
     {

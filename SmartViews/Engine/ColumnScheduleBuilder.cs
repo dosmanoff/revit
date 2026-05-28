@@ -3,12 +3,13 @@ using Autodesk.Revit.DB;
 namespace SmartViews.Engine;
 
 /// <summary>
-/// Creates per-column rebar schedules filtered to a single Host Mark.
+/// Creates a per-column rebar schedule filtered to a single Host Mark, grouped by
+/// Schedule Mark and non-itemized so each unique bar mark collapses to one row.
 ///
-/// <para>Field availability differs between Revit versions and templates, so every
-/// field is looked up by display name and silently skipped when absent — the builder
-/// never throws for a missing field. Default field sets are a sensible starting point
-/// and are expected to be tuned to the project's schedule template.</para>
+/// <para>Mark uniqueness (same mark ⇔ same type/shape/length/bend dimensions) is governed
+/// by Revit's own reinforcement numbering, not assigned here — this builder only groups by
+/// the resulting Schedule Mark. Fields are looked up by display name and skipped if absent,
+/// so the builder never throws across template/version differences.</para>
 /// </summary>
 public sealed class ColumnScheduleBuilder
 {
@@ -16,8 +17,8 @@ public sealed class ColumnScheduleBuilder
 
     public ColumnScheduleBuilder(Document doc) => _doc = doc;
 
-    /// <summary>Rebar quantity schedule filtered to <paramref name="hostMark"/>.</summary>
-    public ViewSchedule? BuildRebarSchedule(string hostMark, string name)
+    /// <param name="includeShapeImage">Include the Shape Image (bend-shape graphic) column.</param>
+    public ViewSchedule BuildRebarSchedule(string hostMark, string name, bool includeShapeImage)
     {
         ViewSchedule schedule = ViewSchedule.CreateSchedule(
             _doc, new ElementId(BuiltInCategory.OST_Rebar));
@@ -25,45 +26,34 @@ public sealed class ColumnScheduleBuilder
 
         ScheduleDefinition def = schedule.Definition;
 
-        AddFirstAvailable(def, "Schedule Mark", "Bar Mark", "Mark");
+        ScheduleField? markField = AddFirstAvailable(def, "Schedule Mark", "Bar Mark", "Mark");
         AddFirstAvailable(def, "Type", "Bar Type", "Family and Type");
-        AddFirstAvailable(def, "Bar Diameter");
         AddFirstAvailable(def, "Shape");
-        AddFirstAvailable(def, "Style");
-        AddFirstAvailable(def, "Quantity");
+        if (includeShapeImage)
+            AddFirstAvailable(def, "Shape Image");
         AddFirstAvailable(def, "Total Bar Length", "Bar Length");
 
-        ApplyHostMarkFilter(def, hostMark);
-        return schedule;
-    }
-
-    /// <summary>
-    /// Bending-detail schedule filtered to <paramref name="hostMark"/>: shape, shape image
-    /// (when the template exposes it), diameter, the A–H bend dimensions, length and quantity.
-    /// The graphical auto-dimensioned bending-detail column is a UI-only schedule option in
-    /// Revit and cannot be toggled through the API, so this provides the tabular equivalent.
-    /// </summary>
-    public ViewSchedule? BuildBendingSchedule(string hostMark, string name)
-    {
-        ViewSchedule schedule = ViewSchedule.CreateSchedule(
-            _doc, new ElementId(BuiltInCategory.OST_Rebar));
-        schedule.Name = name;
-
-        ScheduleDefinition def = schedule.Definition;
-
-        AddFirstAvailable(def, "Schedule Mark", "Bar Mark", "Mark");
-        AddFirstAvailable(def, "Shape");
-        AddFirstAvailable(def, "Shape Image");
-        AddFirstAvailable(def, "Bar Diameter");
-
-        // Shape bend dimensions are exposed as single-letter fields when present.
-        foreach (string dim in new[] { "A", "B", "C", "D", "E", "F", "G", "H", "O", "R" })
+        // Shape bend dimensions (A, B, C, ...) — whichever the project's shapes expose.
+        foreach (string dim in new[] { "A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "O", "R" })
             AddFirstAvailable(def, dim);
 
-        AddFirstAvailable(def, "Total Bar Length", "Bar Length");
-        AddFirstAvailable(def, "Quantity");
-
+        // Filter to this column; the Host Mark column itself is hidden.
         ApplyHostMarkFilter(def, hostMark);
+
+        // One row per unique Schedule Mark.
+        def.IsItemized = false;
+        if (markField is not null)
+        {
+            try
+            {
+                def.AddSortGroupField(new ScheduleSortGroupField(markField.FieldId));
+            }
+            catch (Autodesk.Revit.Exceptions.ArgumentException)
+            {
+                // Field cannot be used for sorting/grouping — leave ungrouped.
+            }
+        }
+
         return schedule;
     }
 
@@ -75,19 +65,16 @@ public sealed class ColumnScheduleBuilder
         if (hostMarkField is null)
             return;
 
-        // Filter the schedule to the target column, then drop the now-redundant column.
         try
         {
             def.AddFilter(new ScheduleFilter(
                 hostMarkField.FieldId, ScheduleFilterType.Equal, hostMark));
+            hostMarkField.IsHidden = true;
         }
         catch (Autodesk.Revit.Exceptions.ArgumentException)
         {
             // Field does not support an equality filter — leave the column visible instead.
-            return;
         }
-
-        hostMarkField.IsHidden = true;
     }
 
     private ScheduleField? AddFirstAvailable(ScheduleDefinition def, params string[] names)
