@@ -170,6 +170,7 @@ The engine searches for a slab directly below the column at the right elevation 
 | `DowelOnlyFoundation` | bool | `true` | If false, regular `OST_Floors` slabs also qualify as the host. Set to false if your foundations are modelled as structural floors. |
 | `DowelHookTop` | string? | `null` | Optional top-end hook. |
 | `DowelHookBot` | string? | `null` | Optional bottom-end hook (rare with L-form, since the bend provides anchorage). |
+| `DowelPositions` | string (selector list) | (empty) | Subset of cage positions to dowel, same selector vocabulary as `LongTopModes` (indices and/or `all`/`corners`/`edges`/`+x`/`-x`/`+y`/`-y`; a position is doweled if it matches any token). Empty = **every** position. Use with `DowelHost=Column` to place starters **only where the column below has no continuing bar** — e.g. when the lower column bent part of its cage into the slab, dowel just the faces that lost their bar. **No commas inside the cell** (use spaces). |
 
 ### 2.9 Upper splices (continuation bars above the column)
 

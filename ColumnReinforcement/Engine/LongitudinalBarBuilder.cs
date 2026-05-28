@@ -238,6 +238,51 @@ public class LongitudinalBarBuilder
     }
 
     /// <summary>
+    /// Resolve a subset of cage positions from a selector string, reusing the same
+    /// vocabulary as <see cref="LongitudinalConfig.TopModes"/> selectors:
+    /// space/<c>;</c>/<c>,</c>-separated tokens, each a 0-based index or one of
+    /// <c>all</c> / <c>corners</c> / <c>edges</c> / <c>+x</c> / <c>-x</c> / <c>+y</c> / <c>-y</c>.
+    /// A position is included if it matches ANY token (include-only — no exclusion).
+    /// A null/empty selector includes every position (the default for builders that
+    /// previously always placed at all positions). Used by the dowel builder to place
+    /// starters only where the column below has no continuing bar.
+    /// </summary>
+    internal static bool[] ResolvePositionMask(
+        IReadOnlyList<(double x, double y)> positions, string? selector)
+    {
+        int n = positions.Count;
+        var mask = new bool[n];
+        if (string.IsNullOrWhiteSpace(selector))
+        {
+            for (int i = 0; i < n; i++) mask[i] = true;     // empty = every position
+            return mask;
+        }
+
+        bool[] isCorner = ClassifyExtremal(positions, cornersOnly: true);
+        bool[] isPerim  = ClassifyExtremal(positions, cornersOnly: false);
+        var (px, mx, py, my) = ClassifyFaces(positions);
+
+        void Mark(Func<int, bool> pred) { for (int i = 0; i < n; i++) if (pred(i)) mask[i] = true; }
+
+        foreach (string raw in selector.Split([' ', ';', ','], StringSplitOptions.RemoveEmptyEntries))
+        {
+            string token = raw.Trim();
+            if (int.TryParse(token, out int idx)) { if (idx >= 0 && idx < n) mask[idx] = true; continue; }
+            switch (token.ToLowerInvariant())
+            {
+                case "all":     Mark(_ => true); break;
+                case "corners": Mark(i => isCorner[i]); break;
+                case "edges":   Mark(i => isPerim[i] && !isCorner[i]); break;
+                case "+x":      Mark(i => px[i]); break;
+                case "-x":      Mark(i => mx[i]); break;
+                case "+y":      Mark(i => py[i]); break;
+                case "-y":      Mark(i => my[i]); break;
+            }
+        }
+        return mask;
+    }
+
+    /// <summary>
     /// Classify each position by which face(s) it sits on: +X (x = max), −X (x = min),
     /// +Y (y = max), −Y (y = min). Corner bars are on two faces. For round columns,
     /// faces map to quadrants of the cage circle by the dominant axis sign.

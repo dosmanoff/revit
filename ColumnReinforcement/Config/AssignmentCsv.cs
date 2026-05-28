@@ -124,7 +124,7 @@ public static class AssignmentCsv
         "StirrupBarType", "StirrupSpacing", "StirrupHookType", "StirrupOffsetTop", "StirrupOffsetBot", "StirrupRotate45",
         "ConfBotEnabled", "ConfBotSpacing", "ConfBotZoneFraction", "ConfBotZoneLength",
         "ConfTopEnabled", "ConfTopSpacing", "ConfTopZoneFraction", "ConfTopZoneLength",
-        "DowelsEnabled", "DowelForm", "DowelHost", "DowelBarType", "DowelExt", "DowelEmbed", "DowelLeg", "DowelOnlyFoundation", "DowelHookTop", "DowelHookBot",
+        "DowelsEnabled", "DowelForm", "DowelHost", "DowelBarType", "DowelExt", "DowelEmbed", "DowelLeg", "DowelOnlyFoundation", "DowelHookTop", "DowelHookBot", "DowelPositions",
         "SplicesEnabled", "SpliceForm", "SpliceBarType", "SpliceLap", "SpliceExt", "SpliceBentLeg",
         "SpliceUpperInset", "SpliceCrankedSlope", "SpliceLowerBendOffset", "SpliceIgnoreSlabAbove", "SpliceHookTop", "SpliceHookBot",
         "CleanExisting",
@@ -187,6 +187,7 @@ public static class AssignmentCsv
         SetBool         (fields, idx, "DowelOnlyFoundation", v => cfg.Dowels.OnlyStructuralFoundation = v, issues, lineNo);
         SetOptStr       (fields, idx, "DowelHookTop", v => cfg.Dowels.HookTopType    = v);
         SetOptStr       (fields, idx, "DowelHookBot", v => cfg.Dowels.HookBottomType = v);
+        SetOptStr       (fields, idx, "DowelPositions", v => cfg.Dowels.Positions    = v);
 
         SetBool                  (fields, idx, "SplicesEnabled",        v => cfg.UpperSplices.Enabled  = v, issues, lineNo);
         SetEnum<UpperSpliceForm> (fields, idx, "SpliceForm",            v => cfg.UpperSplices.Form     = v, issues, lineNo);
@@ -492,6 +493,7 @@ public static class AssignmentCsv
             "DowelOnlyFoundation" => c.Dowels.OnlyStructuralFoundation.ToString().ToLowerInvariant(),
             "DowelHookTop"        => c.Dowels.HookTopType    ?? "",
             "DowelHookBot"        => c.Dowels.HookBottomType ?? "",
+            "DowelPositions"      => c.Dowels.Positions      ?? "",
 
             "SplicesEnabled"        => c.UpperSplices.Enabled.ToString().ToLowerInvariant(),
             "SpliceForm"            => c.UpperSplices.Form.ToString(),
