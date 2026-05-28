@@ -198,11 +198,14 @@ by a crank from below (double-up/clash).
 - Confinement (`ConfTop*`/`ConfBot*`): only if the schedule/Comments call for densified
   zones. Non-seismic default = none. (Schedule labels like `So 6" / Sm 10" / Lo 30"` map to
   `ConfTop/BotSpacing=6`, `ConfTop/BotZoneLength=30`, `StirrupSpacing=10`.)
-- **Crossties** (interior шпильки): when a face has interior longitudinal bars that the
-  outer tie alone can't laterally support (ACI 318-19 §25.7.2.3, 6″ clear rule), set
-  `CrosstiesEnabled=true`. Leave `CrosstiesAuto=true` (the engine places them per ACI from
-  the bar layout — you don't compute the pattern). Use `CrosstiesManual="x:i y:j"` only to
-  force a specific pattern. Rectangular columns only.
+- **Crossties** (interior шпильки): set `CrosstiesEnabled=true` when either (a) the Comments
+  call out a second transverse item beyond the perimeter tie — e.g. `… + #4@10" TIE`, or a
+  leg/set count like `2#4@10" STIRRUPS` (the `2` = outer tie **plus** a crosstie) — or (b) a
+  face has interior longitudinal bars the outer tie alone can't laterally support (ACI 318-19
+  §25.7.2.3, 6″ clear rule). Leave `CrosstiesAuto=true` — the engine places them per ACI from
+  the bar layout, so you don't compute the pattern; the crosstie bar type/hook default to the
+  outer tie's. Use `CrosstiesManual="x:i y:j"` only to force a specific pattern. Rectangular
+  columns only.
 
 ---
 

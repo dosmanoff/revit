@@ -1,6 +1,6 @@
 ﻿# ======================================================================
 #  Армирование стека колонн C1.1 -> C1.4  (модель Empty_project_ArtDreamTJ4X9)
-#  Из дампа schema_version 4. UTF-8 (с BOM). Строки c # — комментарии.
+#  Из дампа schema_version 5. UTF-8 (с BOM). Строки c # — комментарии.
 #  Грузить в плагин: From CSV -> выбрать файл -> Run. Размеры в дюймах.
 # ----------------------------------------------------------------------
 #  C1.1  24x36, низ стека. Сверху C1.2 (18x24) ПОВЁРНУТА на 90 и сдвинута в -Y;
@@ -29,11 +29,14 @@
 # ----------------------------------------------------------------------
 #  Отгиб НАРУЖУ (LongTopBentOutward=true): лапки расходятся в плиту, не пересекаются.
 #  Хомуты #4@10, StirrupOffsetTop=10 -> верхний хомут на низ плиты, в плиту не лезет.
+#  ШПИЛЬКИ: в комментариях колонн есть вторая поперечная арматура
+#  ("2#4@10 STIRRUPS" у C1.1/C1.2, "+ #4@10 TIE" у C1.3/C1.4) -> CrosstiesEnabled=true,
+#  CrosstiesAuto=true. Движок сам ставит стяжки по ACI §25.7.2.3 (тип/шаг от хомута #4).
 #  Cranked: смещение = 1 диаметр (#8->1.0, #7->0.875), уклон 1:6, первый загиб 12"
 #  от верха, проникновение 30". Выпуски C1.3: #7, лап вверх 30", в C1.2 вниз 30".
 # ======================================================================
-Mark,ExpectedSection,ExpectedW,ExpectedD,CoverSides,CoverEnds,LongBarType,LongBarsW,LongBarsD,LongTopDefault,LongTopModes,LongTopBentLeg,LongTopBentOutward,LongCrankUpperInset,LongCrankSlope,LongCrankLowerBendOffset,LongCrankPenetration,StirrupBarType,StirrupSpacing,StirrupOffsetTop,DowelsEnabled,DowelHost,DowelForm,DowelBarType,DowelExt,DowelEmbed,DowelPositions
-C1.1,Rectangular,24,36,1.5,1.5,#8,5,7,BentToSlab,0:Cranked 1:Cranked 2:Cranked 3:Cranked 4:Cranked 10:Cranked 11:Cranked 12:Cranked 13:Cranked,20,true,1.0,6,12,30,#4,10,10,,,,,,,
-C1.2,Rectangular,18,24,1.5,1.5,#7,4,4,BentToSlab,8:Cranked 9:Cranked 10:Cranked 11:Cranked,20,true,0.875,6,12,30,#4,10,10,true,Column,Straight,#7,30,30,-x
-C1.3,Rectangular,16,16,1.5,1.5,#7,4,4,Cranked,,,,0.875,6,12,30,#4,10,10,true,Column,Straight,#7,30,30,+x -x
-C1.4,Rectangular,16,16,1.5,1.5,#7,4,4,BentToSlab,,20,true,,,,,#4,10,10,,,,,,,
+Mark,ExpectedSection,ExpectedW,ExpectedD,CoverSides,CoverEnds,LongBarType,LongBarsW,LongBarsD,LongTopDefault,LongTopModes,LongTopBentLeg,LongTopBentOutward,LongCrankUpperInset,LongCrankSlope,LongCrankLowerBendOffset,LongCrankPenetration,StirrupBarType,StirrupSpacing,StirrupOffsetTop,DowelsEnabled,DowelHost,DowelForm,DowelBarType,DowelExt,DowelEmbed,DowelPositions,CrosstiesEnabled,CrosstiesAuto
+C1.1,Rectangular,24,36,1.5,1.5,#8,5,7,BentToSlab,0:Cranked 1:Cranked 2:Cranked 3:Cranked 4:Cranked 10:Cranked 11:Cranked 12:Cranked 13:Cranked,20,true,1.0,6,12,30,#4,10,10,,,,,,,,true,true
+C1.2,Rectangular,18,24,1.5,1.5,#7,4,4,BentToSlab,8:Cranked 9:Cranked 10:Cranked 11:Cranked,20,true,0.875,6,12,30,#4,10,10,true,Column,Straight,#7,30,30,-x,true,true
+C1.3,Rectangular,16,16,1.5,1.5,#7,4,4,Cranked,,,,0.875,6,12,30,#4,10,10,true,Column,Straight,#7,30,30,+x -x,true,true
+C1.4,Rectangular,16,16,1.5,1.5,#7,4,4,BentToSlab,,20,true,,,,,#4,10,10,,,,,,,,true,true

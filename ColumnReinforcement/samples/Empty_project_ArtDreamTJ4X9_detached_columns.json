@@ -1,0 +1,1537 @@
+{
+  "document": {
+    "title": "Empty_project_ArtDreamTJ4X9_detached", 
+    "path": "C:\\Users\\Vic\\Documents\\Empty_project_ArtDreamTJ4X9_detached.rvt"
+  }, 
+  "generated_at": "2026-05-28T14:44:59.158000", 
+  "column_types_in_use": {
+    "607360": {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "24 x 36", 
+      "id": 607360, 
+      "parameters": {
+        "Export Type to IFC": 0, 
+        "Assembly Description": "Superstructure", 
+        "Section Shape": 0, 
+        "Assembly Code": "B10", 
+        "OmniClass Title": "Columns", 
+        "OmniClass Number": "23.25.30.11.14.11", 
+        "Structural Material": {
+          "name": "CONCRETE 4 KSI", 
+          "id": 122091
+        }, 
+        "b": {
+          "display": "2' - 0\"", 
+          "raw": 2.0
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Family Name": "Concrete-Rectangular-Column", 
+        "Type Name": "24 x 36", 
+        "h": {
+          "display": "3' - 0\"", 
+          "raw": 3.0
+        }, 
+        "Type IfcGUID": "1nPeJvRdf7buJyvqZHFUGn"
+      }
+    }, 
+    "548505": {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 16", 
+      "id": 548505, 
+      "parameters": {
+        "Export Type to IFC": 0, 
+        "Assembly Description": "Superstructure", 
+        "Section Shape": 0, 
+        "Assembly Code": "B10", 
+        "OmniClass Title": "Columns", 
+        "OmniClass Number": "23.25.30.11.14.11", 
+        "Structural Material": {
+          "name": "CONCR_5", 
+          "id": 3337988
+        }, 
+        "b": {
+          "display": "1' - 4\"", 
+          "raw": 1.3333330000000001
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Family Name": "Concrete-Rectangular-Column", 
+        "Type Name": "16 x 16", 
+        "h": {
+          "display": "1' - 4\"", 
+          "raw": 1.3333330000000001
+        }, 
+        "Type IfcGUID": "3hRkffdJzEHwchWtZjqway"
+      }
+    }, 
+    "228667": {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "18 x 24", 
+      "id": 228667, 
+      "parameters": {
+        "Export Type to IFC": 0, 
+        "Assembly Description": "Superstructure", 
+        "Section Shape": 0, 
+        "Assembly Code": "B10", 
+        "OmniClass Title": "Columns", 
+        "OmniClass Number": "23.25.30.11.14.11", 
+        "Structural Material": {
+          "name": "CONCR_5", 
+          "id": 3337988
+        }, 
+        "b": {
+          "display": "1' - 6\"", 
+          "raw": 1.5
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Family Name": "Concrete-Rectangular-Column", 
+        "Type Name": "18 x 24", 
+        "h": {
+          "display": "2' - 0\"", 
+          "raw": 2.0
+        }, 
+        "Type IfcGUID": "0NOeMc_Jr6JPqFI1tvC_ut"
+      }
+    }
+  }, 
+  "levels": [
+    {
+      "name": "CELLAR FLOOR", 
+      "elevation_ft": 65.0, 
+      "id": 1209084
+    }, 
+    {
+      "name": "BASEMENT FLOOR", 
+      "elevation_ft": 72.083299999999994, 
+      "id": 6306469
+    }, 
+    {
+      "name": "1ST FLOOR", 
+      "elevation_ft": 80.083299999999994, 
+      "id": 6308706
+    }, 
+    {
+      "name": "2ND FLOOR", 
+      "elevation_ft": 92.583299999999994, 
+      "id": 6308713
+    }, 
+    {
+      "name": "3RD FLOOR", 
+      "elevation_ft": 103.58329999999999, 
+      "id": 6308720
+    }
+  ], 
+  "warnings": [], 
+  "available_column_family_types": [
+    {
+      "family": "Column-Round", 
+      "type": "24\"", 
+      "id": 2448621
+    }, 
+    {
+      "family": "Column-Round", 
+      "type": "30\"", 
+      "id": 2448623
+    }, 
+    {
+      "family": "Column-Round", 
+      "type": "8\"", 
+      "id": 2448625
+    }, 
+    {
+      "family": "Column-Round", 
+      "type": "R16", 
+      "id": 5517384
+    }, 
+    {
+      "family": "Column-Round", 
+      "type": "R18", 
+      "id": 2448619
+    }, 
+    {
+      "family": "Column-Round", 
+      "type": "R20", 
+      "id": 5521089
+    }, 
+    {
+      "family": "Column-Round", 
+      "type": "RD 12\"", 
+      "id": 2448617
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "10 x 10", 
+      "id": 1214639
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "10 x 14", 
+      "id": 4607987
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "10 x 16", 
+      "id": 4607903
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "10 x 24", 
+      "id": 3706013
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "10 x 36", 
+      "id": 4085030
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "12 x 12", 
+      "id": 548475
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "12 x 16", 
+      "id": 4490082
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "12 x 18", 
+      "id": 228665
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "12 x 20", 
+      "id": 4490159
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "12 x 24", 
+      "id": 548483
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "12 x 36", 
+      "id": 4174264
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "14 x 14", 
+      "id": 1354872
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "14 x 16", 
+      "id": 6089849
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "14 x 18", 
+      "id": 4937243
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "14 x 20", 
+      "id": 4796808
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "14 x 24", 
+      "id": 2272129
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "14 x 30", 
+      "id": 548499
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 12", 
+      "id": 3252648
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 14", 
+      "id": 1803707
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 16", 
+      "id": 548505
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 22", 
+      "id": 607390
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 24", 
+      "id": 2407015
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "16 x 9", 
+      "id": 1684746
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "18 x 18", 
+      "id": 548487
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "18 x 24", 
+      "id": 228667
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "20 x 20", 
+      "id": 3851602
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "20 x 24", 
+      "id": 607425
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "22 x 22", 
+      "id": 4775710
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "24 x 12", 
+      "id": 2089825
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "24 x 14", 
+      "id": 3257054
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "24 x 24", 
+      "id": 548512
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "24 x 30", 
+      "id": 228669
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "24 x 36", 
+      "id": 607360
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "26 x 14", 
+      "id": 3256773
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "26 x 26", 
+      "id": 4858201
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "28 x 14", 
+      "id": 3255913
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "28 x 28", 
+      "id": 4858206
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "30 x 24", 
+      "id": 5759482
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "30 x 30", 
+      "id": 4857092
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "30 x 46", 
+      "id": 632206
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "32 x 14", 
+      "id": 3259598
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "34 x 14", 
+      "id": 3257746
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "36 x 14", 
+      "id": 3259986
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "36 x 24", 
+      "id": 632010
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "36 x 36", 
+      "id": 631962
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "40 x 12", 
+      "id": 2089557
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "46 x 14", 
+      "id": 3258491
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "47 x 14", 
+      "id": 3279076
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "8 x 12", 
+      "id": 4663078
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "8 x 24", 
+      "id": 4590253
+    }, 
+    {
+      "family": "Concrete-Rectangular-Column", 
+      "type": "8 x 8", 
+      "id": 1720843
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "10\"", 
+      "id": 6022458
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "12\"", 
+      "id": 5998034
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "18\"", 
+      "id": 5998036
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "24\"", 
+      "id": 5998038
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "30\"", 
+      "id": 5998040
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "8\"", 
+      "id": 5998042
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "8\" MINI PILE", 
+      "id": 5998046
+    }, 
+    {
+      "family": "HELICAL_PILE", 
+      "type": "CAISSON PILE", 
+      "id": 5998044
+    }, 
+    {
+      "family": "Steel-Round-Pile", 
+      "type": "12\"", 
+      "id": 1297713
+    }, 
+    {
+      "family": "Steel-Round-Pile", 
+      "type": "18\"", 
+      "id": 1297715
+    }, 
+    {
+      "family": "Steel-Round-Pile", 
+      "type": "24\"", 
+      "id": 1297717
+    }, 
+    {
+      "family": "Steel-Round-Pile", 
+      "type": "30\"", 
+      "id": 1297719
+    }, 
+    {
+      "family": "Steel-Round-Pile", 
+      "type": "8\"", 
+      "id": 1298164
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "12\"", 
+      "id": 3809999
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "18\"", 
+      "id": 3810001
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "24\"", 
+      "id": 3810003
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "30\"", 
+      "id": 3810005
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "8\"", 
+      "id": 3810009
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "CAISSON PILE", 
+      "id": 3810007
+    }, 
+    {
+      "family": "Steel-Round-Pile.PILE", 
+      "type": "MINI PILE", 
+      "id": 3942176
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W10X33", 
+      "id": 162574
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W10X49", 
+      "id": 162572
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W12X14", 
+      "id": 4333830
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W12X16", 
+      "id": 4333828
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W12X19", 
+      "id": 4333826
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W12X26", 
+      "id": 6302996
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W12X40", 
+      "id": 162570
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W14X22", 
+      "id": 4333824
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W14X26", 
+      "id": 4333951
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W14X30", 
+      "id": 4333949
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W14X34", 
+      "id": 4333947
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W14X38", 
+      "id": 4333945
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W14X43", 
+      "id": 162568
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W16X36", 
+      "id": 4333943
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W16X40", 
+      "id": 4333941
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W16X45", 
+      "id": 4333939
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W18X35", 
+      "id": 4333937
+    }, 
+    {
+      "family": "W Shapes-Column", 
+      "type": "W8X10", 
+      "id": 162576
+    }
+  ], 
+  "available_rebar_bar_types": [
+    {
+      "name": "#10", 
+      "nominal_diameter_in": 1.2695000000000001
+    }, 
+    {
+      "name": "#11", 
+      "nominal_diameter_in": 1.4101999999999999
+    }, 
+    {
+      "name": "#14", 
+      "nominal_diameter_in": 1.6914000000000000
+    }, 
+    {
+      "name": "#18", 
+      "nominal_diameter_in": 2.2578000000000000
+    }, 
+    {
+      "name": "#20", 
+      "nominal_diameter_in": 0.625
+    }, 
+    {
+      "name": "#3", 
+      "nominal_diameter_in": 0.375
+    }, 
+    {
+      "name": "#4", 
+      "nominal_diameter_in": 0.5
+    }, 
+    {
+      "name": "#5", 
+      "nominal_diameter_in": 0.625
+    }, 
+    {
+      "name": "#6", 
+      "nominal_diameter_in": 0.75
+    }, 
+    {
+      "name": "#7", 
+      "nominal_diameter_in": 0.875
+    }, 
+    {
+      "name": "#8", 
+      "nominal_diameter_in": 1.0
+    }, 
+    {
+      "name": "#9", 
+      "nominal_diameter_in": 1.1289000000000000
+    }
+  ], 
+  "available_rebar_hook_types": [
+    {
+      "name": "Hook - 180 deg."
+    }, 
+    {
+      "name": "Hook - 180 deg.(1)"
+    }, 
+    {
+      "name": "Hook - 180 deg.(2)"
+    }, 
+    {
+      "name": "MAT - 90 deg."
+    }, 
+    {
+      "name": "Standard - 180 deg."
+    }, 
+    {
+      "name": "Standard - 90 deg."
+    }, 
+    {
+      "name": "Stirrup/Tie - 135 deg."
+    }, 
+    {
+      "name": "Stirrup/Tie - 180 deg."
+    }, 
+    {
+      "name": "Stirrup/Tie - 180 deg. +"
+    }, 
+    {
+      "name": "Stirrup/Tie - 90 deg."
+    }, 
+    {
+      "name": "Stirrup/Tie Seismic - 135 deg."
+    }
+  ], 
+  "columns": [
+    {
+      "height_ft": 7.0833000000000004, 
+      "section": "Rectangular", 
+      "type": "24 x 36", 
+      "rotation_deg": 0.0, 
+      "depth_in": 36.0, 
+      "type_id": 607360, 
+      "hints": {
+        "is_ground_level": true, 
+        "is_roof_level": false, 
+        "foundation": {
+          "dowel_only_foundation_recommended": false, 
+          "has_slab_below": true, 
+          "is_structural_foundation": false, 
+          "needs_dowels": true
+        }, 
+        "splice": {
+          "needs_starters_from_lower_column": true, 
+          "notes": [
+            "Upper column is not coaxial (offset +0.00\" / -9.00\" in this column's local frame).", 
+            "Cranked NOT feasible: would need vertical 108.0\" at 1:6 slope but only ~55.0\" available (column height 85.0\" minus 30.0\" lap/bend budget). Place straight dowel-style starter bars from inside the LOWER column up into the UPPER column instead. (Plugin lacks a first-class form for this — engineer to handle manually, or use Straight with bars repositioned to upper cage footprint.)"
+          ], 
+          "cranked_check": {
+            "available_slope_1_to_n": 3.0600000000000001, 
+            "min_required_vertical_in_at_1to6": 108.0, 
+            "lap_budget_assumption_in": 30.0, 
+            "max_inward_inset_in": 18.0, 
+            "available_vertical_in": 55.0, 
+            "feasible_aci_1_to_6": false
+          }, 
+          "max_inward_inset_in": 18.0, 
+          "upper_inset_in": 18.0, 
+          "form_hint": "StraightFromLowerColumn", 
+          "non_coaxial": true, 
+          "overhang_faces": []
+        }
+      }, 
+      "diameter_in": null, 
+      "base": {
+        "level_name": "CELLAR FLOOR", 
+        "x_ft": 5.8586999999999998, 
+        "elevation_ft": 43.603000000000002, 
+        "y_ft": -6.0807000000000002
+      }, 
+      "width_in": 24.0, 
+      "rebar_cover": {
+        "top": null, 
+        "bottom": null, 
+        "other": {
+          "name": "Interior (framing, columns)", 
+          "distance_in": 1.5
+        }
+      }, 
+      "context": {
+        "column_below": null, 
+        "column_above": {
+          "type": "18 x 24", 
+          "mark": "C1.2", 
+          "section": "Rectangular", 
+          "relative": {
+            "axis_aligned": true, 
+            "offset_local_y_in": -9.0, 
+            "axis_swap": true, 
+            "relative_rotation_deg": -90.0, 
+            "offset_local_x_in": 0.0
+          }, 
+          "depth_in": 24.0, 
+          "width_in": 18.0, 
+          "element_id": 6309073, 
+          "diameter_in": null, 
+          "face_insets_in": {
+            "minus_y_in": -0.0, 
+            "minus_x_in": 0.0, 
+            "plus_x_in": 0.0, 
+            "plus_y_in": 18.0
+          }, 
+          "radial_inset": null
+        }, 
+        "slab_below": {
+          "thickness_in": 20.0, 
+          "bottom_elevation_ft": 41.936399999999999, 
+          "role": "below", 
+          "top_elevation_ft": 43.603000000000002, 
+          "type_name": "20\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309475
+        }, 
+        "slab_above": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 49.853000000000002, 
+          "role": "above", 
+          "top_elevation_ft": 50.686399999999999, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309020
+        }
+      }, 
+      "parameters": {
+        "4": 0, 
+        "3": 0, 
+        "Type Id": {
+          "name": "24 x 36", 
+          "id": 607360
+        }, 
+        "Rebar Cover - Other Faces": {
+          "name": "Interior (framing, columns)", 
+          "id": 199741
+        }, 
+        "Column Location Mark": "A-1", 
+        "Volume": {
+          "display": "37.50 CF", 
+          "raw": 37.5
+        }, 
+        "Top Level": {
+          "name": "BASEMENT FLOOR", 
+          "id": 6306469
+        }, 
+        "Phase Created": {
+          "name": "New Construction", 
+          "id": 0
+        }, 
+        "Col.StartBeam": 0, 
+        "Family and Type": {
+          "name": "24 x 36", 
+          "id": 607360
+        }, 
+        "Export to IFC": 0, 
+        "Mark": "C1.1", 
+        "Base Level": {
+          "name": "CELLAR FLOOR", 
+          "id": 1209084
+        }, 
+        "Has Association": 0, 
+        "Moves With Grids": 1, 
+        "Corner Mark": {
+          "display": "1", 
+          "raw": 1.0
+        }, 
+        "Column Style": 0, 
+        "Comments": "20#8 + 2#4@10\"STIRRUPS", 
+        "1": 1, 
+        "Type": {
+          "name": "24 x 36", 
+          "id": 607360
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Length": {
+          "display": "7' - 1\"", 
+          "raw": 7.0833329999999997
+        }, 
+        "Level": {
+          "name": "CELLAR FLOOR", 
+          "id": 1209084
+        }, 
+        "Family": {
+          "name": "24 x 36", 
+          "id": 607360
+        }, 
+        "Top Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "2": 0, 
+        "IfcGUID": "3XZ9ht7wr5qORxMeFtDENt", 
+        "Base Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "Room Bounding": 1
+      }, 
+      "faces": {
+        "-x": {
+          "plan_length_in": 36.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": -180.0
+        }, 
+        "-y": {
+          "plan_length_in": 24.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": -90.0
+        }, 
+        "+y": {
+          "plan_length_in": 24.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": 90.0
+        }, 
+        "+x": {
+          "plan_length_in": 36.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": 0.0
+        }
+      }, 
+      "family": "Concrete-Rectangular-Column", 
+      "mark": "C1.1", 
+      "element_id": 6308833, 
+      "comments": "20#8 + 2#4@10\"STIRRUPS", 
+      "top": {
+        "level_name": "BASEMENT FLOOR", 
+        "elevation_ft": 50.686399999999999
+      }
+    }, 
+    {
+      "height_ft": 8.0, 
+      "section": "Rectangular", 
+      "type": "18 x 24", 
+      "rotation_deg": -90.0, 
+      "depth_in": 24.0, 
+      "type_id": 228667, 
+      "hints": {
+        "is_ground_level": false, 
+        "is_roof_level": false, 
+        "foundation": {
+          "dowel_only_foundation_recommended": false, 
+          "has_slab_below": true, 
+          "is_structural_foundation": false, 
+          "needs_dowels": false
+        }, 
+        "splice": {
+          "needs_starters_from_lower_column": false, 
+          "notes": [
+            "Upper column is not coaxial (offset +1.00\" / +0.00\" in this column's local frame).", 
+            "Cranked feasible: slope 1:16.5 (ACI limit 1:6)."
+          ], 
+          "cranked_check": {
+            "available_slope_1_to_n": 16.5, 
+            "min_required_vertical_in_at_1to6": 24.0, 
+            "lap_budget_assumption_in": 30.0, 
+            "max_inward_inset_in": 4.0, 
+            "available_vertical_in": 66.0, 
+            "feasible_aci_1_to_6": true
+          }, 
+          "max_inward_inset_in": 4.0, 
+          "upper_inset_in": 4.0, 
+          "form_hint": "Cranked", 
+          "non_coaxial": true, 
+          "overhang_faces": []
+        }
+      }, 
+      "diameter_in": null, 
+      "base": {
+        "level_name": "BASEMENT FLOOR", 
+        "x_ft": 5.8586999999999998, 
+        "elevation_ft": 50.686399999999999, 
+        "y_ft": -6.8307000000000002
+      }, 
+      "width_in": 18.0, 
+      "rebar_cover": {
+        "top": null, 
+        "bottom": null, 
+        "other": {
+          "name": "Interior (framing, columns)", 
+          "distance_in": 1.5
+        }
+      }, 
+      "context": {
+        "column_below": {
+          "type": "24 x 36", 
+          "mark": "C1.1", 
+          "section": "Rectangular", 
+          "relative": {
+            "axis_aligned": true, 
+            "offset_local_y_in": -0.0, 
+            "axis_swap": true, 
+            "relative_rotation_deg": 90.0, 
+            "offset_local_x_in": -9.0
+          }, 
+          "depth_in": 36.0, 
+          "width_in": 24.0, 
+          "element_id": 6308833, 
+          "diameter_in": null, 
+          "face_insets_in": {
+            "minus_y_in": 0.0, 
+            "minus_x_in": -18.0, 
+            "plus_x_in": 0.0, 
+            "plus_y_in": 0.0
+          }, 
+          "radial_inset": null
+        }, 
+        "column_above": {
+          "type": "16 x 16", 
+          "mark": "C1.3", 
+          "section": "Rectangular", 
+          "relative": {
+            "axis_aligned": true, 
+            "offset_local_y_in": -0.0, 
+            "axis_swap": true, 
+            "relative_rotation_deg": 90.0, 
+            "offset_local_x_in": 1.0
+          }, 
+          "depth_in": 16.0, 
+          "width_in": 16.0, 
+          "element_id": 6309352, 
+          "diameter_in": null, 
+          "face_insets_in": {
+            "minus_y_in": 4.0, 
+            "minus_x_in": 2.0, 
+            "plus_x_in": 0.0, 
+            "plus_y_in": 4.0
+          }, 
+          "radial_inset": null
+        }, 
+        "slab_below": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 49.853000000000002, 
+          "role": "below", 
+          "top_elevation_ft": 50.686399999999999, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309020
+        }, 
+        "slab_above": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 57.853000000000002, 
+          "role": "above", 
+          "top_elevation_ft": 58.686399999999999, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309336
+        }
+      }, 
+      "parameters": {
+        "4": 0, 
+        "3": 0, 
+        "Type Id": {
+          "name": "18 x 24", 
+          "id": 228667
+        }, 
+        "Rebar Cover - Other Faces": {
+          "name": "Interior (framing, columns)", 
+          "id": 199741
+        }, 
+        "Column Location Mark": "A-1", 
+        "Volume": {
+          "display": "21.50 CF", 
+          "raw": 21.5
+        }, 
+        "Top Level": {
+          "name": "1ST FLOOR", 
+          "id": 6308706
+        }, 
+        "Phase Created": {
+          "name": "New Construction", 
+          "id": 0
+        }, 
+        "Col.StartBeam": 0, 
+        "Family and Type": {
+          "name": "18 x 24", 
+          "id": 228667
+        }, 
+        "Export to IFC": 0, 
+        "Mark": "C1.2", 
+        "Base Level": {
+          "name": "BASEMENT FLOOR", 
+          "id": 6306469
+        }, 
+        "Has Association": 0, 
+        "Moves With Grids": 1, 
+        "Corner Mark": {
+          "display": "1", 
+          "raw": 1.0
+        }, 
+        "Column Style": 0, 
+        "Comments": "12#7 + 2#4@10\" STIRRUPS", 
+        "1": 1, 
+        "Type": {
+          "name": "18 x 24", 
+          "id": 228667
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Length": {
+          "display": "8' - 0\"", 
+          "raw": 8.0
+        }, 
+        "Level": {
+          "name": "BASEMENT FLOOR", 
+          "id": 6306469
+        }, 
+        "Family": {
+          "name": "18 x 24", 
+          "id": 228667
+        }, 
+        "Top Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "2": 0, 
+        "IfcGUID": "3XZ9ht7wr5qORxMeFtDEB7", 
+        "Base Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "Room Bounding": 1
+      }, 
+      "faces": {
+        "-x": {
+          "plan_length_in": 24.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": 90.0
+        }, 
+        "-y": {
+          "plan_length_in": 18.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": 180.0
+        }, 
+        "+y": {
+          "plan_length_in": 18.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": -0.0
+        }, 
+        "+x": {
+          "plan_length_in": 24.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": -90.0
+        }
+      }, 
+      "family": "Concrete-Rectangular-Column", 
+      "mark": "C1.2", 
+      "element_id": 6309073, 
+      "comments": "12#7 + 2#4@10\" STIRRUPS", 
+      "top": {
+        "level_name": "1ST FLOOR", 
+        "elevation_ft": 58.686399999999999
+      }
+    }, 
+    {
+      "height_ft": 12.5, 
+      "section": "Rectangular", 
+      "type": "16 x 16", 
+      "rotation_deg": 0.0, 
+      "depth_in": 16.0, 
+      "type_id": 548505, 
+      "hints": {
+        "is_ground_level": false, 
+        "is_roof_level": false, 
+        "foundation": {
+          "dowel_only_foundation_recommended": false, 
+          "has_slab_below": true, 
+          "is_structural_foundation": false, 
+          "needs_dowels": false
+        }, 
+        "splice": {
+          "needs_starters_from_lower_column": false, 
+          "notes": [], 
+          "cranked_check": null, 
+          "max_inward_inset_in": 0.0, 
+          "upper_inset_in": null, 
+          "form_hint": "Straight", 
+          "non_coaxial": false, 
+          "overhang_faces": []
+        }
+      }, 
+      "diameter_in": null, 
+      "base": {
+        "level_name": "1ST FLOOR", 
+        "x_ft": 5.8586999999999998, 
+        "elevation_ft": 58.686399999999999, 
+        "y_ft": -6.9139999999999997
+      }, 
+      "width_in": 16.0, 
+      "rebar_cover": {
+        "top": null, 
+        "bottom": null, 
+        "other": {
+          "name": "Interior (framing, columns)", 
+          "distance_in": 1.5
+        }
+      }, 
+      "context": {
+        "column_below": {
+          "type": "18 x 24", 
+          "mark": "C1.2", 
+          "section": "Rectangular", 
+          "relative": {
+            "axis_aligned": true, 
+            "offset_local_y_in": 1.0, 
+            "axis_swap": true, 
+            "relative_rotation_deg": -90.0, 
+            "offset_local_x_in": 0.0
+          }, 
+          "depth_in": 24.0, 
+          "width_in": 18.0, 
+          "element_id": 6309073, 
+          "diameter_in": null, 
+          "face_insets_in": {
+            "minus_y_in": -0.0, 
+            "minus_x_in": -4.0, 
+            "plus_x_in": -4.0, 
+            "plus_y_in": -2.0
+          }, 
+          "radial_inset": null
+        }, 
+        "column_above": {
+          "type": "16 x 16", 
+          "mark": "C1.4", 
+          "section": "Rectangular", 
+          "relative": {
+            "axis_aligned": true, 
+            "offset_local_y_in": 0.0, 
+            "axis_swap": false, 
+            "relative_rotation_deg": 0.0, 
+            "offset_local_x_in": 0.0
+          }, 
+          "depth_in": 16.0, 
+          "width_in": 16.0, 
+          "element_id": 6309468, 
+          "diameter_in": null, 
+          "face_insets_in": {
+            "minus_y_in": 0.0, 
+            "minus_x_in": 0.0, 
+            "plus_x_in": 0.0, 
+            "plus_y_in": 0.0
+          }, 
+          "radial_inset": null
+        }, 
+        "slab_below": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 57.853000000000002, 
+          "role": "below", 
+          "top_elevation_ft": 58.686399999999999, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309336
+        }, 
+        "slab_above": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 70.352999999999994, 
+          "role": "above", 
+          "top_elevation_ft": 71.186400000000006, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309048
+        }
+      }, 
+      "parameters": {
+        "4": 0, 
+        "3": 0, 
+        "Type Id": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Rebar Cover - Other Faces": {
+          "name": "Interior (framing, columns)", 
+          "id": 199741
+        }, 
+        "Column Location Mark": "A-1(1' - 0\")", 
+        "Volume": {
+          "display": "20.74 CF", 
+          "raw": 20.740741000000000
+        }, 
+        "Top Level": {
+          "name": "2ND FLOOR", 
+          "id": 6308713
+        }, 
+        "Phase Created": {
+          "name": "New Construction", 
+          "id": 0
+        }, 
+        "Col.StartBeam": 0, 
+        "Family and Type": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Export to IFC": 0, 
+        "Mark": "C1.3", 
+        "Base Level": {
+          "name": "1ST FLOOR", 
+          "id": 6308706
+        }, 
+        "Has Association": 0, 
+        "Moves With Grids": 1, 
+        "Corner Mark": {
+          "display": "1", 
+          "raw": 1.0
+        }, 
+        "Column Style": 0, 
+        "Comments": "12#7 + #4@10\" STIRRUP + #4@10\" TIE", 
+        "1": 1, 
+        "Type": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Length": {
+          "display": "12' - 6\"", 
+          "raw": 12.5
+        }, 
+        "Level": {
+          "name": "1ST FLOOR", 
+          "id": 6308706
+        }, 
+        "Family": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Top Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "2": 0, 
+        "IfcGUID": "3XZ9ht7wr5qORxMeFtDEF_", 
+        "Base Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "Room Bounding": 1
+      }, 
+      "faces": {
+        "-x": {
+          "plan_length_in": 16.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": -180.0
+        }, 
+        "-y": {
+          "plan_length_in": 16.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": -90.0
+        }, 
+        "+y": {
+          "plan_length_in": 16.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": 90.0
+        }, 
+        "+x": {
+          "plan_length_in": 16.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": 0.0
+        }
+      }, 
+      "family": "Concrete-Rectangular-Column", 
+      "mark": "C1.3", 
+      "element_id": 6309352, 
+      "comments": "12#7 + #4@10\" STIRRUP + #4@10\" TIE", 
+      "top": {
+        "level_name": "2ND FLOOR", 
+        "elevation_ft": 71.186400000000006
+      }
+    }, 
+    {
+      "height_ft": 11.0, 
+      "section": "Rectangular", 
+      "type": "16 x 16", 
+      "rotation_deg": 0.0, 
+      "depth_in": 16.0, 
+      "type_id": 548505, 
+      "hints": {
+        "is_ground_level": false, 
+        "is_roof_level": true, 
+        "foundation": {
+          "dowel_only_foundation_recommended": false, 
+          "has_slab_below": true, 
+          "is_structural_foundation": false, 
+          "needs_dowels": false
+        }, 
+        "splice": {
+          "needs_starters_from_lower_column": false, 
+          "notes": [], 
+          "cranked_check": null, 
+          "max_inward_inset_in": null, 
+          "upper_inset_in": null, 
+          "form_hint": "Bent", 
+          "non_coaxial": false, 
+          "overhang_faces": []
+        }
+      }, 
+      "diameter_in": null, 
+      "base": {
+        "level_name": "2ND FLOOR", 
+        "x_ft": 5.8586999999999998, 
+        "elevation_ft": 71.186400000000006, 
+        "y_ft": -6.9139999999999997
+      }, 
+      "width_in": 16.0, 
+      "rebar_cover": {
+        "top": null, 
+        "bottom": null, 
+        "other": {
+          "name": "Interior (framing, columns)", 
+          "distance_in": 1.5
+        }
+      }, 
+      "context": {
+        "column_below": {
+          "type": "16 x 16", 
+          "mark": "C1.3", 
+          "section": "Rectangular", 
+          "relative": {
+            "axis_aligned": true, 
+            "offset_local_y_in": 0.0, 
+            "axis_swap": false, 
+            "relative_rotation_deg": 0.0, 
+            "offset_local_x_in": 0.0
+          }, 
+          "depth_in": 16.0, 
+          "width_in": 16.0, 
+          "element_id": 6309352, 
+          "diameter_in": null, 
+          "face_insets_in": {
+            "minus_y_in": 0.0, 
+            "minus_x_in": 0.0, 
+            "plus_x_in": 0.0, 
+            "plus_y_in": 0.0
+          }, 
+          "radial_inset": null
+        }, 
+        "column_above": null, 
+        "slab_below": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 70.352999999999994, 
+          "role": "below", 
+          "top_elevation_ft": 71.186400000000006, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309048
+        }, 
+        "slab_above": {
+          "thickness_in": 10.0, 
+          "bottom_elevation_ft": 81.352999999999994, 
+          "role": "above", 
+          "top_elevation_ft": 82.186400000000006, 
+          "type_name": "10\" Concrete", 
+          "kind": "Floor", 
+          "element_id": 6309057
+        }
+      }, 
+      "parameters": {
+        "4": 0, 
+        "3": 0, 
+        "Type Id": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Rebar Cover - Other Faces": {
+          "name": "Interior (framing, columns)", 
+          "id": 199741
+        }, 
+        "Column Location Mark": "A-1(1' - 0\")", 
+        "Volume": {
+          "display": "18.07 CF", 
+          "raw": 18.074074000000000
+        }, 
+        "Top Level": {
+          "name": "3RD FLOOR", 
+          "id": 6308720
+        }, 
+        "Phase Created": {
+          "name": "New Construction", 
+          "id": 0
+        }, 
+        "Col.StartBeam": 0, 
+        "Family and Type": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Export to IFC": 0, 
+        "Mark": "C1.4", 
+        "Base Level": {
+          "name": "2ND FLOOR", 
+          "id": 6308713
+        }, 
+        "Has Association": 0, 
+        "Moves With Grids": 1, 
+        "Corner Mark": {
+          "display": "1", 
+          "raw": 1.0
+        }, 
+        "Column Style": 0, 
+        "Comments": "12#7 + #4@10\" STIRRUP + #4@10\" TIE", 
+        "1": 1, 
+        "Type": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Category": {
+          "id": -2001330
+        }, 
+        "Length": {
+          "display": "11' - 0\"", 
+          "raw": 11.0
+        }, 
+        "Level": {
+          "name": "2ND FLOOR", 
+          "id": 6308713
+        }, 
+        "Family": {
+          "name": "16 x 16", 
+          "id": 548505
+        }, 
+        "Top Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "2": 0, 
+        "IfcGUID": "3XZ9ht7wr5qORxMeFtDE1A", 
+        "Base Offset": {
+          "display": "0' - 0\"", 
+          "raw": 0.0
+        }, 
+        "Room Bounding": 1
+      }, 
+      "faces": {
+        "-x": {
+          "plan_length_in": 16.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": -180.0
+        }, 
+        "-y": {
+          "plan_length_in": 16.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": -90.0
+        }, 
+        "+y": {
+          "plan_length_in": 16.0, 
+          "kind": "short", 
+          "outward_normal_world_deg": 90.0
+        }, 
+        "+x": {
+          "plan_length_in": 16.0, 
+          "kind": "long", 
+          "outward_normal_world_deg": 0.0
+        }
+      }, 
+      "family": "Concrete-Rectangular-Column", 
+      "mark": "C1.4", 
+      "element_id": 6309468, 
+      "comments": "12#7 + #4@10\" STIRRUP + #4@10\" TIE", 
+      "top": {
+        "level_name": "3RD FLOOR", 
+        "elevation_ft": 82.186400000000006
+      }
+    }
+  ], 
+  "units_note": "Section dimensions are in inches. Elevations and plan offsets are in feet (Revit internal). Use these directly when filling assignments.csv (see assignments-csv-guide.md).", 
+  "schema_version": 5
+}
