@@ -75,12 +75,13 @@ public class ColumnReinforcer
                 bool longWantsSlab =
                     cfg.Longitudinal.TopDefault == BarTopMode.BentToSlab ||
                     (cfg.Longitudinal.TopModes?.IndexOf("B", StringComparison.OrdinalIgnoreCase) >= 0);
-                bool needsSlabAbove = cfg.UpperSplices.Enabled || longWantsSlab;
+                // Ties also need the slab above (to keep the top tie below its soffit).
+                bool needsSlabAbove = cfg.UpperSplices.Enabled || longWantsSlab || cfg.Stirrups.Enabled;
                 Element? slabAbove = needsSlabAbove ? HostContext.FindSlabAbove(fi, geom) : null;
 
                 int created = 0;
                 created += longBuilder.Build(geom, cfg, tag, slabAbove);
-                created += tieBuilder.Build(geom, cfg, tag);
+                created += tieBuilder.Build(geom, cfg, tag, slabAbove);
                 FoundationDowelBuilder.Result dowelResult  = dowelBuilder.Build(geom, cfg, tag, dowelHostInfo);
                 UpperSpliceBuilder.Result     spliceResult = spliceBuilder.Build(geom, cfg, tag, slabAbove);
                 created += dowelResult.Created;

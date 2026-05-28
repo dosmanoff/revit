@@ -187,11 +187,11 @@ by a crank from below (double-up/clash).
 ## 6. Stirrups (keep them out of the slab)
 
 - `StirrupBarType` + `StirrupSpacing` from Comments.
-- **`StirrupOffsetTop` = thickness of the slab above** (`context.slab_above.thickness_in`).
-  The column top usually coincides with the slab top, so the top ~slab-thickness of
-  the column is inside the slab; this offset parks the highest tie at the slab soffit
-  instead of inside the slab. Bottom offset: leave default (slab below sits beneath
-  the column base).
+- **`StirrupOffsetTop`**: the engine now **auto-clamps** the highest tie/crosstie to the
+  slab soffit when a slab is above (a column modelled up to the slab top otherwise puts ties
+  inside the slab, which Revit flags "rebar outside its host"). So you no longer need to set
+  this just to clear the slab — set it only to skip an additional joint zone. Bottom offset:
+  leave default (the slab below sits beneath the column base).
 - Hook: default `Stirrup/Tie - 135 deg.` (wraps the bar more fully; inherited by crossties).
   Use `Stirrup/Tie - 90 deg.` or `Stirrup/Tie Seismic - 135 deg.` if the project/Comments
   call for it — and only if it's in `available_rebar_hook_types`.
