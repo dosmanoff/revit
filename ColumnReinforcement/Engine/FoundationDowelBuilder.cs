@@ -101,14 +101,17 @@ public class FoundationDowelBuilder
                 $"({UnitConv.FtToIn(hostThickness):0.##}\").");
 
         var positions = LongitudinalBarBuilder.ComputeCagePositions(_doc, cfg, geom);
+        bool[] mask = LongitudinalBarBuilder.ResolvePositionMask(positions, d.Positions);
 
         double zLocalHostTop     = hostTopZ - geom.BaseCenter.Z;
         double zLocalDowelBottom = zLocalHostTop - embedment;
         double zLocalDowelTop    = zLocalHostTop + extension;
 
         int created = 0;
-        foreach ((double x, double y) in positions)
+        for (int i = 0; i < positions.Count; i++)
         {
+            if (!mask[i]) continue;
+            (double x, double y) = positions[i];
             IList<Curve> curves = d.Form switch
             {
                 DowelForm.Straight => Straight(geom, x, y, zLocalDowelBottom, zLocalDowelTop),
@@ -172,6 +175,7 @@ public class FoundationDowelBuilder
                 $"({UnitConv.FtToIn(hostHeight):0.##}\").");
 
         var positions = LongitudinalBarBuilder.ComputeCagePositions(_doc, cfg, geom);
+        bool[] mask = LongitudinalBarBuilder.ResolvePositionMask(positions, d.Positions);
         double offset = barType.BarModelDiameter;   // 1·d_bar along face
 
         double zLocalHostTop      = hostTopZ - geom.BaseCenter.Z;
@@ -179,8 +183,10 @@ public class FoundationDowelBuilder
         double zLocalDowelTop     = zLocalHostTop + extension;
 
         int created = 0;
-        foreach ((double x, double y) in positions)
+        for (int i = 0; i < positions.Count; i++)
         {
+            if (!mask[i]) continue;
+            (double x, double y) = positions[i];
             (double xd, double yd) = OffsetAlongFace(geom, x, y, offset);
             XYZ p0 = geom.At(xd, yd, zLocalDowelBottom);
             XYZ p1 = geom.At(xd, yd, zLocalDowelTop);

@@ -318,6 +318,17 @@ public class DowelsConfig
     [JsonPropertyName("host")]
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public DowelHost Host { get; set; } = DowelHost.Auto;
+
+    /// <summary>
+    /// Optional subset of cage positions to place dowels at, using the same selector
+    /// vocabulary as <see cref="LongitudinalConfig.TopModes"/>: space/<c>;</c>/<c>,</c>-separated
+    /// 0-based indices and/or the keywords <c>all</c> / <c>corners</c> / <c>edges</c> /
+    /// <c>+x</c> / <c>-x</c> / <c>+y</c> / <c>-y</c>. A position is doweled if it matches any
+    /// token. <c>null</c>/empty (the default) dowels EVERY position. Use this to place
+    /// starters only where the column below has no continuing bar — e.g. when the lower
+    /// column bent part of its cage into the slab, dowel just those faces.
+    /// </summary>
+    [JsonPropertyName("positions")] public string? Positions { get; set; }
 }
 
 /// <summary>Shape variants for upper splices.</summary>
