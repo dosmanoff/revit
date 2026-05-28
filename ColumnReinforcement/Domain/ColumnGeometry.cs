@@ -66,13 +66,32 @@ public class ColumnGeometry
         // the rectangle itself, which would offset the cage outside the concrete.
         var (width, depth, section) = AnalyzeCrossSection(inst, tr) ?? FallbackToAabb(bb, tr);
 
+        XYZ localX = tr.BasisX.Normalize();
+        XYZ localY = tr.BasisY.Normalize();
+
+        // Canonicalise so LocalX is always the SHORTER in-plan side and Width ≤ Depth,
+        // independent of how the family authored its local axes. This makes the bar
+        // enumeration deterministic: LongBarsW (the "width" count) always lands on the
+        // short faces, LongBarsD on the long faces — matching the convention the user
+        // fills the CSV with ("bars along the short edge" = W). Rotating the frame +90°
+        // about Z (newX = oldY, newY = -oldX) keeps it right-handed, so tie winding and
+        // hook orientation are unaffected.
+        if (section == ColumnSection.Rectangular && width > depth)
+        {
+            (width, depth) = (depth, width);
+            XYZ newX = localY;
+            XYZ newY = localX.Negate();
+            localX = newX;
+            localY = newY;
+        }
+
         return new ColumnGeometry
         {
             Instance   = inst,
             Section    = section,
             BaseCenter = new XYZ(tr.Origin.X, tr.Origin.Y, bb.Min.Z),
-            LocalX     = tr.BasisX.Normalize(),
-            LocalY     = tr.BasisY.Normalize(),
+            LocalX     = localX,
+            LocalY     = localY,
             Width      = width,
             Depth      = depth,
             Height     = height,
