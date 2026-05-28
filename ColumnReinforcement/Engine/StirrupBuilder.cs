@@ -45,15 +45,15 @@ public class StirrupBuilder
         double zMin = s.OffsetBottom is { } ob ? cfg.Ft(ob) : endCover;
         double zMax = geom.Height - (s.OffsetTop is { } ot ? cfg.Ft(ot) : endCover);
 
-        // Keep ties/crossties out of the slab above: a column modelled up to the slab TOP
-        // has its top ~slab-thickness inside the slab, so a tie there sits in the slab (and
-        // Revit flags it "rebar outside its host column"). Clamp the highest tie to the slab
-        // soffit. Only ever lowers zMax — an explicit offsetTop that already clears the slab
-        // wins.
+        // Keep ties/crossties out of the slab above. A column modelled up to the slab TOP
+        // and JOINED to it has its rebar-host SOLID end at the slab soffit, so a tie placed
+        // at (or above) the soffit sits on/over the host boundary and Revit flags it "rebar
+        // completely outside its host". Clamp the highest tie to one end-cover BELOW the
+        // soffit — strictly inside the host, clear of the joint. Only ever lowers zMax.
         if (slabAbove?.get_BoundingBox(null) is { } slabBb)
         {
-            double soffitLocalZ = slabBb.Min.Z - geom.BaseCenter.Z;
-            if (soffitLocalZ < zMax) zMax = soffitLocalZ;
+            double topBelowSoffit = (slabBb.Min.Z - geom.BaseCenter.Z) - endCover;
+            if (topBelowSoffit < zMax) zMax = topBelowSoffit;
         }
 
         if (zMax - zMin <= 0)
@@ -176,13 +176,19 @@ public class StirrupBuilder
             LongitudinalBarBuilder.ComputeRectangularCageBounds(doc, cfg, geom);
         int nx = Math.Max(2, cfg.Longitudinal.BarsAlongWidth);
         int ny = Math.Max(2, cfg.Longitudinal.BarsAlongDepth);
+        // Bar-LINE positions (where each crosstie sits) follow the longitudinal cage.
         double[] xs = LongitudinalBarBuilder.LinSpace(xMin, xMax, nx);
         double[] ys = LongitudinalBarBuilder.LinSpace(yMin, yMax, ny);
 
-        // Each crosstie runs between the longitudinal bars on the two opposite faces — its
-        // ends sit ON those bar centrelines so the 135° hook curls around the bar. (Ending
-        // outside the bar, at the tie line, leaves the hook in front of the bar instead of
-        // wrapping it — the "binds imprecisely" symptom.)
+        // Crosstie SPAN reaches the outer-tie line (cover + d_crosstie/2 from the face) — just
+        // OUTSIDE the perimeter longitudinal bar. The 135° hook then curls back INWARD over
+        // the bar and wraps it. Ending ON the bar centreline (cage line) leaves the inward
+        // hook starting past the bar, so it never catches it — the worse "binds imprecisely"
+        // case. Perpendicular position stays on the cage bar line.
+        double dCt = RebarFactory.GetBarType(doc, c.BarType ?? cfg.Stirrups.BarType).BarModelDiameter;
+        double tieInset = cfg.Ft(cfg.Cover.Sides) + dCt / 2.0;
+        double spanXMin = -geom.Width / 2.0 + tieInset, spanXMax = geom.Width / 2.0 - tieInset;
+        double spanYMin = -geom.Depth / 2.0 + tieInset, spanYMax = geom.Depth / 2.0 - tieInset;
 
         // Lines that get a crosstie, expressed as bar-line indices on each axis.
         // spanXAtY[i] true → a crosstie joining the ±X faces at ys[i]; spanYAtX[j] → ±Y faces at xs[j].
@@ -214,8 +220,8 @@ public class StirrupBuilder
             foreach (int j in AutoSupportIndices(xs, dLong, maxClear)) spanYAtX.Add(j);
         }
 
-        foreach (int i in spanXAtY) result.Add(((xMin, ys[i]), (xMax, ys[i])));
-        foreach (int j in spanYAtX) result.Add(((xs[j], yMin), (xs[j], yMax)));
+        foreach (int i in spanXAtY) result.Add(((spanXMin, ys[i]), (spanXMax, ys[i])));
+        foreach (int j in spanYAtX) result.Add(((xs[j], spanYMin), (xs[j], spanYMax)));
         return result;
     }
 
