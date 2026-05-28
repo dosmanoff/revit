@@ -18,6 +18,10 @@ public sealed class ColumnViewsEngine
     private readonly HashSet<string> _existingViewNames;
     private readonly HashSet<string> _existingSheetNumbers;
 
+    // (generated view, names of that column's own elevations to keep) — section markers are
+    // hidden in a final pass once every column's sections exist, so order can't leak markers.
+    private readonly List<(ElementId ViewId, HashSet<string> KeepNames)> _markerCleanup = new();
+
     public ColumnViewsEngine(Document doc, ColumnViewsConfig cfg)
     {
         _doc = doc;
@@ -57,7 +61,37 @@ public sealed class ColumnViewsEngine
             }
         }
 
+        FinalizeSectionMarkers(result);
         return result;
+    }
+
+    /// <summary>
+    /// After every column's views and sections exist, hides each generated view's foreign
+    /// section markers (those whose view name isn't in that view's keep-set).
+    /// </summary>
+    private void FinalizeSectionMarkers(ViewCreationResult result)
+    {
+        if (_markerCleanup.Count == 0)
+            return;
+
+        try
+        {
+            using var tx = new Transaction(_doc, "Column Views — hide foreign sections");
+            tx.Start();
+            _doc.Regenerate();
+
+            foreach ((ElementId viewId, HashSet<string> keep) in _markerCleanup)
+            {
+                if (_doc.GetElement(viewId) is View view)
+                    HideForeignSectionMarkers(view, keep);
+            }
+
+            tx.Commit();
+        }
+        catch (Exception ex)
+        {
+            result.RecordError($"Hiding foreign sections: {ex.Message}");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -109,23 +143,30 @@ public sealed class ColumnViewsEngine
         View? botPlan = CreatePlan(fi, bbox, mark, isTop: false, bottomCutZ);
         if (botPlan is not null) created.Add(botPlan);
 
+        // Optional isometric 3D view of just this column and its rebar.
+        View3D? view3d = _cfg.Create3DView ? Create3D(rebarBox, mark) : null;
+        if (view3d is not null) created.Add(view3d);
+
         foreach (View v in created)
             ApplyAppearance(v);
 
         // Visibility computed from the new crops before we query what's visible.
         _doc.Regenerate();
 
-        // This column's own elevation section markers stay; markers of other columns are hidden.
+        // This column's own elevation markers; foreign markers are hidden in the final pass.
         HashSet<string> keepMarkerNames = created.OfType<ViewSection>()
             .Select(v => v.Name)
-            .ToHashSet(StringComparer.Ordinal);
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (View v in created)
         {
             ApplyForeignRebarTreatment(v, mark, result);
-            HideForeignSectionMarkers(v, keepMarkerNames);
+            _markerCleanup.Add((v.Id, keepMarkerNames));
             result.RecordCreated();
         }
+
+        if (view3d is not null)
+            Isolate3D(view3d, fi.Id, hostRebar);
 
         AssignScheduleMarks(hostRebar);
 
@@ -314,6 +355,42 @@ public sealed class ColumnViewsEngine
             return _doc.GetElement(fi.LevelId) as Level;
 
         return null;
+    }
+
+    // -----------------------------------------------------------------------
+    // 3D view (default isometric orientation, isolated to the column + its rebar)
+    // -----------------------------------------------------------------------
+
+    private View3D Create3D(BoundingBoxXYZ box, string mark)
+    {
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.ThreeDimensional, null);
+        View3D view = View3D.CreateIsometric(_doc, vft.Id);
+
+        double p = _cfg.CropPadding;
+        view.SetSectionBox(new BoundingBoxXYZ
+        {
+            Min = new XYZ(box.Min.X - p, box.Min.Y - p, box.Min.Z - p),
+            Max = new XYZ(box.Max.X + p, box.Max.Y + p, box.Max.Z + p),
+        });
+        view.IsSectionBoxActive = true;
+
+        Name(view, _cfg.View3DNameTemplate, mark, direction: null, end: null);
+        return view;
+    }
+
+    /// <summary>Hides everything in the 3D view except the column and its own rebar.</summary>
+    private void Isolate3D(View3D view, ElementId columnId, IReadOnlyList<Rebar> hostRebar)
+    {
+        var keep = new HashSet<ElementId>(hostRebar.Select(r => r.Id)) { columnId };
+
+        List<ElementId> toHide = new FilteredElementCollector(_doc, view.Id)
+            .WhereElementIsNotElementType()
+            .Where(e => !keep.Contains(e.Id) && e.CanBeHidden(view))
+            .Select(e => e.Id)
+            .ToList();
+
+        if (toHide.Count > 0)
+            HideSafely(view, toHide);
     }
 
     // -----------------------------------------------------------------------

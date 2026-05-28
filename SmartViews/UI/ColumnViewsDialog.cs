@@ -10,6 +10,7 @@ using Panel = System.Windows.Controls.Panel;
 using TextBox = System.Windows.Controls.TextBox;
 using Orientation = System.Windows.Controls.Orientation;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using VerticalAlignment = System.Windows.VerticalAlignment;
 using RvtDetailLevel = Autodesk.Revit.DB.ViewDetailLevel;
 using RvtDisplayStyle = Autodesk.Revit.DB.DisplayStyle;
 
@@ -46,13 +47,20 @@ public sealed class ColumnViewsDialog : Window
     private readonly ComboBox _visualStyle;
     private readonly CheckBox _createRebarSchedule;
     private readonly CheckBox _bendingGraphics;
+    private readonly CheckBox _create3D;
     private readonly CheckBox _placeOnSheet;
+
+    private readonly int _columnCount;
 
     public ColumnViewsConfig Config { get; }
 
-    public ColumnViewsDialog(ColumnViewsConfig config, IReadOnlyList<string> titleBlockNames)
+    /// <summary>True when the user asked to re-pick columns instead of running.</summary>
+    public bool ReselectRequested { get; private set; }
+
+    public ColumnViewsDialog(ColumnViewsConfig config, IReadOnlyList<string> titleBlockNames, int columnCount)
     {
         Config = config;
+        _columnCount = columnCount;
 
         Title = "Column Views";
         Width = 560;
@@ -61,6 +69,8 @@ public sealed class ColumnViewsDialog : Window
         ResizeMode = ResizeMode.NoResize;
 
         var root = new StackPanel { Margin = new Thickness(16) };
+
+        root.Children.Add(BuildSelectionRow(columnCount));
 
         root.Children.Add(SectionHeader("Naming templates  (tokens: {Mark} {Direction} {End} {Level})"));
         _elevationName     = AddTextRow(root, "Elevation view", config.ElevationNameTemplate);
@@ -86,6 +96,7 @@ public sealed class ColumnViewsDialog : Window
 
         _createRebarSchedule = AddCheckRow(root, "Create rebar schedule", config.CreateRebarSchedule);
         _bendingGraphics     = AddCheckRow(root, "Generate bending-detail graphics (Shape Image column)", config.BendingDetailGraphics);
+        _create3D            = AddCheckRow(root, "Add 3D view (column + its rebar only)", config.Create3DView);
         _placeOnSheet        = AddCheckRow(root, "Place views and schedule on a sheet", config.PlaceOnSheet);
 
         root.Children.Add(BuildButtonRow());
@@ -121,8 +132,15 @@ public sealed class ColumnViewsDialog : Window
 
         Config.CreateRebarSchedule   = _createRebarSchedule.IsChecked == true;
         Config.BendingDetailGraphics = _bendingGraphics.IsChecked == true;
+        Config.Create3DView          = _create3D.IsChecked == true;
         Config.PlaceOnSheet          = _placeOnSheet.IsChecked == true;
 
+        DialogResult = true;
+    }
+
+    private void Reselect_Click(object sender, RoutedEventArgs e)
+    {
+        ReselectRequested = true;
         DialogResult = true;
     }
 
@@ -180,9 +198,36 @@ public sealed class ColumnViewsDialog : Window
         Margin = new Thickness(0, 0, 0, 2),
     };
 
+    private StackPanel BuildSelectionRow(int columnCount)
+    {
+        var label = new TextBlock
+        {
+            Text = columnCount == 1 ? "1 column selected" : $"{columnCount} columns selected",
+            VerticalAlignment = VerticalAlignment.Center,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 12, 0),
+        };
+
+        var select = new Button { Content = "Select columns…", Width = 130 };
+        select.Click += Reselect_Click;
+
+        return new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { label, select },
+        };
+    }
+
     private StackPanel BuildButtonRow()
     {
-        var ok = new Button { Content = "Run", Width = 90, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var ok = new Button
+        {
+            Content = "Run",
+            Width = 90,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsDefault = true,
+            IsEnabled = _columnCount > 0,
+        };
         ok.Click += Ok_Click;
 
         var cancel = new Button { Content = "Cancel", Width = 90, IsCancel = true };

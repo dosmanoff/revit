@@ -81,6 +81,15 @@ public sealed class ColumnViewsConfig
     public bool CreateRebarSchedule { get; set; } = true;
 
     /// <summary>
+    /// When true, also creates an isometric 3D view (default orientation) per column showing
+    /// only that column and its own rebar, and places it on the sheet.
+    /// </summary>
+    public bool Create3DView { get; set; } = true;
+
+    /// <summary>Tokens: {Mark} {Level}. Name of the generated 3D view.</summary>
+    public string View3DNameTemplate { get; set; } = "{Mark} - 3D";
+
+    /// <summary>
     /// When true, the schedule includes the rebar Shape Image column (the bend-shape diagram),
     /// i.e. "generate bending-detail graphics". When false, only the tabular fields are shown.
     /// </summary>
