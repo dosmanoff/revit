@@ -196,7 +196,13 @@ by a crank from below (double-up/clash).
   135 deg.` only if the project is seismic / Comments say so — and only if it's in
   `available_rebar_hook_types`.
 - Confinement (`ConfTop*`/`ConfBot*`): only if the schedule/Comments call for densified
-  zones. Non-seismic default = none.
+  zones. Non-seismic default = none. (Schedule labels like `So 6" / Sm 10" / Lo 30"` map to
+  `ConfTop/BotSpacing=6`, `ConfTop/BotZoneLength=30`, `StirrupSpacing=10`.)
+- **Crossties** (interior шпильки): when a face has interior longitudinal bars that the
+  outer tie alone can't laterally support (ACI 318-19 §25.7.2.3, 6″ clear rule), set
+  `CrosstiesEnabled=true`. Leave `CrosstiesAuto=true` (the engine places them per ACI from
+  the bar layout — you don't compute the pattern). Use `CrosstiesManual="x:i y:j"` only to
+  force a specific pattern. Rectangular columns only.
 
 ---
 

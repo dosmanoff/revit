@@ -1,0 +1,29 @@
+﻿# ======================================================================
+#  Демонстрация поперечных стяжек (crossties / шпильки) — типовые сечения
+#  как на чертеже REINF. TYPE [1..5]. UTF-8 (с BOM). Размеры в дюймах.
+# ----------------------------------------------------------------------
+#  Хомуты #4: So 6" (сгущение у концов), Sm 10" (середина), Lo 30" (длина
+#  зоны сгущения) — это поля Conf*: ConfTop/BotSpacing=6, *ZoneLength=30,
+#  StirrupSpacing=10.
+#
+#  ШПИЛЬКИ (crossties): CrosstiesEnabled=true. В режиме CrosstiesAuto=true
+#  движок сам ставит стяжки, чтобы поддержать промежуточные стержни по
+#  ACI 318-19 §25.7.2.3 (стержень получает стяжку, когда его расстояние в
+#  свету до ближайшего поддержанного > 6"; угловые держит внешний хомут).
+#    [1] 12x12, 4 стержня (2x2): промежуточных нет -> стяжек нет.
+#    [2] 16x16, 8 (3x3): по одной стяжке вдоль X и вдоль Y (средние стержни).
+#    [3] 18x18, 8 (3x3): то же.
+#    [4] 10x18, 8 (2x4): одна стяжка через длинную сторону.
+#    [5] 16x20, 10 (3x4): стяжка вдоль X и вдоль Y.
+#  Ручной режим: CrosstiesAuto=false + CrosstiesManual="x:i y:j" — стяжка
+#  вдоль X на ряду стержней i (по оси Y) и/или вдоль Y на столбце j (по оси X),
+#  индексы 0-based по линиям стержней, промежуточные = 1..N-2; "x:all"/"y:all".
+#  Стяжки ставятся на тех же отметках, что и внешний хомут.
+# ======================================================================
+Mark,ExpectedSection,ExpectedW,ExpectedD,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing,ConfBotEnabled,ConfBotSpacing,ConfBotZoneLength,ConfTopEnabled,ConfTopSpacing,ConfTopZoneLength,CrosstiesEnabled,CrosstiesAuto,CrosstiesManual
+TYPE1-12x12,Rectangular,12,12,#8,2,2,#4,10,true,6,30,true,6,30,true,true,
+TYPE2-16x16,Rectangular,16,16,#8,3,3,#4,10,true,6,30,true,6,30,true,true,
+TYPE3-18x18,Rectangular,18,18,#9,3,3,#4,10,true,6,30,true,6,30,true,true,
+TYPE4-10x18,Rectangular,10,18,#8,2,4,#4,10,true,6,30,true,6,30,true,true,
+TYPE5-16x20,Rectangular,16,20,#9,3,4,#4,10,true,6,30,true,6,30,true,true,
+TYPE5-16x20-manual,Rectangular,16,20,#9,3,4,#4,10,true,6,30,true,6,30,true,false,x:1 x:2 y:1

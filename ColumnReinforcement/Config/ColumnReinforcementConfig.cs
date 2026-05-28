@@ -205,6 +205,51 @@ public class StirrupsConfig
     /// by default; when both are disabled the engine behaves exactly as in Phase 1.
     /// </summary>
     [JsonPropertyName("confinement")] public ConfinementZonesConfig Confinement { get; set; } = new();
+
+    /// <summary>
+    /// Interior crossties (single bars hooked at both ends) that laterally support the
+    /// interior longitudinal bars per ACI 318-19 §25.7.2.3. Placed at the same elevations
+    /// as the outer tie. Disabled by default. Rectangular columns only.
+    /// </summary>
+    [JsonPropertyName("crossties")] public CrosstiesConfig Crossties { get; set; } = new();
+}
+
+/// <summary>
+/// Interior crossties — single straight bars spanning between two opposite faces of the
+/// cage at an interior longitudinal-bar line, with a hook at each end that wraps the
+/// outer tie / longitudinal bar. They satisfy ACI 318-19 §25.7.2.3 (lateral support of
+/// interior bars). Inner closed sub-ties ("хомуты") are a separate, later feature.
+/// </summary>
+public class CrosstiesConfig
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; set; }
+
+    /// <summary>RebarBarType .Name. <c>null</c> = use the outer tie's bar type.</summary>
+    [JsonPropertyName("barType")] public string? BarType { get; set; }
+
+    /// <summary>RebarHookType .Name applied at both ends. <c>null</c> = use the outer tie's hook.</summary>
+    [JsonPropertyName("hookType")] public string? HookType { get; set; }
+
+    /// <summary>
+    /// When true (default) and <see cref="Manual"/> is empty, the engine auto-places
+    /// crossties to laterally support interior bars per ACI 318-19 §25.7.2.3: walking each
+    /// face out from the (tie-supported) corners, a bar gets a crosstie once its clear
+    /// distance from the last supported bar exceeds <see cref="MaxClearSpacing"/>.
+    /// </summary>
+    [JsonPropertyName("auto")] public bool Auto { get; set; } = true;
+
+    /// <summary>ACI 318-19 §25.7.2.3 limit — 6 in clear. Drives <see cref="Auto"/> placement.</summary>
+    [JsonPropertyName("maxClearSpacing")] public Length MaxClearSpacing { get; set; } = new(6);
+
+    /// <summary>
+    /// Manual override. When non-empty, <see cref="Auto"/> is ignored and exactly these
+    /// crossties are placed. Space/<c>;</c>/<c>,</c>-separated <c>axis:line</c> tokens:
+    /// <c>x:&lt;i&gt;</c> = a crosstie spanning the X dimension (joining the two ±X faces)
+    /// at Y bar-row <c>i</c>; <c>y:&lt;j&gt;</c> = spanning Y at X bar-column <c>j</c>.
+    /// Indices are 0-based into the cage bar lines (interior lines are 1 … count−2).
+    /// <c>x:all</c> / <c>y:all</c> select every interior line on that axis. Example: <c>x:1 y:1</c>.
+    /// </summary>
+    [JsonPropertyName("manual")] public string? Manual { get; set; }
 }
 
 /// <summary>Top and bottom confinement-zone settings.</summary>

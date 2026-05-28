@@ -458,7 +458,7 @@ public class LongitudinalBarBuilder
         return pts;
     }
 
-    private static double[] LinSpace(double from, double to, int n)
+    internal static double[] LinSpace(double from, double to, int n)
     {
         if (n <= 1) return [from];
         var a = new double[n];
