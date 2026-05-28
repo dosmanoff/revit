@@ -39,52 +39,59 @@ public class LongitudinalBarBuilder
                 $"({UnitConv.FtToIn(geom.Height):0.##}\").");
 
         var positions = ComputeCagePositions(_doc, cfg, geom);
-        bool[] terminate = ResolveTerminationMask(cfg.Longitudinal, positions);
+        BarTopMode[] modes = ResolveTopModes(cfg.Longitudinal, positions);
 
-        // Bent-into-slab geometry needs a slab above and the bend elevation inside it.
-        double zLocalBend = 0;
-        double bentLeg    = 0;
-        bool hasBent      = terminate.Any(t => t);
-        if (hasBent)
+        // Resolve geometry shared by all bars of a given mode, lazily.
+        double zLocalSlabBend = 0;
+        double bentLeg = 0;
+        bool needsSlab = modes.Any(m => m == BarTopMode.BentToSlab);
+        if (needsSlab)
         {
             if (slabAbove is null)
                 throw new InvalidOperationException(
-                    $"longitudinal.topTermination={cfg.Longitudinal.TopTermination} requires an OST_Floors slab above the column; none found.");
+                    "longitudinal.topModes selects BentToSlab, which requires an OST_Floors slab above the column; none found.");
             BoundingBoxXYZ slabBb = slabAbove.get_BoundingBox(null)
                 ?? throw new InvalidOperationException("Slab above the column has no bounding box.");
-            zLocalBend = (slabBb.Max.Z - endCover) - geom.BaseCenter.Z;
+            zLocalSlabBend = (slabBb.Max.Z - endCover) - geom.BaseCenter.Z;
             bentLeg = cfg.Ft(cfg.Longitudinal.TopBentLeg);
             if (bentLeg <= 0)
-                throw new InvalidOperationException("longitudinal.topBentLeg must be positive when topTermination is set.");
-            if (zLocalBend <= zBottom)
+                throw new InvalidOperationException("longitudinal.topBentLeg must be positive for BentToSlab bars.");
+            if (zLocalSlabBend <= zBottom)
                 throw new InvalidOperationException(
-                    $"Bent termination bend point ({UnitConv.FtToIn(zLocalBend):0.##}\") is at or below the bar bottom " +
+                    $"BentToSlab bend point ({UnitConv.FtToIn(zLocalSlabBend):0.##}\") is at or below the bar bottom " +
                     $"({UnitConv.FtToIn(zBottom):0.##}\"). Check end cover and slab elevation.");
+        }
+
+        // Cranked geometry (config-driven; doesn't need slab detection).
+        double crankInset    = cfg.Ft(cfg.Longitudinal.CrankUpperInset);
+        double crankPen      = cfg.Ft(cfg.Longitudinal.CrankPenetration);
+        double crankBendLowZ = geom.Height - cfg.Ft(cfg.Longitudinal.CrankLowerBendOffset);
+        double crankSlope    = cfg.Longitudinal.CrankSlope;
+        bool needsCrank = modes.Any(m => m == BarTopMode.Cranked);
+        if (needsCrank)
+        {
+            if (crankInset <= 0)  throw new InvalidOperationException("longitudinal.crankUpperInset must be positive for Cranked bars.");
+            if (crankPen <= 0)    throw new InvalidOperationException("longitudinal.crankPenetration must be positive for Cranked bars.");
+            if (crankSlope <= 0)  throw new InvalidOperationException("longitudinal.crankSlope must be positive for Cranked bars.");
+            if (crankBendLowZ <= zBottom)
+                throw new InvalidOperationException(
+                    $"Cranked lower bend ({UnitConv.FtToIn(crankBendLowZ):0.##}\") is at or below the bar bottom " +
+                    $"({UnitConv.FtToIn(zBottom):0.##}\"). Reduce crankLowerBendOffset or check the column height.");
         }
 
         int created = 0;
         for (int i = 0; i < positions.Count; i++)
         {
             (double x, double y) = positions[i];
+            BarTopMode mode = modes[i];
 
-            IList<Curve> curves;
-            XYZ normal;
-            if (terminate[i])
+            (IList<Curve> curves, XYZ normal, bool hasTopHook) = mode switch
             {
-                // Vertical leg up into the slab + 90° bend with horizontal leg inward.
-                XYZ p0 = geom.At(x, y, zBottom);
-                XYZ pCorner = geom.At(x, y, zLocalBend);
-                XYZ pLegEnd = pCorner + geom.InwardDirection(x, y) * bentLeg;
-                curves = new List<Curve> { Line.CreateBound(p0, pCorner), Line.CreateBound(pCorner, pLegEnd) };
-                normal = geom.NormalForBendAt(x, y);
-            }
-            else
-            {
-                XYZ p0 = geom.At(x, y, zBottom);
-                XYZ p1 = geom.At(x, y, zTop);
-                curves = new List<Curve> { Line.CreateBound(p0, p1) };
-                normal = geom.LocalX;
-            }
+                BarTopMode.Straight   => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
+                BarTopMode.BentToSlab => (BentBar(geom, x, y, zBottom, zLocalSlabBend, bentLeg), geom.NormalForBendAt(x, y), false),
+                BarTopMode.Cranked    => CrankedBar(geom, x, y, zBottom, crankBendLowZ, crankInset, crankSlope, crankPen),
+                _ => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
+            };
 
             RebarFactory.Create(
                 _doc,
@@ -95,67 +102,144 @@ public class LongitudinalBarBuilder
                 curves,
                 tag,
                 startHook: hookBottom,
-                endHook:   terminate[i] ? null : hookTop);
+                endHook:   hasTopHook ? hookTop : null);
             created++;
         }
 
         return created;
     }
 
-    /// <summary>
-    /// For each position, decide whether that bar terminates with a 90° bend into the
-    /// slab above (true) or runs straight to the column top (false), according to
-    /// <see cref="LongitudinalConfig.TopTermination"/>. Position layout matches the
-    /// rectangular case in <see cref="LayoutRectangular"/>: the first 2·nx entries are
-    /// the bottom and top faces (in that order), followed by the (ny−2) interior
-    /// positions on each side face.
-    /// </summary>
-    internal static bool[] ResolveTerminationMask(LongitudinalConfig cfg, IReadOnlyList<(double x, double y)> positions)
+    private static IList<Curve> StraightBar(ColumnGeometry geom, double x, double y, double zBottom, double zTop) =>
+        new List<Curve> { Line.CreateBound(geom.At(x, y, zBottom), geom.At(x, y, zTop)) };
+
+    private static IList<Curve> BentBar(ColumnGeometry geom, double x, double y, double zBottom, double zBend, double leg)
     {
-        var mask = new bool[positions.Count];
-        switch (cfg.TopTermination)
+        XYZ p0 = geom.At(x, y, zBottom);
+        XYZ pCorner = geom.At(x, y, zBend);
+        XYZ pLegEnd = pCorner + geom.InwardDirection(x, y) * leg;
+        return new List<Curve> { Line.CreateBound(p0, pCorner), Line.CreateBound(pCorner, pLegEnd) };
+    }
+
+    /// <summary>
+    /// Cranked main bar: vertical inside this column → diagonal to the upper cage
+    /// offset → vertical penetration into the upper column. Returns curves, the
+    /// bend-plane normal, and whether a top hook applies (no — the bar ends inside
+    /// the upper column).
+    /// </summary>
+    private static (IList<Curve>, XYZ, bool) CrankedBar(
+        ColumnGeometry geom, double x, double y, double zBottom, double zBendLow,
+        double inset, double slope, double penetration)
+    {
+        double xu = x - Math.Sign(x) * inset;
+        double yu = y - Math.Sign(y) * inset;
+        double offsetMag = Math.Sqrt((xu - x) * (xu - x) + (yu - y) * (yu - y));
+
+        if (offsetMag < 1e-9)
         {
-            case LongTopTermination.None:
-                return mask;
+            // No offset on this bar's axis — degenerate to a straight bar that
+            // simply runs up into the upper column for the penetration length.
+            XYZ a = geom.At(x, y, zBottom);
+            XYZ b = geom.At(x, y, zBendLow + penetration);
+            return (new List<Curve> { Line.CreateBound(a, b) }, geom.LocalX, false);
+        }
 
-            case LongTopTermination.All:
-                for (int i = 0; i < mask.Length; i++) mask[i] = true;
-                return mask;
+        double diagonalRise = slope * offsetMag;
+        double zBendHigh = zBendLow + diagonalRise;
+        double zTop = zBendHigh + penetration;
 
-            case LongTopTermination.Corners:
-                // Geometrically: the 4 corners of a rectangular cage are positions where
-                // |x| is at its max AND |y| is at its max. For round columns Corners maps
-                // to "none" (no notion of corners).
-                MarkExtremalPositions(positions, mask, cornersOnly: true);
-                return mask;
+        XYZ p0 = geom.At(x,  y,  zBottom);
+        XYZ p1 = geom.At(x,  y,  zBendLow);
+        XYZ p2 = geom.At(xu, yu, zBendHigh);
+        XYZ p3 = geom.At(xu, yu, zTop);
 
-            case LongTopTermination.Edges:
-                MarkExtremalPositions(positions, mask, cornersOnly: false);
-                // Subtract corners — Edges means "non-corner perimeter bars".
-                var cornerMask = new bool[positions.Count];
-                MarkExtremalPositions(positions, cornerMask, cornersOnly: true);
-                for (int i = 0; i < mask.Length; i++) mask[i] = mask[i] && !cornerMask[i];
-                return mask;
+        XYZ offsetDir = new XYZ(xu - x, yu - y, 0).Normalize();
+        XYZ normal = XYZ.BasisZ.CrossProduct(offsetDir).Normalize();
 
-            default:
-                return mask;
+        return (new List<Curve>
+        {
+            Line.CreateBound(p0, p1),
+            Line.CreateBound(p1, p2),
+            Line.CreateBound(p2, p3),
+        }, normal, false);
+    }
+
+    /// <summary>
+    /// Resolve a <see cref="BarTopMode"/> for every cage position. Starts from
+    /// <see cref="LongitudinalConfig.TopDefault"/> and applies the
+    /// <see cref="LongitudinalConfig.TopModes"/> override string. Precedence
+    /// (low → high): default, group keyword (corners/edges/all), explicit index.
+    /// </summary>
+    internal static BarTopMode[] ResolveTopModes(LongitudinalConfig cfg, IReadOnlyList<(double x, double y)> positions)
+    {
+        int n = positions.Count;
+        var modes = new BarTopMode[n];
+        for (int i = 0; i < n; i++) modes[i] = cfg.TopDefault;
+
+        if (string.IsNullOrWhiteSpace(cfg.TopModes)) return modes;
+
+        bool[] isCorner = ClassifyExtremal(positions, cornersOnly: true);
+        bool[] isPerim  = ClassifyExtremal(positions, cornersOnly: false);
+
+        // Two passes so that index overrides always beat group keywords regardless
+        // of token order: pass 1 applies group keywords, pass 2 applies indices.
+        var indexTokens = new List<(int idx, BarTopMode mode)>();
+
+        foreach (string raw in cfg.TopModes.Split([' ', ';', ','], StringSplitOptions.RemoveEmptyEntries))
+        {
+            string token = raw.Trim();
+            int colon = token.IndexOf(':');
+            if (colon <= 0 || colon == token.Length - 1) continue;       // malformed → ignore
+            string selector = token.Substring(0, colon).Trim();
+            string modeStr  = token.Substring(colon + 1).Trim();
+            if (!TryParseMode(modeStr, out BarTopMode mode)) continue;
+
+            if (int.TryParse(selector, out int idx))
+            {
+                indexTokens.Add((idx, mode));
+            }
+            else
+            {
+                switch (selector.ToLowerInvariant())
+                {
+                    case "all":     for (int i = 0; i < n; i++) modes[i] = mode; break;
+                    case "corners": for (int i = 0; i < n; i++) if (isCorner[i]) modes[i] = mode; break;
+                    case "edges":   for (int i = 0; i < n; i++) if (isPerim[i] && !isCorner[i]) modes[i] = mode; break;
+                }
+            }
+        }
+
+        foreach (var (idx, mode) in indexTokens)
+            if (idx >= 0 && idx < n) modes[idx] = mode;
+
+        return modes;
+    }
+
+    private static bool TryParseMode(string s, out BarTopMode mode)
+    {
+        switch (s.Trim().ToLowerInvariant())
+        {
+            case "s": case "straight":    mode = BarTopMode.Straight;   return true;
+            case "c": case "cranked":     mode = BarTopMode.Cranked;    return true;
+            case "b": case "benttoslab":  mode = BarTopMode.BentToSlab; return true;
+            default: mode = BarTopMode.Straight; return false;
         }
     }
 
-    private static void MarkExtremalPositions(IReadOnlyList<(double x, double y)> positions, bool[] mask, bool cornersOnly)
+    private static bool[] ClassifyExtremal(IReadOnlyList<(double x, double y)> positions, bool cornersOnly)
     {
-        if (positions.Count == 0) return;
+        var flags = new bool[positions.Count];
+        if (positions.Count == 0) return flags;
         double maxAbsX = positions.Max(p => Math.Abs(p.x));
         double maxAbsY = positions.Max(p => Math.Abs(p.y));
         const double tol = 1e-9;
-
         for (int i = 0; i < positions.Count; i++)
         {
             var (x, y) = positions[i];
             bool onMaxX = Math.Abs(Math.Abs(x) - maxAbsX) < tol;
             bool onMaxY = Math.Abs(Math.Abs(y) - maxAbsY) < tol;
-            mask[i] = cornersOnly ? (onMaxX && onMaxY) : (onMaxX || onMaxY);
+            flags[i] = cornersOnly ? (onMaxX && onMaxY) : (onMaxX || onMaxY);
         }
+        return flags;
     }
 
     /// <summary>

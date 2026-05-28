@@ -72,25 +72,24 @@ public class CoverConfig
 }
 
 /// <summary>
-/// Which subset of the longitudinal cage terminates with a 90° bend into the
-/// slab above, instead of continuing straight to the column top. Used when the
-/// upper column is so much smaller (or absent) that a Cranked splice would
-/// violate the ACI 1:6 slope cap — terminate the lower cage bars in the slab
-/// and start fresh dowels for the upper column instead (via DowelHost=Column).
+/// What the top end of a single longitudinal bar does. Assigned per bar via
+/// <see cref="LongitudinalConfig.TopDefault"/> + <see cref="LongitudinalConfig.TopModes"/>.
 /// </summary>
-public enum LongTopTermination
+public enum BarTopMode
 {
-    /// <summary>All bars run straight to the column top (Phase-1 behaviour).</summary>
-    None,
+    /// <summary>Run straight to the column top (Phase-1 behaviour).</summary>
+    Straight,
 
-    /// <summary>Every bar gets a 90° bend into the slab above.</summary>
-    All,
+    /// <summary>
+    /// Crank the bar itself: vertical inside this column, a diagonal offsetting
+    /// to the upper column's (smaller / shifted) cage position, then a vertical
+    /// penetration into the upper column. The bar is one continuous piece — no
+    /// separate splice bar. Avoids clashing with the upper column's cage.
+    /// </summary>
+    Cranked,
 
-    /// <summary>Only the four corner bars terminate with the bend; mid-face bars continue straight.</summary>
-    Corners,
-
-    /// <summary>Only the non-corner perimeter bars (mid-face) terminate with the bend.</summary>
-    Edges,
+    /// <summary>90° bend into the slab above; the bar terminates with a horizontal leg in the slab.</summary>
+    BentToSlab,
 }
 
 /// <summary>Longitudinal (vertical) reinforcement layout.</summary>
@@ -118,19 +117,42 @@ public class LongitudinalConfig
     [JsonPropertyName("hookBottomType")] public string? HookBottomType { get; set; }
 
     /// <summary>
-    /// Subset of bars that terminate with a 90° bend into the slab above
-    /// (see <see cref="LongTopTermination"/>). Requires a slab above for the
-    /// selected bars; non-selected bars continue straight to the column top.
+    /// Default top mode applied to every bar that isn't overridden by
+    /// <see cref="TopModes"/>. <see cref="BarTopMode.Straight"/> reproduces
+    /// Phase-1 behaviour.
     /// </summary>
-    [JsonPropertyName("topTermination")]
+    [JsonPropertyName("topDefault")]
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public LongTopTermination TopTermination { get; set; } = LongTopTermination.None;
+    public BarTopMode TopDefault { get; set; } = BarTopMode.Straight;
 
     /// <summary>
-    /// Horizontal leg length inside the slab above for bars selected by
-    /// <see cref="TopTermination"/>. Direction is inward (toward column centre).
+    /// Per-bar top-mode overrides as a space- or semicolon-separated list of
+    /// <c>selector:mode</c> tokens. Selector is a 0-based bar index (in the cage
+    /// enumeration order — see the CSV guide), or a group keyword
+    /// <c>corners</c> / <c>edges</c> / <c>all</c>. Mode is <c>Straight</c> /
+    /// <c>Cranked</c> / <c>BentToSlab</c> (or the short forms <c>S</c> / <c>C</c> / <c>B</c>).
+    /// Precedence: explicit index &gt; group keyword &gt; <see cref="TopDefault"/>.
+    /// Example: <c>"corners:Cranked 8:BentToSlab"</c>. Null/empty = all bars use the default.
+    /// </summary>
+    [JsonPropertyName("topModes")] public string? TopModes { get; set; }
+
+    /// <summary>
+    /// Horizontal leg length inside the slab above for bars in
+    /// <see cref="BarTopMode.BentToSlab"/> mode. Direction is inward (toward column centre).
     /// </summary>
     [JsonPropertyName("topBentLeg")] public Length TopBentLeg { get; set; } = new(12);
+
+    /// <summary>Cranked mode: how much the upper column's cage is inset on each side (the offset the bar cranks to).</summary>
+    [JsonPropertyName("crankUpperInset")] public Length CrankUpperInset { get; set; } = new(2);
+
+    /// <summary>Cranked mode: vertical-over-horizontal slope of the diagonal. ACI 318-19 §10.7.4.1 caps at 1:6 (so default 6).</summary>
+    [JsonPropertyName("crankSlope")] public double CrankSlope { get; set; } = 6.0;
+
+    /// <summary>Cranked mode: distance from the column top down to the first bend (top of the lower vertical leg).</summary>
+    [JsonPropertyName("crankLowerBendOffset")] public Length CrankLowerBendOffset { get; set; } = new(6);
+
+    /// <summary>Cranked mode: how far the bar penetrates up INTO the upper column past the second bend (lap with the upper cage).</summary>
+    [JsonPropertyName("crankPenetration")] public Length CrankPenetration { get; set; } = new(24);
 }
 
 /// <summary>Transverse (tie) reinforcement.</summary>

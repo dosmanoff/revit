@@ -1,0 +1,78 @@
+# ======================================================================
+#  ПРИМЕР assignments.csv НА ОДНУ КОЛОННУ  (C1.1, 20"x20", нижний этаж)
+#  Строки, начинающиеся с #, плагин игнорирует — это комментарии.
+#  Пустая ячейка = "взять значение по умолчанию" (можно не заполнять).
+#  Формат каждого поля и пример — в строках ниже.
+# ----------------------------------------------------------------------
+#  ИДЕНТИФИКАЦИЯ
+#  Mark            — марка колонны, ДОЛЖНА совпадать с параметром Mark в Revit | строка | C1.1
+#
+#  ГЕОМЕТРИЯ (только для проверки — движок берёт реальные размеры из Revit)
+#  ExpectedSection — тип сечения | Rectangular | Round | Rectangular
+#  ExpectedW       — ожидаемая ширина | число, дюймы | 20
+#  ExpectedD       — ожидаемая глубина | число, дюймы | 20
+#  ExpectedDia     — ожидаемый диаметр (для круглых) | число, дюймы | (пусто для прямоуг.)
+#
+#  ОБЩЕЕ
+#  Units           — единицы для числовых длин | Imperial | Metric | Imperial
+#  CoverSides      — защитный слой по боковым граням (до наружной грани хомута) | длина | 1.5  (или "1 1/2\"")
+#  CoverEnds       — защитный слой по торцам (верх/низ) | длина | 1.5
+#
+#  ПРОДОЛЬНАЯ АРМАТУРА
+#  LongBarType     — тип стержня (RebarBarType.Name в документе, strict) | строка | #10
+#  LongBarsW       — кол-во стержней вдоль ширины (вкл. угловые), мин 2 | целое | 4
+#  LongBarsD       — кол-во стержней вдоль глубины (вкл. угловые), мин 2 | целое | 4
+#  LongBarsAround  — кол-во стержней по окружности (только круглые), мин 3 | целое | (пусто)
+#  LongCornersOnly — только 4 угловых стержня | true | false | false
+#  LongTopDefault  — режим верха ВСЕХ стержней | Straight|Cranked|BentToSlab | Straight
+#  LongTopModes    — переопределение по стержням: "selector:mode" через пробел;
+#                    selector = индекс (0,1..) или corners|edges|all; mode = S|C|B | строка | corners:Cranked 8:BentToSlab
+#  LongTopBentLeg  — BentToSlab: длина гориз. лапки в плите | длина | (пусто)
+#  LongCrankUpperInset — Cranked: на сколько уже верхняя клетка на сторону | длина | (пусто)
+#  LongCrankSlope  — Cranked: уклон диагонали (ACI ≤ 1:6) | число | (пусто, по умолч. 6)
+#  LongCrankLowerBendOffset — Cranked: от верха колонны до первого загиба | длина | (пусто)
+#  LongCrankPenetration — Cranked: проникновение стержня в верхнюю колонну | длина | (пусто)
+#
+#  ХОМУТЫ (поперечная арматура)
+#  StirrupBarType  — тип хомута | строка | #4
+#  StirrupSpacing  — основной шаг хомутов | длина | 8
+#  StirrupHookType — тип крюка (RebarHookType.Name, strict) | строка | Stirrup/Tie - 90 deg.
+#  StirrupOffsetTop — отступ верхнего хомута от верх. грани (пусто=CoverEnds) | длина | (пусто)
+#  StirrupOffsetBot — отступ нижнего хомута от ниж. грани | длина | (пусто)
+#
+#  ЗОНЫ СГУЩЕНИЯ ХОМУТОВ
+#  ConfBotEnabled  — включить сгущение снизу | true | false | true
+#  ConfBotSpacing  — шаг хомутов в зоне сгущения снизу | длина | 4
+#  ConfBotZoneFraction — длина зоны как доля высоты (0..1) | число | 0.25
+#  ConfBotZoneLength — ИЛИ абсолютная длина зоны (приоритетнее доли) | длина | (пусто)
+#  ConfTopEnabled  — включить сгущение сверху | true | false | true
+#  ConfTopSpacing  — шаг сверху | длина | 4
+#  ConfTopZoneFraction — доля высоты сверху | число | 0.25
+#  ConfTopZoneLength — абсолютная длина зоны сверху | длина | (пусто)
+#
+#  ВЫПУСКИ ИЗ НИЖЕЛЕЖАЩЕЙ КОНСТРУКЦИИ (dowels)
+#  DowelsEnabled   — создавать выпуски снизу | true | false | true
+#  DowelForm       — форма | Straight | L | L
+#  DowelHost       — откуда выпуски | Auto|Foundation|Floor|Column|Beam | Auto
+#  DowelBarType    — тип стержня выпуска (для Column — матч с верхней клеткой) | строка | #10
+#  DowelExt        — длина выпуска НАД хостом (нахлёстка с клеткой колонны) | длина | 30
+#  DowelEmbed      — заглубление В хост (для Column = нахлёстка в нижнюю колонну) | длина | 6
+#  DowelLeg        — гориз. лапка для формы L (внутри плиты) | длина | 12
+#  DowelOnlyFoundation — Auto: искать только OST_StructuralFoundation | true | false | true
+#
+#  ВЫПУСКИ ВВЕРХ (splices в вышележащую колонну/плиту)
+#  SplicesEnabled  — создавать выпуски вверх | true | false | true
+#  SpliceForm      — форма | Straight | Bent | Cranked | Straight
+#  SpliceBarType   — тип стержня (обычно = LongBarType) | строка | #10
+#  SpliceLap       — нахлёстка ВНУТРИ текущей колонны (ACI Class B = 1.3*ld) | длина | 30
+#  SpliceExt       — Straight: над колонной/плитой; Cranked: нахлёстка в верхней колонне | длина | 30
+#  SpliceBentLeg   — Bent: гориз. лапка в плите сверху | длина | (пусто)
+#  SpliceUpperInset — Cranked: насколько верхняя колонна уже на сторону | длина | (пусто)
+#  SpliceCrankedSlope — Cranked: уклон диагонали (ACI ≤ 1:6, по умолч. 6) | число | (пусто)
+#  SpliceLowerBendOffset — Cranked: от верха колонны до первого загиба | длина | (пусто)
+#
+#  ПРОЧЕЕ
+#  CleanExisting   — удалять ранее созданную этим плагином арматуру перед запуском | true | false | true
+# ======================================================================
+Mark,ExpectedSection,ExpectedW,ExpectedD,Units,CoverSides,CoverEnds,LongBarType,LongBarsW,LongBarsD,LongCornersOnly,StirrupBarType,StirrupSpacing,StirrupHookType,ConfBotEnabled,ConfBotSpacing,ConfBotZoneFraction,ConfTopEnabled,ConfTopSpacing,ConfTopZoneFraction,DowelsEnabled,DowelForm,DowelHost,DowelBarType,DowelExt,DowelEmbed,DowelLeg,DowelOnlyFoundation,SplicesEnabled,SpliceForm,SpliceBarType,SpliceLap,SpliceExt,CleanExisting
+C1.1,Rectangular,20,20,Imperial,1.5,1.5,#10,4,4,false,#4,8,Stirrup/Tie - 90 deg.,true,4,0.25,true,4,0.25,true,L,Auto,#10,30,6,12,true,true,Straight,#10,30,30,true

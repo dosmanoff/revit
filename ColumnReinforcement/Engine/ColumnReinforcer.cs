@@ -70,9 +70,12 @@ public class ColumnReinforcer
                     ? HostContext.ResolveDowelHost(fi, geom, cfg.Dowels.Host, cfg.Dowels.OnlyStructuralFoundation)
                     : null;
 
-                bool needsSlabAbove =
-                    cfg.UpperSplices.Enabled ||
-                    cfg.Longitudinal.TopTermination != LongTopTermination.None;
+                // BentToSlab bars (default or any per-bar override) need the slab above,
+                // as do upper splices.
+                bool longWantsSlab =
+                    cfg.Longitudinal.TopDefault == BarTopMode.BentToSlab ||
+                    (cfg.Longitudinal.TopModes?.IndexOf("B", StringComparison.OrdinalIgnoreCase) >= 0);
+                bool needsSlabAbove = cfg.UpperSplices.Enabled || longWantsSlab;
                 Element? slabAbove = needsSlabAbove ? HostContext.FindSlabAbove(fi, geom) : null;
 
                 int created = 0;
