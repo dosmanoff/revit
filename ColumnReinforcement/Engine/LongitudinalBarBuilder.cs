@@ -179,9 +179,13 @@ public class LongitudinalBarBuilder
 
         bool[] isCorner = ClassifyExtremal(positions, cornersOnly: true);
         bool[] isPerim  = ClassifyExtremal(positions, cornersOnly: false);
+        // Per-face membership (a corner bar belongs to two faces). After the
+        // canonical short-side orientation in ColumnGeometry, ±X are the long
+        // faces and ±Y are the short faces.
+        var (onPlusX, onMinusX, onPlusY, onMinusY) = ClassifyFaces(positions);
 
-        // Two passes so that index overrides always beat group keywords regardless
-        // of token order: pass 1 applies group keywords, pass 2 applies indices.
+        // Two passes so that index overrides always beat group/face keywords
+        // regardless of token order: pass 1 applies keywords, pass 2 applies indices.
         var indexTokens = new List<(int idx, BarTopMode mode)>();
 
         foreach (string raw in cfg.TopModes.Split([' ', ';', ','], StringSplitOptions.RemoveEmptyEntries))
@@ -196,15 +200,18 @@ public class LongitudinalBarBuilder
             if (int.TryParse(selector, out int idx))
             {
                 indexTokens.Add((idx, mode));
+                continue;
             }
-            else
+
+            switch (selector.ToLowerInvariant())
             {
-                switch (selector.ToLowerInvariant())
-                {
-                    case "all":     for (int i = 0; i < n; i++) modes[i] = mode; break;
-                    case "corners": for (int i = 0; i < n; i++) if (isCorner[i]) modes[i] = mode; break;
-                    case "edges":   for (int i = 0; i < n; i++) if (isPerim[i] && !isCorner[i]) modes[i] = mode; break;
-                }
+                case "all":     Apply(modes, mode, _ => true); break;
+                case "corners": Apply(modes, mode, i => isCorner[i]); break;
+                case "edges":   Apply(modes, mode, i => isPerim[i] && !isCorner[i]); break;
+                case "+x":      Apply(modes, mode, i => onPlusX[i]); break;
+                case "-x":      Apply(modes, mode, i => onMinusX[i]); break;
+                case "+y":      Apply(modes, mode, i => onPlusY[i]); break;
+                case "-y":      Apply(modes, mode, i => onMinusY[i]); break;
             }
         }
 
@@ -212,6 +219,38 @@ public class LongitudinalBarBuilder
             if (idx >= 0 && idx < n) modes[idx] = mode;
 
         return modes;
+    }
+
+    private static void Apply(BarTopMode[] modes, BarTopMode mode, Func<int, bool> predicate)
+    {
+        for (int i = 0; i < modes.Length; i++)
+            if (predicate(i)) modes[i] = mode;
+    }
+
+    /// <summary>
+    /// Classify each position by which face(s) it sits on: +X (x = max), −X (x = min),
+    /// +Y (y = max), −Y (y = min). Corner bars are on two faces. For round columns,
+    /// faces map to quadrants of the cage circle by the dominant axis sign.
+    /// </summary>
+    private static (bool[] px, bool[] mx, bool[] py, bool[] my) ClassifyFaces(
+        IReadOnlyList<(double x, double y)> positions)
+    {
+        int n = positions.Count;
+        var px = new bool[n]; var mx = new bool[n]; var py = new bool[n]; var my = new bool[n];
+        if (n == 0) return (px, mx, py, my);
+
+        double xMax = positions.Max(p => p.x), xMin = positions.Min(p => p.x);
+        double yMax = positions.Max(p => p.y), yMin = positions.Min(p => p.y);
+        const double tol = 1e-9;
+        for (int i = 0; i < n; i++)
+        {
+            var (x, y) = positions[i];
+            px[i] = Math.Abs(x - xMax) < tol;
+            mx[i] = Math.Abs(x - xMin) < tol;
+            py[i] = Math.Abs(y - yMax) < tol;
+            my[i] = Math.Abs(y - yMin) < tol;
+        }
+        return (px, mx, py, my);
     }
 
     private static bool TryParseMode(string s, out BarTopMode mode)
