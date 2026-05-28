@@ -37,30 +37,58 @@ public sealed class ColumnSheetBuilder
     public void PlaceOnSheet(ViewSheet sheet, IReadOnlyList<View> views, IReadOnlyList<ViewSchedule> schedules)
     {
         BoundingBoxUV outline = sheet.Outline;
-        double u0 = outline.Min.U, v0 = outline.Min.V;
-        double w = outline.Max.U - u0;
-        double h = outline.Max.V - v0;
+        const double gap = 0.08;                  // ~1" between items, in sheet feet
+        double left = outline.Min.U + 0.1;
+        double topY = outline.Max.V - 0.1;
 
-        double[] colU = { u0 + w * 0.22, u0 + w * 0.52 };
-        double[] rowV = { v0 + h * 0.72, v0 + h * 0.40 };
-
-        for (int i = 0; i < views.Count; i++)
+        var vps = new List<Viewport>();
+        foreach (View view in views)
         {
-            View view = views[i];
-            if (!Viewport.CanAddViewToSheet(_doc, sheet.Id, view.Id))
-                continue;
-
-            double u = colU[i % 2];
-            double v = rowV[(i / 2) % 2];
-            Viewport.Create(_doc, sheet.Id, view.Id, new XYZ(u, v, 0));
+            if (Viewport.CanAddViewToSheet(_doc, sheet.Id, view.Id))
+                vps.Add(Viewport.Create(_doc, sheet.Id, view.Id, XYZ.Zero));
         }
 
-        double scheduleU = u0 + w * 0.80;
-        for (int i = 0; i < schedules.Count; i++)
+        // Viewport outlines are only valid once the new viewports are regenerated.
+        _doc.Regenerate();
+
+        // Pack two viewports per row using their true outline sizes so none overlap.
+        double rightEdge = left;
+        double rowTop = topY;
+        for (int i = 0; i < vps.Count; i += 2)
         {
-            double v = v0 + h * (0.80 - i * 0.35);
-            ScheduleSheetInstance.Create(_doc, sheet.Id, schedules[i].Id, new XYZ(scheduleU, v, 0));
+            List<Viewport> row = vps.Skip(i).Take(2).ToList();
+            double rowHeight = row.Max(BoxHeight);
+            double x = left;
+            foreach (Viewport vp in row)
+            {
+                double w = BoxWidth(vp);
+                vp.SetBoxCenter(new XYZ(x + w / 2.0, rowTop - rowHeight / 2.0, 0));
+                x += w + gap;
+                rightEdge = Math.Max(rightEdge, x);
+            }
+            rowTop -= rowHeight + gap;
         }
+
+        // Schedules stack down the right of the viewport block.
+        double scheduleX = rightEdge + gap;
+        double scheduleY = topY;
+        foreach (ViewSchedule schedule in schedules)
+        {
+            ScheduleSheetInstance.Create(_doc, sheet.Id, schedule.Id, new XYZ(scheduleX, scheduleY, 0));
+            scheduleY -= 0.6;
+        }
+    }
+
+    private static double BoxWidth(Viewport vp)
+    {
+        Outline o = vp.GetBoxOutline();
+        return o.MaximumPoint.X - o.MinimumPoint.X;
+    }
+
+    private static double BoxHeight(Viewport vp)
+    {
+        Outline o = vp.GetBoxOutline();
+        return o.MaximumPoint.Y - o.MinimumPoint.Y;
     }
 
     private ElementId ResolveTitleBlock()

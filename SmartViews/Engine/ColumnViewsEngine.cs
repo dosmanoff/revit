@@ -83,20 +83,30 @@ public sealed class ColumnViewsEngine
         BoundingBoxXYZ rebarBox = CombineBoundingBoxes(bbox, hostRebar);
         (double? topStirrupZ, double? bottomStirrupZ) = StirrupZExtents(hostRebar);
 
+        // World Z of each end-plan cut plane (above the relevant stirrup, else a face inset).
+        double topCutZ = topStirrupZ.HasValue
+            ? topStirrupZ.Value + _cfg.PlanCutAboveStirrup
+            : bbox.Max.Z - _cfg.PlanCutInset;
+        double bottomCutZ = bottomStirrupZ.HasValue
+            ? bottomStirrupZ.Value + _cfg.PlanCutAboveStirrup
+            : bbox.Min.Z + _cfg.PlanCutInset;
+        var planCuts = new[] { (Z: topCutZ, Label: "Top Plan"), (Z: bottomCutZ, Label: "Bottom Plan") };
+
         var created = new List<View>();
 
-        // Two perpendicular elevations, sized to enclose all of the column's rebar.
-        View? front = CreateElevation(rebarBox, lookDir: fwd, mark, "Front");
+        // Two perpendicular elevations, sized to enclose all of the column's rebar, with the
+        // plan cut levels drawn across them.
+        View? front = CreateElevation(rebarBox, lookDir: fwd, mark, "Front", planCuts);
         if (front is not null) created.Add(front);
 
-        View? side = CreateElevation(rebarBox, lookDir: rgt, mark, "Side");
+        View? side = CreateElevation(rebarBox, lookDir: rgt, mark, "Side", planCuts);
         if (side is not null) created.Add(side);
 
-        // Two end plans cut just above the topmost / bottommost stirrup.
-        View? topPlan = CreatePlan(fi, bbox, mark, isTop: true, topStirrupZ, bottomStirrupZ);
+        // Two end plans cut at the computed levels.
+        View? topPlan = CreatePlan(fi, bbox, mark, isTop: true, topCutZ);
         if (topPlan is not null) created.Add(topPlan);
 
-        View? botPlan = CreatePlan(fi, bbox, mark, isTop: false, topStirrupZ, bottomStirrupZ);
+        View? botPlan = CreatePlan(fi, bbox, mark, isTop: false, bottomCutZ);
         if (botPlan is not null) created.Add(botPlan);
 
         foreach (View v in created)
@@ -105,9 +115,15 @@ public sealed class ColumnViewsEngine
         // Visibility computed from the new crops before we query what's visible.
         _doc.Regenerate();
 
+        // This column's own elevation section markers stay; markers of other columns are hidden.
+        HashSet<string> keepMarkerNames = created.OfType<ViewSection>()
+            .Select(v => v.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
         foreach (View v in created)
         {
             ApplyForeignRebarTreatment(v, mark, result);
+            HideForeignSectionMarkers(v, keepMarkerNames);
             result.RecordCreated();
         }
 
@@ -173,7 +189,9 @@ public sealed class ColumnViewsEngine
     // Elevations
     // -----------------------------------------------------------------------
 
-    private View? CreateElevation(BoundingBoxXYZ bbox, XYZ lookDir, string mark, string direction)
+    private View? CreateElevation(
+        BoundingBoxXYZ bbox, XYZ lookDir, string mark, string direction,
+        IReadOnlyList<(double Z, string Label)> planCuts)
     {
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.Section, _cfg.SectionViewTypeName);
 
@@ -207,7 +225,38 @@ public sealed class ColumnViewsEngine
 
         Name(view, _cfg.ElevationNameTemplate, mark, direction: direction, end: null);
         ApplyTemplate(view, _cfg.ElevationViewTemplate);
+
+        DrawPlanCutLines(view, center, basisX, halfWidth: hLocal + half, planCuts);
         return view;
+    }
+
+    /// <summary>
+    /// Draws a horizontal detail line (with a label) across the elevation at each plan cut
+    /// level, so the elevation shows where the top/bottom plans are taken. Best-effort.
+    /// </summary>
+    private void DrawPlanCutLines(
+        View view, XYZ center, XYZ basisX, double halfWidth,
+        IReadOnlyList<(double Z, string Label)> planCuts)
+    {
+        ElementId textTypeId = _doc.GetDefaultElementTypeId(ElementTypeGroup.TextNoteType);
+
+        foreach ((double z, string label) in planCuts)
+        {
+            XYZ rise = XYZ.BasisZ * (z - center.Z);
+            XYZ p1 = center - basisX * halfWidth + rise;
+            XYZ p2 = center + basisX * halfWidth + rise;
+
+            try
+            {
+                _doc.Create.NewDetailCurve(view, Line.CreateBound(p1, p2));
+                if (textTypeId != ElementId.InvalidElementId)
+                    TextNote.Create(_doc, view.Id, p2, label, textTypeId);
+            }
+            catch (Exception)
+            {
+                // Annotation is non-critical — skip this cut line if Revit rejects it.
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -215,8 +264,7 @@ public sealed class ColumnViewsEngine
     // -----------------------------------------------------------------------
 
     private View? CreatePlan(
-        FamilyInstance fi, BoundingBoxXYZ bbox, string mark, bool isTop,
-        double? topStirrupZ, double? bottomStirrupZ)
+        FamilyInstance fi, BoundingBoxXYZ bbox, string mark, bool isTop, double cutWorldZ)
     {
         Level? level = ResolveLevel(fi);
         if (level is null)
@@ -234,16 +282,6 @@ public sealed class ColumnViewsEngine
             Min = new XYZ(bbox.Min.X - pad, bbox.Min.Y - pad, existing.Min.Z),
             Max = new XYZ(bbox.Max.X + pad, bbox.Max.Y + pad, existing.Max.Z),
         };
-
-        // Cut just above the topmost / bottommost stirrup so the plan slices through the
-        // reinforced section; fall back to an inset from the column face if no stirrups exist.
-        double cutWorldZ = isTop
-            ? (topStirrupZ.HasValue
-                ? topStirrupZ.Value + _cfg.PlanCutAboveStirrup
-                : bbox.Max.Z - _cfg.PlanCutInset)
-            : (bottomStirrupZ.HasValue
-                ? bottomStirrupZ.Value + _cfg.PlanCutAboveStirrup
-                : bbox.Min.Z + _cfg.PlanCutInset);
 
         double levelElev = level.ProjectElevation;
         double cut = cutWorldZ - levelElev;
@@ -318,6 +356,24 @@ public sealed class ColumnViewsEngine
 
         // Always drop annotations (tags / dimensions) that point at foreign rebar.
         HideForeignAnnotations(view, foreign);
+    }
+
+    /// <summary>
+    /// Hides section/elevation markers in the view whose view name is not in
+    /// <paramref name="keepNames"/> — i.e. the markers belonging to other columns. A marker
+    /// element's Name is its view's name, so this keeps this column's own elevation cut lines.
+    /// </summary>
+    private void HideForeignSectionMarkers(View view, HashSet<string> keepNames)
+    {
+        List<ElementId> toHide = new FilteredElementCollector(_doc, view.Id)
+            .OfCategory(BuiltInCategory.OST_Viewers)
+            .WhereElementIsNotElementType()
+            .Where(e => !keepNames.Contains(e.Name))
+            .Select(e => e.Id)
+            .ToList();
+
+        if (toHide.Count > 0)
+            HideSafely(view, toHide);
     }
 
     /// <summary>Hides tags and dimensions in the view that reference any of <paramref name="foreignRebar"/>.</summary>
