@@ -14,6 +14,10 @@
 #          0..3 (грань -Y, Y=-9.6) и 4..7 (грань +Y, Y=+9.6) -> ВНЕ C1.3 -> отгиб в плиту
 #          8..11 (грани ±X, Y=+-3.2)                          -> под C1.3 -> Cranked
 #        => 8 стержней (короткие грани) уходят в плиту, 4 (длинные грани) — вверх в C1.3.
+#        ВНИЗ: C1.1 ниже тоже отогнула часть стержней в плиту. Cranked из C1.1
+#        приходят на грань +X C1.2 и на грани ±Y, а грань -X C1.2 остаётся без
+#        непрерывного стержня снизу. Поэтому выпуски-стартеры из C1.1
+#        (DowelHost=Column) ставим на грань -X: DowelPositions="-x" (стержни 0,4,8,10).
 #
 #  C1.3  16x16. ВНИЗ: т.к. C1.2 отогнула 8 стержней в плиту, выпуски-стартеры идут
 #        ВВЕРХ из C1.2 (DowelHost=Column) для тех позиций C1.3, куда НЕ пришёл
@@ -30,6 +34,6 @@
 # ======================================================================
 Mark,ExpectedSection,ExpectedW,ExpectedD,CoverSides,CoverEnds,LongBarType,LongBarsW,LongBarsD,LongTopDefault,LongTopModes,LongTopBentLeg,LongTopBentOutward,LongCrankUpperInset,LongCrankSlope,LongCrankLowerBendOffset,LongCrankPenetration,StirrupBarType,StirrupSpacing,StirrupOffsetTop,DowelsEnabled,DowelHost,DowelForm,DowelBarType,DowelExt,DowelEmbed,DowelPositions
 C1.1,Rectangular,24,36,1.5,1.5,#8,5,7,BentToSlab,0:Cranked 1:Cranked 2:Cranked 3:Cranked 4:Cranked 10:Cranked 11:Cranked 12:Cranked 13:Cranked,20,true,1.0,6,12,30,#4,10,10,,,,,,,
-C1.2,Rectangular,18,24,1.5,1.5,#7,4,4,BentToSlab,8:Cranked 9:Cranked 10:Cranked 11:Cranked,20,true,0.875,6,12,30,#4,10,10,,,,,,,
+C1.2,Rectangular,18,24,1.5,1.5,#7,4,4,BentToSlab,8:Cranked 9:Cranked 10:Cranked 11:Cranked,20,true,0.875,6,12,30,#4,10,10,true,Column,Straight,#7,30,30,-x
 C1.3,Rectangular,16,16,1.5,1.5,#7,4,4,Cranked,,,,0.875,6,12,30,#4,10,10,true,Column,Straight,#7,30,30,+x -x
 C1.4,Rectangular,16,16,1.5,1.5,#7,4,4,BentToSlab,,20,true,,,,,#4,10,10,,,,,,,
