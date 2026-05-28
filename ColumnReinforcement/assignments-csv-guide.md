@@ -117,8 +117,15 @@ Rectangular columns use `LongBarsW` and `LongBarsD`. Round columns use `LongBars
 | `LongCornersOnly` | bool | `false` | Rectangular only. If true, places exactly 4 corner bars and ignores `LongBarsW`/`LongBarsD`. |
 | `LongHookTop` | string? | `null` | Optional `RebarHookType.Name` for the top end of longitudinals. `null` (empty cell) = no hook. |
 | `LongHookBot` | string? | `null` | Same for the bottom end. |
-| `LongTopTermination` | enum: `None` \| `All` \| `Corners` \| `Edges` | `None` | Which bars terminate with a 90° bend into the slab above. `None` = all straight to column top (Phase-1). `All` = every bar bent. `Corners` = only the 4 corner bars bent; mid-face bars continue straight. `Edges` = only non-corner perimeter bars bent. Requires `OST_Floors` slab above when any bar is selected. Used when the upper column is much smaller than the lower and a Cranked splice would violate ACI 1:6. |
-| `LongTopBentLeg` | length | `12` in | Horizontal leg length inside the slab above for bars selected by `LongTopTermination`. Direction is inward toward the column centre. |
+| `LongTopDefault` | enum: `Straight` \| `Cranked` \| `BentToSlab` | `Straight` | What the TOP of each longitudinal bar does, applied to every bar not overridden by `LongTopModes`. `Straight` = run to column top (Phase-1). `Cranked` = the bar itself bends over to the upper (smaller/shifted) column's cage offset and penetrates up into it — one continuous bar, avoids clashing with the upper cage. `BentToSlab` = 90° hook into the slab above. |
+| `LongTopModes` | string (selector:mode list) | (empty) | Per-bar override of `LongTopDefault`. Space/`;`-separated `selector:mode` tokens. **Selector**: 0-based bar index in cage enumeration order (see below), or a group keyword `corners` / `edges` / `all`. **Mode**: `Straight`/`Cranked`/`BentToSlab` (or short `S`/`C`/`B`). Precedence: explicit index > group keyword > `LongTopDefault`. Example: `corners:Cranked 8:BentToSlab` — corner bars crank, bar #8 bends to slab, everything else uses the default. **No commas inside the cell** (they're the CSV delimiter) — use spaces. |
+| `LongTopBentLeg` | length | `12` in | `BentToSlab` bars: horizontal leg length inside the slab above. Inward toward the column centre. |
+| `LongCrankUpperInset` | length | `2` in | `Cranked` bars: how much the upper column's cage is inset on each side — the offset the bar cranks to. |
+| `LongCrankSlope` | number | `6` | `Cranked` bars: vertical/horizontal slope of the diagonal. ACI 318-19 §10.7.4.1 caps at 1:6, so keep ≥ 6. |
+| `LongCrankLowerBendOffset` | length | `6` in | `Cranked` bars: distance from the column top down to the first bend. |
+| `LongCrankPenetration` | length | `24` in | `Cranked` bars: how far the bar penetrates UP into the upper column past the second bend (lap with the upper cage). |
+
+> **Cage enumeration order** (for `LongTopModes` indices). Rectangular: bottom face left→right (indices `0 … nx−1`), then top face left→right (`nx … 2·nx−1`), then the interior side bars row by row, left side then right side (`2·nx …`). Round: bar at angle 0 (along local X) is index `0`, then counter-clockwise. When unsure, use the `corners`/`edges` keywords instead of raw indices — they're robust to changing the bar counts.
 
 ### 2.6 Ties (transverse reinforcement)
 
@@ -261,15 +268,28 @@ C4.1,#6,true,#3,6
 Upper column much smaller than lower (e.g., 24″→12″, 12″ offset per side). At 1:6 slope per ACI 318 §10.7.4.1 the Cranked diagonal would need 72″ of vertical rise, which doesn't fit in a typical lap zone. Workaround: terminate the lower cage with 90° bends into the slab above, then place fresh dowels from the lower column up into the upper column.
 
 ```csv
-Mark,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing,LongTopTermination,LongTopBentLeg,DowelsEnabled,DowelForm,DowelHost,DowelBarType,DowelExt,DowelEmbed,SplicesEnabled,SpliceForm,SpliceLap,SpliceBentLeg
-C1.1,#11,4,4,#5,6,All,18,true,L,Auto,#11,36,8,false,,,
-C1.2,#8,3,3,#4,8,None,,true,Straight,Column,#8,36,36,true,Bent,24,12
+Mark,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing,LongTopDefault,LongTopBentLeg,DowelsEnabled,DowelForm,DowelHost,DowelBarType,DowelExt,DowelEmbed,SplicesEnabled,SpliceForm,SpliceLap,SpliceBentLeg
+C1.1,#11,4,4,#5,6,BentToSlab,18,true,L,Auto,#11,36,8,false,,,
+C1.2,#8,3,3,#4,8,Straight,,true,Straight,Column,#8,36,36,true,Bent,24,12
 ```
 
 Row C1.1 (the 24×24 ground column):
 - Foundation dowels from the footing below (`DowelHost=Auto`, found as `OST_StructuralFoundation`)
-- All 16 `#11` bars bend 90° into the floor slab above (`LongTopTermination=All`, 18″ leg)
+- All 16 `#11` bars bend 90° into the floor slab above (`LongTopDefault=BentToSlab`, 18″ leg)
 - No upper splice — the bars don't continue up
+
+### 4.7 Cranking the main bars themselves to a smaller upper column
+
+When the upper column is only moderately smaller (the 1:6 slope fits), you can crank the main longitudinal bars directly — no separate splice bars. Here the corner bars crank to the inset upper cage while mid-face bars run straight (a common detail when only the corners would clash):
+
+```csv
+Mark,LongBarType,LongBarsW,LongBarsD,StirrupBarType,StirrupSpacing,LongTopDefault,LongTopModes,LongCrankUpperInset,LongCrankSlope,LongCrankLowerBendOffset,LongCrankPenetration
+C1.1,#9,4,4,#4,8,Straight,corners:Cranked,2,6,6,30
+```
+
+All bars default to `Straight`; the four corner bars are overridden to `Cranked`. Each cranked corner bar: vertical inside this column up to 6″ below the top, diagonal at 1:6 to the position 2″ inset, then 30″ vertical penetration into the upper column. To crank *every* bar instead, set `LongTopDefault=Cranked` and drop `LongTopModes`.
+
+This coexists with `SpliceForm=Cranked` (separate splice bars) — use whichever strategy your detailer prefers. Main-bar cranking = one continuous bar; splice-bar Cranked = the column bars terminate and short cranked starters lap them.
 
 Row C1.2 (the 12×12 upper column):
 - Dowels from the lower column (`DowelHost=Column`), positions offset 1·db along the face from the upper cage, 36″ lap inside lower column, 36″ extension into upper cage
