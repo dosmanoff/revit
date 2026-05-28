@@ -164,8 +164,18 @@ public class StirrupBuilder
             LongitudinalBarBuilder.ComputeRectangularCageBounds(doc, cfg, geom);
         int nx = Math.Max(2, cfg.Longitudinal.BarsAlongWidth);
         int ny = Math.Max(2, cfg.Longitudinal.BarsAlongDepth);
+        // Bar-LINE positions (where each crosstie sits) follow the longitudinal cage.
         double[] xs = LongitudinalBarBuilder.LinSpace(xMin, xMax, nx);
         double[] ys = LongitudinalBarBuilder.LinSpace(yMin, yMax, ny);
+
+        // Crosstie SPAN reaches the outer-tie line (cover + d_crosstie/2 from the face),
+        // a touch outside the perimeter longitudinal bars, so each end brackets the bar it
+        // engages and the hook wraps around it (rather than stopping on the bar centreline,
+        // which leaves the hook short of the bar). Perpendicular position stays on the cage.
+        double dCt = RebarFactory.GetBarType(doc, c.BarType ?? cfg.Stirrups.BarType).BarModelDiameter;
+        double tieInset = cfg.Ft(cfg.Cover.Sides) + dCt / 2.0;
+        double spanXMin = -geom.Width / 2.0 + tieInset, spanXMax = geom.Width / 2.0 - tieInset;
+        double spanYMin = -geom.Depth / 2.0 + tieInset, spanYMax = geom.Depth / 2.0 - tieInset;
 
         // Lines that get a crosstie, expressed as bar-line indices on each axis.
         // spanXAtY[i] true → a crosstie joining the ±X faces at ys[i]; spanYAtX[j] → ±Y faces at xs[j].
@@ -197,8 +207,8 @@ public class StirrupBuilder
             foreach (int j in AutoSupportIndices(xs, dLong, maxClear)) spanYAtX.Add(j);
         }
 
-        foreach (int i in spanXAtY) result.Add(((xMin, ys[i]), (xMax, ys[i])));
-        foreach (int j in spanYAtX) result.Add(((xs[j], yMin), (xs[j], yMax)));
+        foreach (int i in spanXAtY) result.Add(((spanXMin, ys[i]), (spanXMax, ys[i])));
+        foreach (int j in spanYAtX) result.Add(((xs[j], spanYMin), (xs[j], spanYMax)));
         return result;
     }
 

@@ -134,7 +134,7 @@ Rectangular columns use `LongBarsW` and `LongBarsD`. Round columns use `LongBars
 |---|---|---|---|
 | `StirrupBarType` | string | `#4` | `RebarBarType.Name`. Use `#3` for #10 longitudinal and smaller; `#4` for #11 and larger (ACI 318 §25.7.2.1). |
 | `StirrupSpacing` | length | `8` in | Center-to-center tie spacing along the column height. ACI 318 §25.7.2.1 minimum: `min(16·d_long, 48·d_tie, least column dim)`. |
-| `StirrupHookType` | string? | `Stirrup/Tie - 90 deg.` | OOTB Revit tie-hook name. For seismic detailing, use `Stirrup/Tie - 135 deg.`. Empty cell = no hook (rare; ties almost always need hooks). |
+| `StirrupHookType` | string? | `Stirrup/Tie - 135 deg.` | OOTB Revit tie-hook name, inherited by crossties unless `CrosstiesHookType` overrides. 135° is the default (wraps the longitudinal bar more fully than 90°). Use `Stirrup/Tie - 90 deg.` or `Stirrup/Tie Seismic - 135 deg.` as needed. Empty cell = no hook (rare; ties almost always need hooks). |
 | `StirrupOffsetTop` | length? | `null` | Distance from the top face of the column to the highest tie. `null` (empty) = use `CoverEnds`. Override when you need to skip the joint zone. |
 | `StirrupOffsetBot` | length? | `null` | Same for the bottom face. |
 | `StirrupRotate45` | bool | `false` | Phase 2+ feature. Rotates the rectangular tie 45° about the column axis (ACI §25.7.2.3 allowed cases). Currently a no-op flag — keep `false`. |

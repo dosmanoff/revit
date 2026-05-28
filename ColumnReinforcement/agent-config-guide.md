@@ -192,9 +192,9 @@ by a crank from below (double-up/clash).
   the column is inside the slab; this offset parks the highest tie at the slab soffit
   instead of inside the slab. Bottom offset: leave default (slab below sits beneath
   the column base).
-- Hook: default `Stirrup/Tie - 90 deg.` (non-seismic). Use `Stirrup/Tie Seismic -
-  135 deg.` only if the project is seismic / Comments say so — and only if it's in
-  `available_rebar_hook_types`.
+- Hook: default `Stirrup/Tie - 135 deg.` (wraps the bar more fully; inherited by crossties).
+  Use `Stirrup/Tie - 90 deg.` or `Stirrup/Tie Seismic - 135 deg.` if the project/Comments
+  call for it — and only if it's in `available_rebar_hook_types`.
 - Confinement (`ConfTop*`/`ConfBot*`): only if the schedule/Comments call for densified
   zones. Non-seismic default = none. (Schedule labels like `So 6" / Sm 10" / Lo 30"` map to
   `ConfTop/BotSpacing=6`, `ConfTop/BotZoneLength=30`, `StirrupSpacing=10`.)
