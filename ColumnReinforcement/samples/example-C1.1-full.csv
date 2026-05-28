@@ -1,0 +1,22 @@
+﻿# ======================================================================
+#  ПОЛНЫЙ КОНФИГ НА ОДНУ КОЛОННУ — C1.1, 24"x36"
+#  Файл UTF-8 с BOM. Строки с # — комментарии (плагин пропускает).
+#  Все 59 полей присутствуют; незаполненные = значение по умолчанию.
+# ----------------------------------------------------------------------
+#  Сводка:
+#   - Сечение 24x36, защитный слой 1.5" по сторонам и торцам
+#   - Продольная #8: 5 стержней вдоль короткой грани (24"), 7 вдоль длинной (36") = 20 шт, индексы 0..19
+#   - Хомут #4 @ 10", сгущение до 8" сверху и снизу (зона 1/4 высоты), крюки Stirrup/Tie Seismic - 135 deg.
+#   - Режим верха стержней (поиндексно):
+#       cranked  : 0..6 и 18..19  (смещение внутрь 1 диаметр = 1", уклон 1:6, бенд-оффсет 8", проникновение 48"=4')
+#       в плиту  : 7..17          (лапка 20")
+#   - Выпусков из фундамента нет; отдельных splice-баров нет (cranked-стержни сами идут вверх)
+#
+#  Раскладка индексов (план, локальные оси):
+#     верх грани 24":   5 6 7 8 9
+#     боковые ряды:     18/19 (верхний) ... 10/11 (нижний)  [лев/прав]
+#     низ грани 24":    0 1 2 3 4
+#     углы = 0,4,5,9
+# ======================================================================
+Mark,ExpectedSection,ExpectedW,ExpectedD,ExpectedDia,Units,CoverSides,CoverEnds,LongBarType,LongBarsW,LongBarsD,LongBarsAround,LongCornersOnly,LongHookTop,LongHookBot,LongTopDefault,LongTopModes,LongTopBentLeg,LongCrankUpperInset,LongCrankSlope,LongCrankLowerBendOffset,LongCrankPenetration,StirrupBarType,StirrupSpacing,StirrupHookType,StirrupOffsetTop,StirrupOffsetBot,StirrupRotate45,ConfBotEnabled,ConfBotSpacing,ConfBotZoneFraction,ConfBotZoneLength,ConfTopEnabled,ConfTopSpacing,ConfTopZoneFraction,ConfTopZoneLength,DowelsEnabled,DowelForm,DowelHost,DowelBarType,DowelExt,DowelEmbed,DowelLeg,DowelOnlyFoundation,DowelHookTop,DowelHookBot,SplicesEnabled,SpliceForm,SpliceBarType,SpliceLap,SpliceExt,SpliceBentLeg,SpliceUpperInset,SpliceCrankedSlope,SpliceLowerBendOffset,SpliceIgnoreSlabAbove,SpliceHookTop,SpliceHookBot,CleanExisting
+C1.1,Rectangular,24,36,,Imperial,1.5,1.5,#8,5,7,,false,,,Straight,0:C 1:C 2:C 3:C 4:C 5:C 6:C 7:B 8:B 9:B 10:B 11:B 12:B 13:B 14:B 15:B 16:B 17:B 18:C 19:C,20,1,6,8,48,#4,10,Stirrup/Tie Seismic - 135 deg.,,,false,true,8,0.25,,true,8,0.25,,false,,,,,,,,,,false,,,,,,,,,,,,true
