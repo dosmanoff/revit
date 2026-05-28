@@ -203,10 +203,16 @@ public class StirrupBuilder
     }
 
     /// <summary>
-    /// Interior bar indices that need a crosstie so no bar is more than <paramref name="maxClear"/>
-    /// clear from a laterally-supported bar (ACI 318-19 §25.7.2.3). Corners (indices 0 and
-    /// n−1) are supported by the outer tie. Greedy walk from each corner; a final back-check
-    /// covers the gap to the far corner.
+    /// Interior bar indices that need a crosstie so every bar is laterally supported per
+    /// ACI 318-19 §25.7.2.3 (no bar more than <paramref name="maxClear"/> clear from a
+    /// supported bar). Corners (indices 0 and n−1) are held by the outer tie. The cage is
+    /// evenly spaced (<see cref="LongitudinalBarBuilder.LinSpace"/>), so:
+    /// <list type="bullet">
+    ///   <item>clear spacing &gt; <paramref name="maxClear"/> → support EVERY interior bar;</item>
+    ///   <item>otherwise → support ALTERNATE interior bars (even indices), leaving each
+    ///         unsupported bar within one spacing (≤ <paramref name="maxClear"/>) of a
+    ///         supported bar on each side.</item>
+    /// </list>
     /// </summary>
     internal static List<int> AutoSupportIndices(double[] pos, double barDia, double maxClear)
     {
@@ -214,13 +220,11 @@ public class StirrupBuilder
         int n = pos.Length;
         if (n <= 2) return need;                 // only corners — nothing interior to support
 
-        double lastSup = pos[0];
-        for (int i = 1; i <= n - 2; i++)
-        {
-            if ((pos[i] - lastSup) - barDia > maxClear) { need.Add(i); lastSup = pos[i]; }
-        }
-        if ((pos[n - 1] - lastSup) - barDia > maxClear && (need.Count == 0 || need[^1] != n - 2))
-            need.Add(n - 2);
+        double clearSpacing = (pos[n - 1] - pos[0]) / (n - 1) - barDia;
+        if (clearSpacing > maxClear)
+            for (int i = 1; i <= n - 2; i++) need.Add(i);          // every interior bar
+        else
+            for (int i = 2; i <= n - 2; i += 2) need.Add(i);       // alternate (even) interior bars
         return need;
     }
 
