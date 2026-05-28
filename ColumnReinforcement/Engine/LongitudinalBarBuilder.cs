@@ -88,7 +88,7 @@ public class LongitudinalBarBuilder
             (IList<Curve> curves, XYZ normal, bool hasTopHook) = mode switch
             {
                 BarTopMode.Straight   => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
-                BarTopMode.BentToSlab => (BentBar(geom, x, y, zBottom, zLocalSlabBend, bentLeg), geom.NormalForBendAt(x, y), false),
+                BarTopMode.BentToSlab => (BentBar(geom, x, y, zBottom, zLocalSlabBend, bentLeg, cfg.Longitudinal.TopBentOutward), geom.NormalForBendAt(x, y), false),
                 BarTopMode.Cranked    => CrankedBar(geom, x, y, zBottom, crankBendLowZ, crankInset, crankSlope, crankPen),
                 _ => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
             };
@@ -112,11 +112,16 @@ public class LongitudinalBarBuilder
     private static IList<Curve> StraightBar(ColumnGeometry geom, double x, double y, double zBottom, double zTop) =>
         new List<Curve> { Line.CreateBound(geom.At(x, y, zBottom), geom.At(x, y, zTop)) };
 
-    private static IList<Curve> BentBar(ColumnGeometry geom, double x, double y, double zBottom, double zBend, double leg)
+    private static IList<Curve> BentBar(
+        ColumnGeometry geom, double x, double y, double zBottom, double zBend, double leg, bool outward)
     {
         XYZ p0 = geom.At(x, y, zBottom);
         XYZ pCorner = geom.At(x, y, zBend);
-        XYZ pLegEnd = pCorner + geom.InwardDirection(x, y) * leg;
+        // Inward = toward the column centre (legs from opposite faces cross in small
+        // columns); outward = along the bar's outward face normal, so legs fan into the
+        // surrounding slab without clashing. The bend-plane normal is identical either way.
+        XYZ legDir = outward ? geom.InwardDirection(x, y).Negate() : geom.InwardDirection(x, y);
+        XYZ pLegEnd = pCorner + legDir * leg;
         return new List<Curve> { Line.CreateBound(p0, pCorner), Line.CreateBound(pCorner, pLegEnd) };
     }
 
@@ -152,7 +157,12 @@ public class LongitudinalBarBuilder
         XYZ p2 = geom.At(xu, yu, zBendHigh);
         XYZ p3 = geom.At(xu, yu, zTop);
 
-        XYZ offsetDir = new XYZ(xu - x, yu - y, 0).Normalize();
+        // The bar lies in the vertical plane through (x,y) and (xu,yu); its normal is
+        // perpendicular to that plane. (xu-x, yu-y) are LOCAL-frame offsets, so project
+        // them through LocalX/LocalY into world before taking the cross product —
+        // otherwise the normal is wrong for any rotated column and Rebar.CreateFromCurves
+        // rejects the bar with "An internal error has occurred."
+        XYZ offsetDir = (geom.LocalX * (xu - x) + geom.LocalY * (yu - y)).Normalize();
         XYZ normal = XYZ.BasisZ.CrossProduct(offsetDir).Normalize();
 
         return (new List<Curve>

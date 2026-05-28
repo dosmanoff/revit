@@ -138,9 +138,18 @@ public class LongitudinalConfig
 
     /// <summary>
     /// Horizontal leg length inside the slab above for bars in
-    /// <see cref="BarTopMode.BentToSlab"/> mode. Direction is inward (toward column centre).
+    /// <see cref="BarTopMode.BentToSlab"/> mode.
     /// </summary>
     [JsonPropertyName("topBentLeg")] public Length TopBentLeg { get; set; } = new(12);
+
+    /// <summary>
+    /// <see cref="BarTopMode.BentToSlab"/> direction: when <c>true</c> (default) the
+    /// horizontal leg bends OUTWARD, along the bar's outward face normal, so legs from
+    /// opposite faces fan apart into the surrounding slab. When <c>false</c> the leg
+    /// bends inward toward the column centre (legacy behaviour) — fine for large columns
+    /// but causes opposite-face legs to cross in small ones.
+    /// </summary>
+    [JsonPropertyName("topBentOutward")] public bool TopBentOutward { get; set; } = true;
 
     /// <summary>Cranked mode: how much the upper column's cage is inset on each side (the offset the bar cranks to).</summary>
     [JsonPropertyName("crankUpperInset")] public Length CrankUpperInset { get; set; } = new(2);
