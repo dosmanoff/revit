@@ -19,7 +19,7 @@ public class ColumnViewsCommand : IExternalCommand
 
         ColumnViewsConfig config = ColumnViewsConfigStore.Load(doc);
 
-        var dialog = new ColumnViewsDialog(config);
+        var dialog = new ColumnViewsDialog(config, TitleBlockNames(doc));
         if (dialog.ShowDialog() != true)
             return Result.Cancelled;
 
@@ -47,6 +47,16 @@ public class ColumnViewsCommand : IExternalCommand
         group.Assimilate();
         return Result.Succeeded;
     }
+
+    private static IReadOnlyList<string> TitleBlockNames(Document doc) =>
+        new FilteredElementCollector(doc)
+            .OfCategory(BuiltInCategory.OST_TitleBlocks)
+            .OfClass(typeof(FamilySymbol))
+            .Cast<FamilySymbol>()
+            .Select(t => t.Name)
+            .Distinct()
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     /// <summary>
     /// Returns the structural columns in the current selection; if none are selected,

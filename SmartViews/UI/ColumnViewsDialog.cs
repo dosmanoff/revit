@@ -22,6 +22,8 @@ namespace SmartViews.UI;
 /// </summary>
 public sealed class ColumnViewsDialog : Window
 {
+    private const string FirstAvailable = "(first available)";
+
     private static readonly string[] DetailLevels = { "Coarse", "Medium", "Fine" };
 
     private static readonly (string Label, RvtDisplayStyle Style)[] VisualStyles =
@@ -37,7 +39,7 @@ public sealed class ColumnViewsDialog : Window
     private readonly TextBox _rebarScheduleName;
     private readonly TextBox _sheetNumber;
     private readonly TextBox _sheetName;
-    private readonly TextBox _titleBlock;
+    private readonly ComboBox _titleBlock;
     private readonly ComboBox _foreignRebar;
     private readonly TextBox _viewScale;
     private readonly ComboBox _detailLevel;
@@ -48,7 +50,7 @@ public sealed class ColumnViewsDialog : Window
 
     public ColumnViewsConfig Config { get; }
 
-    public ColumnViewsDialog(ColumnViewsConfig config)
+    public ColumnViewsDialog(ColumnViewsConfig config, IReadOnlyList<string> titleBlockNames)
     {
         Config = config;
 
@@ -77,7 +79,10 @@ public sealed class ColumnViewsDialog : Window
         root.Children.Add(SectionHeader("Options"));
         _foreignRebar = AddComboRow(root, "Rebar from other columns",
             new[] { "Hide", "Halftone", "Show" }, config.ForeignRebar.ToString());
-        _titleBlock = AddTextRow(root, "Title block (blank = first available)", config.TitleBlockName ?? string.Empty);
+
+        string[] titleBlockItems = new[] { FirstAvailable }.Concat(titleBlockNames).ToArray();
+        _titleBlock = AddComboRow(root, "Title block",
+            titleBlockItems, config.TitleBlockName ?? FirstAvailable);
 
         _createRebarSchedule = AddCheckRow(root, "Create rebar schedule", config.CreateRebarSchedule);
         _bendingGraphics     = AddCheckRow(root, "Generate bending-detail graphics (Shape Image column)", config.BendingDetailGraphics);
@@ -98,8 +103,9 @@ public sealed class ColumnViewsDialog : Window
         Config.SheetNumberTemplate       = _sheetNumber.Text.Trim();
         Config.SheetNameTemplate         = _sheetName.Text.Trim();
 
-        string titleBlock = _titleBlock.Text.Trim();
-        Config.TitleBlockName = string.IsNullOrEmpty(titleBlock) ? null : titleBlock;
+        string? titleBlock = _titleBlock.SelectedItem as string;
+        Config.TitleBlockName =
+            string.IsNullOrEmpty(titleBlock) || titleBlock == FirstAvailable ? null : titleBlock;
 
         Config.ForeignRebar = Enum.TryParse(_foreignRebar.SelectedItem as string, out ForeignRebarMode mode)
             ? mode

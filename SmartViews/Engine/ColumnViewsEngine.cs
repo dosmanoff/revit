@@ -111,6 +111,8 @@ public sealed class ColumnViewsEngine
             result.RecordCreated();
         }
 
+        AssignScheduleMarks(hostRebar);
+
         List<ViewSchedule> schedules = BuildSchedules(mark, result);
 
         if (_cfg.PlaceOnSheet)
@@ -200,6 +202,8 @@ public sealed class ColumnViewsEngine
         };
 
         ViewSection view = ViewSection.CreateSection(_doc, vft.Id, sectionBox);
+        view.CropBoxActive = true;
+        view.CropBoxVisible = false;
 
         Name(view, _cfg.ElevationNameTemplate, mark, direction: direction, end: null);
         ApplyTemplate(view, _cfg.ElevationViewTemplate);
@@ -224,7 +228,7 @@ public sealed class ColumnViewsEngine
         double pad = _cfg.CropPadding;
         BoundingBoxXYZ existing = plan.CropBox;
         plan.CropBoxActive = true;
-        plan.CropBoxVisible = true;
+        plan.CropBoxVisible = false;
         plan.CropBox = new BoundingBoxXYZ
         {
             Min = new XYZ(bbox.Min.X - pad, bbox.Min.Y - pad, existing.Min.Z),
@@ -290,12 +294,12 @@ public sealed class ColumnViewsEngine
             return;
         }
 
-        List<ElementId> foreign = new FilteredElementCollector(_doc, view.Id)
+        HashSet<ElementId> foreign = new FilteredElementCollector(_doc, view.Id)
             .OfCategory(BuiltInCategory.OST_Rebar)
             .WhereElementIsNotElementType()
             .Where(e => IsForeignRebar(e, targetMark))
             .Select(e => e.Id)
-            .ToList();
+            .ToHashSet();
 
         if (foreign.Count == 0)
             return;
@@ -309,18 +313,61 @@ public sealed class ColumnViewsEngine
         }
         else // Hide
         {
-            try
+            HideSafely(view, foreign.ToList());
+        }
+
+        // Always drop annotations (tags / dimensions) that point at foreign rebar.
+        HideForeignAnnotations(view, foreign);
+    }
+
+    /// <summary>Hides tags and dimensions in the view that reference any of <paramref name="foreignRebar"/>.</summary>
+    private void HideForeignAnnotations(View view, HashSet<ElementId> foreignRebar)
+    {
+        var toHide = new List<ElementId>();
+
+        foreach (IndependentTag tag in new FilteredElementCollector(_doc, view.Id)
+                     .OfClass(typeof(IndependentTag)).Cast<IndependentTag>())
+        {
+            if (tag.GetTaggedLocalElementIds().Any(foreignRebar.Contains))
+                toHide.Add(tag.Id);
+        }
+
+        foreach (Dimension dim in new FilteredElementCollector(_doc, view.Id)
+                     .OfClass(typeof(Dimension)).Cast<Dimension>())
+        {
+            if (ReferencesForeign(dim, foreignRebar))
+                toHide.Add(dim.Id);
+        }
+
+        if (toHide.Count > 0)
+            HideSafely(view, toHide);
+    }
+
+    private static bool ReferencesForeign(Dimension dim, HashSet<ElementId> foreignRebar)
+    {
+        ReferenceArray? refs = dim.References;
+        if (refs is null) return false;
+
+        foreach (Reference r in refs)
+            if (r is not null && foreignRebar.Contains(r.ElementId))
+                return true;
+
+        return false;
+    }
+
+    private static void HideSafely(View view, IList<ElementId> ids)
+    {
+        try
+        {
+            view.HideElements(ids);
+        }
+        catch (Autodesk.Revit.Exceptions.ArgumentException)
+        {
+            // One or more elements refused hiding — hide what we can, one at a time.
+            foreach (ElementId id in ids)
             {
-                view.HideElements(foreign);
-            }
-            catch (Autodesk.Revit.Exceptions.ArgumentException)
-            {
-                // One or more elements refused hiding — hide what we can, one at a time.
-                foreach (ElementId id in foreign)
-                {
-                    try { view.HideElements(new List<ElementId> { id }); }
-                    catch (Autodesk.Revit.Exceptions.ArgumentException) { /* skip */ }
-                }
+                try { view.HideElements(new List<ElementId> { id }); }
+                catch (Autodesk.Revit.Exceptions.ArgumentException) { /* skip */ }
             }
         }
     }
@@ -429,6 +476,57 @@ public sealed class ColumnViewsEngine
 
         return (top, bottom);
     }
+
+    /// <summary>
+    /// Numbers the column's rebar Schedule Mark 1..N over unique (Type, Shape, Total Bar
+    /// Length) groups, ordered by those keys. Best-effort: when the Schedule Mark parameter
+    /// is read-only (Revit reinforcement numbering is automatic), the existing values are
+    /// left untouched.
+    /// </summary>
+    private void AssignScheduleMarks(IReadOnlyList<Rebar> hostRebar)
+    {
+        if (hostRebar.Count == 0)
+            return;
+
+        var groups = hostRebar
+            .Select(r => (Bar: r, Type: BarTypeName(r), Shape: BarShapeName(r), Len: BarTotalLength(r)))
+            .GroupBy(x => (x.Type, x.Shape, Math.Round(x.Len, 4)))
+            .OrderBy(g => g.Key.Item1, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.Item2, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.Item3)
+            .ToList();
+
+        int mark = 0;
+        foreach (var group in groups)
+        {
+            mark++;
+            foreach (var x in group)
+                SetScheduleMark(x.Bar, mark);
+        }
+    }
+
+    private static void SetScheduleMark(Rebar rebar, int mark)
+    {
+        Parameter? p = rebar.LookupParameter("Schedule Mark");
+        if (p is null || p.IsReadOnly)
+            return;
+
+        if (p.StorageType == StorageType.Integer)
+            p.Set(mark);
+        else if (p.StorageType == StorageType.String)
+            p.Set(mark.ToString());
+    }
+
+    private string BarTypeName(Rebar rebar) =>
+        _doc.GetElement(rebar.GetTypeId())?.Name ?? string.Empty;
+
+    private static string BarShapeName(Rebar rebar) =>
+        rebar.LookupParameter("Shape")?.AsValueString() ?? string.Empty;
+
+    private static double BarTotalLength(Rebar rebar) =>
+        rebar.LookupParameter("Total Bar Length")?.AsDouble()
+        ?? rebar.LookupParameter("Bar Length")?.AsDouble()
+        ?? 0.0;
 
     private void ApplyAppearance(View view)
     {

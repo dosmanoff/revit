@@ -26,12 +26,12 @@ public sealed class ColumnScheduleBuilder
 
         ScheduleDefinition def = schedule.Definition;
 
-        ScheduleField? markField = AddFirstAvailable(def, "Schedule Mark", "Bar Mark", "Mark");
-        AddFirstAvailable(def, "Type", "Bar Type", "Family and Type");
-        AddFirstAvailable(def, "Shape");
+        AddFirstAvailable(def, "Schedule Mark", "Bar Mark", "Mark");
+        ScheduleField? typeField = AddFirstAvailable(def, "Type", "Bar Type", "Family and Type");
+        ScheduleField? shapeField = AddFirstAvailable(def, "Shape");
         if (includeShapeImage)
             AddFirstAvailable(def, "Shape Image");
-        AddFirstAvailable(def, "Total Bar Length", "Bar Length");
+        ScheduleField? lengthField = AddFirstAvailable(def, "Total Bar Length", "Bar Length");
 
         // Shape bend dimensions (A, B, C, ...) — whichever the project's shapes expose.
         foreach (string dim in new[] { "A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "O", "R" })
@@ -40,24 +40,31 @@ public sealed class ColumnScheduleBuilder
         // Filter to this column; the Host Mark column itself is hidden.
         ApplyHostMarkFilter(def, hostMark);
 
-        // One row per unique Schedule Mark.
+        // Sort/group by Type → Shape → Total Bar Length, collapsing identical bars to one row.
         def.IsItemized = false;
-        if (markField is not null)
-        {
-            try
-            {
-                def.AddSortGroupField(new ScheduleSortGroupField(markField.FieldId));
-            }
-            catch (Autodesk.Revit.Exceptions.ArgumentException)
-            {
-                // Field cannot be used for sorting/grouping — leave ungrouped.
-            }
-        }
+        AddGroup(def, typeField);
+        AddGroup(def, shapeField);
+        AddGroup(def, lengthField);
 
         return schedule;
     }
 
     // -----------------------------------------------------------------------
+
+    private static void AddGroup(ScheduleDefinition def, ScheduleField? field)
+    {
+        if (field is null)
+            return;
+
+        try
+        {
+            def.AddSortGroupField(new ScheduleSortGroupField(field.FieldId, ScheduleSortOrder.Ascending));
+        }
+        catch (Autodesk.Revit.Exceptions.ArgumentException)
+        {
+            // Field cannot be used for sorting/grouping — skip it.
+        }
+    }
 
     private void ApplyHostMarkFilter(ScheduleDefinition def, string hostMark)
     {
