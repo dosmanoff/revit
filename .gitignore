@@ -4,3 +4,4 @@ obj/
 .vs/
 __pycache__/
 *.pyc
+.claude/
