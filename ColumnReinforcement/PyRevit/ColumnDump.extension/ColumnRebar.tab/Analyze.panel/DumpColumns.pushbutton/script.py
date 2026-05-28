@@ -42,7 +42,7 @@ output = script.get_output()
 FT_TO_IN = 12.0
 Z_TOLERANCE_FT = 1.0 / 96.0          # 1/8" — same as the C# HostContext
 XY_NEIGHBOUR_TOL_FT = 1.5            # 18" — columns "in the same stack"; insets resolve true offsets
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # ACI 318 §10.7.4.1: maximum crank slope = 1:6 (inward shift per unit vertical).
 ACI_MAX_CRANK_SLOPE = 1.0 / 6.0
@@ -615,8 +615,15 @@ def find_slab_above(geom):
     top_z = geom["top_z_ft"]
     cx, cy = geom["base_center"].X, geom["base_center"].Y
 
+    # The slab "above" is the one the column connects to at its top — its TOP must
+    # reach at least the column top (so a bent bar can develop inside it), and it
+    # must overlap the column in plan. A column modelled up to the top of the slab
+    # (or partway into it) has that slab's bottom BELOW its top, so requiring
+    # slab.Min.Z >= columnTop would skip the connecting slab and pick the NEXT slab
+    # up. Choose the nearest qualifying slab = smallest top elevation. Mirrors
+    # Domain/HostContext.cs FindSlabAbove (PR-44).
     best = None
-    best_bottom_z = float("inf")
+    best_top_z = float("inf")
 
     col = (FilteredElementCollector(doc)
            .OfCategory(BuiltInCategory.OST_Floors)
@@ -625,14 +632,14 @@ def find_slab_above(geom):
         bb = e.get_BoundingBox(None)
         if bb is None:
             continue
-        if bb.Min.Z < top_z - Z_TOLERANCE_FT:
+        if bb.Max.Z < top_z - Z_TOLERANCE_FT:
             continue
         if cx < bb.Min.X or cx > bb.Max.X:
             continue
         if cy < bb.Min.Y or cy > bb.Max.Y:
             continue
-        if bb.Min.Z < best_bottom_z:
-            best_bottom_z = bb.Min.Z
+        if bb.Max.Z < best_top_z:
+            best_top_z = bb.Max.Z
             best = e
     return best
 
