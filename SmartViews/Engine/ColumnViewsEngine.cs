@@ -147,6 +147,12 @@ public sealed class ColumnViewsEngine
         View3D? view3d = _cfg.Create3DView ? Create3D(rebarBox, mark) : null;
         if (view3d is not null) created.Add(view3d);
 
+        // Optional drafting view with a RebarBendingDetail per unique shape.
+        ViewDrafting? bendingView = _cfg.CreateBendingDetailView
+            ? CreateBendingDetailView(hostRebar, mark, result)
+            : null;
+        if (bendingView is not null) created.Add(bendingView);
+
         foreach (View v in created)
             ApplyAppearance(v);
 
@@ -187,10 +193,22 @@ public sealed class ColumnViewsEngine
         try
         {
             var builder = new ColumnScheduleBuilder(_doc);
-            ViewSchedule s = builder.BuildRebarSchedule(
-                mark,
-                UniqueName(Token(_cfg.RebarScheduleNameTemplate, mark)),
-                _cfg.BendingDetailGraphics);
+            string name = UniqueName(Token(_cfg.RebarScheduleNameTemplate, mark));
+
+            ViewSchedule s;
+            if (!string.IsNullOrWhiteSpace(_cfg.ScheduleTemplateName)
+                && FindScheduleByName(_cfg.ScheduleTemplateName!) is { } template)
+            {
+                s = builder.BuildFromTemplate(template, mark, name);
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(_cfg.ScheduleTemplateName))
+                    result.RecordError(
+                        $"Schedule template \"{_cfg.ScheduleTemplateName}\" not found — built from scratch.");
+                s = builder.BuildRebarSchedule(mark, name, _cfg.BendingDetailGraphics);
+            }
+
             schedules.Add(s);
             result.RecordCreated();
         }
@@ -201,6 +219,13 @@ public sealed class ColumnViewsEngine
 
         return schedules;
     }
+
+    private ViewSchedule? FindScheduleByName(string name) =>
+        new FilteredElementCollector(_doc)
+            .OfClass(typeof(ViewSchedule))
+            .Cast<ViewSchedule>()
+            .FirstOrDefault(s => !s.IsTemplate
+                && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
 
     private void PlaceOnSheet(
         FamilyInstance fi,
@@ -392,6 +417,67 @@ public sealed class ColumnViewsEngine
         if (toHide.Count > 0)
             HideSafely(view, toHide);
     }
+
+    // -----------------------------------------------------------------------
+    // Bending-detail drafting view (one RebarBendingDetail per unique shape)
+    // -----------------------------------------------------------------------
+
+    private ViewDrafting? CreateBendingDetailView(
+        IReadOnlyList<Rebar> hostRebar, string mark, ViewCreationResult result)
+    {
+        if (hostRebar.Count == 0)
+            return null;
+
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.Drafting, null);
+        ViewDrafting view = ViewDrafting.Create(_doc, vft.Id);
+        Name(view, _cfg.BendingDetailViewNameTemplate, mark, direction: null, end: null);
+
+        // One representative rebar per unique (Type, Shape, Total Bar Length) group, so the
+        // drafting view shows one bending detail per unique shape.
+        List<Rebar> unique = hostRebar
+            .GroupBy(r => (BarTypeName(r), BarShapeName(r), Math.Round(BarTotalLength(r), 4)))
+            .Select(g => g.First())
+            .ToList();
+
+        RebarBendingDetailType? bdType = ResolveBendingDetailType();
+        if (bdType is null)
+        {
+            result.RecordError(
+                $"Bending-detail view for {mark}: no RebarBendingDetailType found in the project.");
+            return view;
+        }
+
+        const double colGap = 5.0;
+        const double rowGap = 3.0;
+        const int cols = 3;
+
+        for (int i = 0; i < unique.Count; i++)
+        {
+            int col = i % cols;
+            int row = i / cols;
+            XYZ pos = new XYZ(col * colGap, -row * rowGap, 0);
+
+            try
+            {
+                var bd = RebarBendingDetail.Create(
+                    _doc, view.Id, unique[i].Id, 0, bdType, XYZ.Zero, 0);
+                try { RebarBendingDetail.SetPosition(bd, pos); }
+                catch { /* layout is best-effort */ }
+            }
+            catch (Exception ex)
+            {
+                result.RecordError($"Bending detail for rebar {unique[i].Id.Value}: {ex.Message}");
+            }
+        }
+
+        return view;
+    }
+
+    private RebarBendingDetailType? ResolveBendingDetailType() =>
+        new FilteredElementCollector(_doc)
+            .OfClass(typeof(RebarBendingDetailType))
+            .Cast<RebarBendingDetailType>()
+            .FirstOrDefault();
 
     // -----------------------------------------------------------------------
     // Foreign rebar treatment (hide / halftone bars hosted by other columns)
@@ -663,11 +749,21 @@ public sealed class ColumnViewsEngine
 
     private void ApplyAppearance(View view)
     {
-        if (_cfg.ViewScale > 0)
-            TrySet(() => view.Scale = _cfg.ViewScale);
+        int scale = ScaleFor(view);
+        if (scale > 0)
+            TrySet(() => view.Scale = scale);
         TrySet(() => view.DetailLevel = _cfg.DetailLevel);
         TrySet(() => view.DisplayStyle = _cfg.VisualStyle);
     }
+
+    private int ScaleFor(View view) => view switch
+    {
+        ViewSection  _ => _cfg.ElevationScale,
+        ViewPlan     _ => _cfg.PlanScale,
+        View3D       _ => _cfg.View3DScale,
+        ViewDrafting _ => _cfg.BendingDetailScale,
+        _              => _cfg.ElevationScale,
+    };
 
     /// <summary>Applies a view setting, ignoring failures (e.g. when a view template owns it).</summary>
     private static void TrySet(Action set)

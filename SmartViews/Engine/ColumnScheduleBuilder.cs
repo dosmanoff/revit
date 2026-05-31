@@ -86,6 +86,16 @@ public sealed class ColumnScheduleBuilder
 
     private ScheduleField? AddFirstAvailable(ScheduleDefinition def, params string[] names)
     {
+        // First check fields already in the definition (matters when reusing a template).
+        int existingCount = def.GetFieldCount();
+        for (int i = 0; i < existingCount; i++)
+        {
+            ScheduleField existing = def.GetField(i);
+            foreach (string name in names)
+                if (string.Equals(existing.ColumnHeading, name, StringComparison.OrdinalIgnoreCase))
+                    return existing;
+        }
+
         IList<SchedulableField> fields = def.GetSchedulableFields();
 
         foreach (string name in names)
@@ -107,5 +117,47 @@ public sealed class ColumnScheduleBuilder
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Duplicates an existing schedule and applies a Host Mark filter to it, preserving the
+    /// template's fields, grouping, sorting and formatting. When the template did not already
+    /// show a Host Mark column, the added one is hidden so the template's look is unchanged.
+    /// </summary>
+    public ViewSchedule BuildFromTemplate(ViewSchedule template, string hostMark, string name)
+    {
+        ElementId dupId = template.Duplicate(ViewDuplicateOption.Duplicate);
+        var dup = (ViewSchedule)_doc.GetElement(dupId);
+        dup.Name = name;
+
+        ScheduleDefinition def = dup.Definition;
+
+        bool hadHostMarkColumn = HasField(def, "Host Mark");
+        ScheduleField? hostMarkField = AddFirstAvailable(def, "Host Mark");
+        if (hostMarkField is null)
+            return dup;
+
+        try
+        {
+            def.AddFilter(new ScheduleFilter(
+                hostMarkField.FieldId, ScheduleFilterType.Equal, hostMark));
+            if (!hadHostMarkColumn)
+                hostMarkField.IsHidden = true;
+        }
+        catch (Autodesk.Revit.Exceptions.ArgumentException)
+        {
+            // Field doesn't support an equality filter — leave the duplicate as-is.
+        }
+
+        return dup;
+    }
+
+    private static bool HasField(ScheduleDefinition def, string columnHeading)
+    {
+        int n = def.GetFieldCount();
+        for (int i = 0; i < n; i++)
+            if (string.Equals(def.GetField(i).ColumnHeading, columnHeading, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
     }
 }
