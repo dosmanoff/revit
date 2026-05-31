@@ -19,13 +19,14 @@ public class ColumnViewsCommand : IExternalCommand
 
         ColumnViewsConfig config = ColumnViewsConfigStore.Load(doc);
         IReadOnlyList<string> titleBlocks = TitleBlockNames(doc);
+        IReadOnlyList<string> scheduleTemplates = RebarScheduleNames(doc);
 
         // Start from whatever columns are already selected; the dialog lets the user re-pick.
         IList<ElementId> columnIds = ColumnsInSelection(uidoc);
 
         while (true)
         {
-            var dialog = new ColumnViewsDialog(config, titleBlocks, columnIds.Count);
+            var dialog = new ColumnViewsDialog(config, titleBlocks, scheduleTemplates, columnIds.Count);
             if (dialog.ShowDialog() != true)
                 return Result.Cancelled;
 
@@ -68,6 +69,17 @@ public class ColumnViewsCommand : IExternalCommand
             .OfClass(typeof(FamilySymbol))
             .Cast<FamilySymbol>()
             .Select(t => t.Name)
+            .Distinct()
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static IReadOnlyList<string> RebarScheduleNames(Document doc) =>
+        new FilteredElementCollector(doc)
+            .OfClass(typeof(ViewSchedule))
+            .Cast<ViewSchedule>()
+            .Where(s => !s.IsTemplate
+                && s.Definition?.CategoryId.Value == (long)BuiltInCategory.OST_Rebar)
+            .Select(s => s.Name)
             .Distinct()
             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
             .ToList();

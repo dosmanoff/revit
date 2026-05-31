@@ -49,8 +49,17 @@ public sealed class ColumnViewsConfig
 
     // ---- View appearance (applied to every generated graphical view) ----
 
-    /// <summary>View scale denominator. 12 = 1"=1'-0", 48 = 1/4"=1'-0", etc.</summary>
-    public int ViewScale { get; set; } = 12;
+    /// <summary>Scale denominator for elevations. 12 = 1"=1'-0", 48 = 1/4"=1'-0", etc.</summary>
+    public int ElevationScale { get; set; } = 12;
+
+    /// <summary>Scale denominator for end plans.</summary>
+    public int PlanScale { get; set; } = 12;
+
+    /// <summary>Scale denominator for the 3D view.</summary>
+    public int View3DScale { get; set; } = 24;
+
+    /// <summary>Scale denominator for the bending-detail drafting view.</summary>
+    public int BendingDetailScale { get; set; } = 12;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public ViewDetailLevel DetailLevel { get; set; } = ViewDetailLevel.Fine;
@@ -81,6 +90,13 @@ public sealed class ColumnViewsConfig
     public bool CreateRebarSchedule { get; set; } = true;
 
     /// <summary>
+    /// Name of an existing rebar ViewSchedule to use as a template. When set, the per-column
+    /// schedule is created by duplicating that schedule and applying a Host Mark filter,
+    /// preserving the template's fields/grouping/formatting. Null = build from scratch.
+    /// </summary>
+    public string? ScheduleTemplateName { get; set; }
+
+    /// <summary>
     /// When true, also creates an isometric 3D view (default orientation) per column showing
     /// only that column and its own rebar, and places it on the sheet.
     /// </summary>
@@ -94,6 +110,16 @@ public sealed class ColumnViewsConfig
     /// i.e. "generate bending-detail graphics". When false, only the tabular fields are shown.
     /// </summary>
     public bool BendingDetailGraphics { get; set; } = true;
+
+    /// <summary>
+    /// When true, creates a drafting view per column containing a RebarBendingDetail annotation
+    /// for each unique bending shape hosted by the column, using Revit's native bending-detail
+    /// functionality. The view is placed on the column's sheet.
+    /// </summary>
+    public bool CreateBendingDetailView { get; set; } = true;
+
+    /// <summary>Tokens: {Mark}. Name of the bending-detail drafting view.</summary>
+    public string BendingDetailViewNameTemplate { get; set; } = "{Mark} - Bending Details";
 
     // ---- Sheet auto-placement ----
 

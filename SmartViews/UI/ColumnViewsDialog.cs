@@ -18,12 +18,14 @@ namespace SmartViews.UI;
 
 /// <summary>
 /// Code-only options dialog for the Column Views tool. Surfaces naming templates, view
-/// appearance (scale / detail level / visual style), foreign-rebar treatment, and the
-/// schedule/graphics/sheet toggles, writing them back into <see cref="Config"/> on OK.
+/// appearance (per-view scale / detail level / visual style), schedule template, foreign-rebar
+/// treatment, and the schedule/graphics/3D/bending/sheet toggles. Writes choices into
+/// <see cref="Config"/> on OK.
 /// </summary>
 public sealed class ColumnViewsDialog : Window
 {
     private const string FirstAvailable = "(first available)";
+    private const string BuildFromScratch = "(build from scratch)";
 
     private static readonly string[] DetailLevels = { "Coarse", "Medium", "Fine" };
 
@@ -35,19 +37,41 @@ public sealed class ColumnViewsDialog : Window
         ("Shaded with Edges", RvtDisplayStyle.ShadingWithEdges),
     };
 
+    /// <summary>Standard architectural scales, label ↔ Revit scale denominator.</summary>
+    private static readonly (string Label, int Value)[] Scales =
+    {
+        ("3\"=1'-0\" (4)",        4),
+        ("1 1/2\"=1'-0\" (8)",    8),
+        ("1\"=1'-0\" (12)",      12),
+        ("3/4\"=1'-0\" (16)",    16),
+        ("1/2\"=1'-0\" (24)",    24),
+        ("3/8\"=1'-0\" (32)",    32),
+        ("1/4\"=1'-0\" (48)",    48),
+        ("3/16\"=1'-0\" (64)",   64),
+        ("1/8\"=1'-0\" (96)",    96),
+        ("1/16\"=1'-0\" (192)", 192),
+    };
+
     private readonly TextBox _elevationName;
     private readonly TextBox _planName;
     private readonly TextBox _rebarScheduleName;
+    private readonly TextBox _view3DName;
+    private readonly TextBox _bendingDetailName;
     private readonly TextBox _sheetNumber;
     private readonly TextBox _sheetName;
     private readonly ComboBox _titleBlock;
+    private readonly ComboBox _scheduleTemplate;
     private readonly ComboBox _foreignRebar;
-    private readonly TextBox _viewScale;
+    private readonly ComboBox _elevationScale;
+    private readonly ComboBox _planScale;
+    private readonly ComboBox _view3DScale;
+    private readonly ComboBox _bendingDetailScale;
     private readonly ComboBox _detailLevel;
     private readonly ComboBox _visualStyle;
     private readonly CheckBox _createRebarSchedule;
     private readonly CheckBox _bendingGraphics;
     private readonly CheckBox _create3D;
+    private readonly CheckBox _createBendingDetailView;
     private readonly CheckBox _placeOnSheet;
 
     private readonly int _columnCount;
@@ -57,13 +81,17 @@ public sealed class ColumnViewsDialog : Window
     /// <summary>True when the user asked to re-pick columns instead of running.</summary>
     public bool ReselectRequested { get; private set; }
 
-    public ColumnViewsDialog(ColumnViewsConfig config, IReadOnlyList<string> titleBlockNames, int columnCount)
+    public ColumnViewsDialog(
+        ColumnViewsConfig config,
+        IReadOnlyList<string> titleBlockNames,
+        IReadOnlyList<string> scheduleNames,
+        int columnCount)
     {
         Config = config;
         _columnCount = columnCount;
 
         Title = "Column Views";
-        Width = 560;
+        Width = 600;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.NoResize;
@@ -76,15 +104,20 @@ public sealed class ColumnViewsDialog : Window
         _elevationName     = AddTextRow(root, "Elevation view", config.ElevationNameTemplate);
         _planName          = AddTextRow(root, "End plan view", config.PlanNameTemplate);
         _rebarScheduleName = AddTextRow(root, "Rebar schedule", config.RebarScheduleNameTemplate);
+        _view3DName        = AddTextRow(root, "3D view", config.View3DNameTemplate);
+        _bendingDetailName = AddTextRow(root, "Bending-detail view", config.BendingDetailViewNameTemplate);
         _sheetNumber       = AddTextRow(root, "Sheet number", config.SheetNumberTemplate);
         _sheetName         = AddTextRow(root, "Sheet name", config.SheetNameTemplate);
 
         root.Children.Add(SectionHeader("View appearance"));
-        _viewScale   = AddTextRow(root, "Scale denominator  (12 = 1\"=1'-0\", 48 = 1/4\"=1'-0\")",
-            config.ViewScale.ToString());
-        _detailLevel = AddComboRow(root, "Detail level", DetailLevels, config.DetailLevel.ToString());
-        _visualStyle = AddComboRow(root, "Visual style",
-            VisualStyles.Select(v => v.Label).ToArray(), LabelFor(config.VisualStyle));
+        string[] scaleLabels = Scales.Select(s => s.Label).ToArray();
+        _elevationScale     = AddComboRow(root, "Elevation scale", scaleLabels, ScaleLabel(config.ElevationScale));
+        _planScale          = AddComboRow(root, "End plan scale", scaleLabels, ScaleLabel(config.PlanScale));
+        _view3DScale        = AddComboRow(root, "3D view scale", scaleLabels, ScaleLabel(config.View3DScale));
+        _bendingDetailScale = AddComboRow(root, "Bending-detail view scale", scaleLabels, ScaleLabel(config.BendingDetailScale));
+        _detailLevel        = AddComboRow(root, "Detail level", DetailLevels, config.DetailLevel.ToString());
+        _visualStyle        = AddComboRow(root, "Visual style",
+            VisualStyles.Select(v => v.Label).ToArray(), VisualStyleLabel(config.VisualStyle));
 
         root.Children.Add(SectionHeader("Options"));
         _foreignRebar = AddComboRow(root, "Rebar from other columns",
@@ -94,10 +127,15 @@ public sealed class ColumnViewsDialog : Window
         _titleBlock = AddComboRow(root, "Title block",
             titleBlockItems, config.TitleBlockName ?? FirstAvailable);
 
-        _createRebarSchedule = AddCheckRow(root, "Create rebar schedule", config.CreateRebarSchedule);
-        _bendingGraphics     = AddCheckRow(root, "Generate bending-detail graphics (Shape Image column)", config.BendingDetailGraphics);
-        _create3D            = AddCheckRow(root, "Add 3D view (column + its rebar only)", config.Create3DView);
-        _placeOnSheet        = AddCheckRow(root, "Place views and schedule on a sheet", config.PlaceOnSheet);
+        string[] scheduleItems = new[] { BuildFromScratch }.Concat(scheduleNames).ToArray();
+        _scheduleTemplate = AddComboRow(root, "Rebar schedule template",
+            scheduleItems, config.ScheduleTemplateName ?? BuildFromScratch);
+
+        _createRebarSchedule     = AddCheckRow(root, "Create rebar schedule", config.CreateRebarSchedule);
+        _bendingGraphics         = AddCheckRow(root, "Include Shape Image column in built-from-scratch schedule", config.BendingDetailGraphics);
+        _create3D                = AddCheckRow(root, "Add 3D view (column + its rebar only)", config.Create3DView);
+        _createBendingDetailView = AddCheckRow(root, "Add bending-detail drafting view", config.CreateBendingDetailView);
+        _placeOnSheet            = AddCheckRow(root, "Place views and schedule on a sheet", config.PlaceOnSheet);
 
         root.Children.Add(BuildButtonRow());
 
@@ -108,32 +146,41 @@ public sealed class ColumnViewsDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        Config.ElevationNameTemplate     = _elevationName.Text.Trim();
-        Config.PlanNameTemplate          = _planName.Text.Trim();
-        Config.RebarScheduleNameTemplate = _rebarScheduleName.Text.Trim();
-        Config.SheetNumberTemplate       = _sheetNumber.Text.Trim();
-        Config.SheetNameTemplate         = _sheetName.Text.Trim();
+        Config.ElevationNameTemplate         = _elevationName.Text.Trim();
+        Config.PlanNameTemplate              = _planName.Text.Trim();
+        Config.RebarScheduleNameTemplate     = _rebarScheduleName.Text.Trim();
+        Config.View3DNameTemplate            = _view3DName.Text.Trim();
+        Config.BendingDetailViewNameTemplate = _bendingDetailName.Text.Trim();
+        Config.SheetNumberTemplate           = _sheetNumber.Text.Trim();
+        Config.SheetNameTemplate             = _sheetName.Text.Trim();
 
         string? titleBlock = _titleBlock.SelectedItem as string;
         Config.TitleBlockName =
             string.IsNullOrEmpty(titleBlock) || titleBlock == FirstAvailable ? null : titleBlock;
 
+        string? scheduleTemplate = _scheduleTemplate.SelectedItem as string;
+        Config.ScheduleTemplateName =
+            string.IsNullOrEmpty(scheduleTemplate) || scheduleTemplate == BuildFromScratch ? null : scheduleTemplate;
+
         Config.ForeignRebar = Enum.TryParse(_foreignRebar.SelectedItem as string, out ForeignRebarMode mode)
             ? mode
             : ForeignRebarMode.Hide;
 
-        if (int.TryParse(_viewScale.Text.Trim(), out int scale) && scale > 0)
-            Config.ViewScale = scale;
+        Config.ElevationScale     = ScaleValue(_elevationScale.SelectedItem as string, Config.ElevationScale);
+        Config.PlanScale          = ScaleValue(_planScale.SelectedItem as string, Config.PlanScale);
+        Config.View3DScale        = ScaleValue(_view3DScale.SelectedItem as string, Config.View3DScale);
+        Config.BendingDetailScale = ScaleValue(_bendingDetailScale.SelectedItem as string, Config.BendingDetailScale);
 
         if (Enum.TryParse(_detailLevel.SelectedItem as string, out RvtDetailLevel detail))
             Config.DetailLevel = detail;
 
-        Config.VisualStyle = StyleFor(_visualStyle.SelectedItem as string);
+        Config.VisualStyle = VisualStyleFor(_visualStyle.SelectedItem as string);
 
-        Config.CreateRebarSchedule   = _createRebarSchedule.IsChecked == true;
-        Config.BendingDetailGraphics = _bendingGraphics.IsChecked == true;
-        Config.Create3DView          = _create3D.IsChecked == true;
-        Config.PlaceOnSheet          = _placeOnSheet.IsChecked == true;
+        Config.CreateRebarSchedule      = _createRebarSchedule.IsChecked == true;
+        Config.BendingDetailGraphics    = _bendingGraphics.IsChecked == true;
+        Config.Create3DView             = _create3D.IsChecked == true;
+        Config.CreateBendingDetailView  = _createBendingDetailView.IsChecked == true;
+        Config.PlaceOnSheet             = _placeOnSheet.IsChecked == true;
 
         DialogResult = true;
     }
@@ -144,10 +191,28 @@ public sealed class ColumnViewsDialog : Window
         DialogResult = true;
     }
 
-    private static string LabelFor(RvtDisplayStyle style) =>
+    // -----------------------------------------------------------------------
+    // Scale / style label helpers
+    // -----------------------------------------------------------------------
+
+    private static string ScaleLabel(int value)
+    {
+        foreach ((string Label, int Value) s in Scales)
+            if (s.Value == value) return s.Label;
+        return Scales.First(s => s.Value == 12).Label; // fall back to 1"=1'-0"
+    }
+
+    private static int ScaleValue(string? label, int fallback)
+    {
+        foreach ((string Label, int Value) s in Scales)
+            if (string.Equals(s.Label, label, StringComparison.Ordinal)) return s.Value;
+        return fallback;
+    }
+
+    private static string VisualStyleLabel(RvtDisplayStyle style) =>
         VisualStyles.FirstOrDefault(v => v.Style == style).Label ?? "Hidden Line";
 
-    private static RvtDisplayStyle StyleFor(string? label)
+    private static RvtDisplayStyle VisualStyleFor(string? label)
     {
         foreach ((string Label, RvtDisplayStyle Style) v in VisualStyles)
             if (string.Equals(v.Label, label, StringComparison.Ordinal))
