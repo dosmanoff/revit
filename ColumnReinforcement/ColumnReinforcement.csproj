@@ -20,6 +20,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Test project lives under Tests\ as a sibling .csproj; keep its sources out of the main assembly. -->
+    <Compile Remove="Tests\**" />
+    <None    Remove="Tests\**" />
+    <Content Remove="Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="ColumnReinforcement.addin" CopyToOutputDirectory="PreserveNewest" />
     <None Include="samples\*.json" CopyToOutputDirectory="PreserveNewest">
       <Link>samples\%(Filename)%(Extension)</Link>
