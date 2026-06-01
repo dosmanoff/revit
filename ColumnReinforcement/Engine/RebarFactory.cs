@@ -103,25 +103,30 @@ public static class RebarFactory
         RebarHookOrientation endHookOrient = RebarHookOrientation.Right,
         RebarShape? shape = null)
     {
-        Rebar rebar = shape is null
-            ? Rebar.CreateFromCurves(
-                doc, style, barType, startHook, endHook, host,
-                norm:             normal,
-                curves:           curves,
-                startHookOrient:  startHookOrient,
-                endHookOrient:    endHookOrient,
-                useExistingShapeIfPossible: true,
-                createNewShape:   true)
-            : Rebar.CreateFromCurvesAndShape(
-                doc, shape, barType, startHook, endHook, host,
-                norm:                       normal,
-                curves:                     curves,
-                startHookOrient:            startHookOrient,
-                endHookOrient:              endHookOrient,
-                hookRotationAngleAtStart:   0.0,
-                hookRotationAngleAtEnd:     0.0,
-                endTreatmentTypeIdAtStart:  ElementId.InvalidElementId,
-                endTreatmentTypeIdAtEnd:    ElementId.InvalidElementId);
+        // Always go through CreateFromCurves first — it tolerates null hooks (Cranked
+        // main bars and many other cases have no top hook in our configs). Then, if
+        // the caller asked for a pinned shape, swap it via the shape-driven accessor.
+        // The first attempt with Rebar.CreateFromCurvesAndShape on this overload threw
+        // NRE inside Revit when either hook was null (PR #75 → #76 regression).
+        Rebar rebar = Rebar.CreateFromCurves(
+            doc, style, barType, startHook, endHook, host,
+            norm:             normal,
+            curves:           curves,
+            startHookOrient:  startHookOrient,
+            endHookOrient:    endHookOrient,
+            useExistingShapeIfPossible: true,
+            createNewShape:   true);
+
+        if (shape is not null)
+        {
+            // CreateFromCurves with useExistingShapeIfPossible=true produces a
+            // shape-driven bar, so the accessor is non-null in practice. Defensive
+            // null-check anyway: a missing accessor means we can't pin the shape and
+            // the user will see whichever shape Revit auto-matched — preferable to a
+            // hard crash on an otherwise-valid run.
+            RebarShapeDrivenAccessor? accessor = rebar.GetShapeDrivenAccessor();
+            accessor?.SetRebarShapeId(shape.Id);
+        }
 
         ExistingRebarCleaner.Tag(rebar, tag);
         return rebar;
