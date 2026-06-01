@@ -72,6 +72,9 @@ public class ColumnReinforcementCommand : IExternalCommand
         using var group = new TransactionGroup(doc, "Column Reinforcement");
         group.Start();
 
+        // Reset shape-pin diagnostics from any earlier run in the same session.
+        _ = RebarFactory.DrainShapePinFailures();
+
         var reinforcer = new ColumnReinforcer(doc);
         RunResult result = reinforcer.Run(mapping, dialog.DryRun);
 
@@ -83,6 +86,40 @@ public class ColumnReinforcementCommand : IExternalCommand
         else               group.Assimilate();
 
         ResultsDialog.Show(result);
+
+        // If any RebarShape pin (e.g. Cranked → shape "19") was rejected by Revit,
+        // surface it in a SEPARATE dialog so the user can see WHY the bar ended
+        // up in the wrong (auto-matched) shape — message is the actual Revit API
+        // exception, which usually points at a parametric mismatch with the
+        // family (slope/length out of range, etc.).
+        var pinFailures = RebarFactory.DrainShapePinFailures();
+        if (pinFailures.Count > 0)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"{pinFailures.Count} bar(s) couldn't be created in the requested RebarShape; they fell back to Revit's auto-match (which may pick the wrong family).");
+            sb.AppendLine();
+            // Group identical messages so a project-wide failure shows once with a count.
+            var grouped = pinFailures
+                .GroupBy(f => $"{f.ShapeName}|{f.BarTypeName}|{f.ExceptionType}|{f.Message}")
+                .Select(g => (count: g.Count(), sample: g.First(), hostIds: g.Select(f => f.HostId).Distinct().Take(5).ToArray()))
+                .OrderByDescending(t => t.count)
+                .Take(8);
+            foreach (var (count, sample, hostIds) in grouped)
+            {
+                sb.AppendLine($"× {count} bar(s) — shape '{sample.ShapeName}' / bar '{sample.BarTypeName}'");
+                sb.AppendLine($"   {sample.ExceptionType}: {sample.Message}");
+                sb.AppendLine($"   First hosts: {string.Join(", ", hostIds)}");
+                sb.AppendLine();
+            }
+            var td = new TaskDialog("Column Reinforcement — shape pinning")
+            {
+                MainInstruction = "Shape pin fallbacks",
+                MainContent     = sb.ToString(),
+                CommonButtons   = TaskDialogCommonButtons.Close,
+            };
+            td.Show();
+        }
+
         return Result.Succeeded;
     }
 

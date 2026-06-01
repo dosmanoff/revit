@@ -132,22 +132,98 @@ public static class RebarFactory
                     endTreatmentTypeIdAtStart:  ElementId.InvalidElementId,
                     endTreatmentTypeIdAtEnd:    ElementId.InvalidElementId);
             }
-            catch
+            catch (Exception ex)
             {
-                // Shape-pin failed — fall through to auto-match below.
+                // Shape-pin failed — fall through to auto-match below. Capture the
+                // exception so the caller can surface it (otherwise the bar silently
+                // lands in whichever shape Revit auto-matches, which in projects with
+                // a competing custom Z family is often the wrong one).
+                RecordShapePinFailure(host, shape, barType, ex);
                 rebar = null;
             }
         }
-        rebar ??= Rebar.CreateFromCurves(
-            doc, style, barType, startHook, endHook, host,
-            norm:             normal,
-            curves:           curves,
-            startHookOrient:  startHookOrient,
-            endHookOrient:    endHookOrient,
-            useExistingShapeIfPossible: true,
-            createNewShape:   true);
+        if (rebar is null)
+        {
+            rebar = Rebar.CreateFromCurves(
+                doc, style, barType, startHook, endHook, host,
+                norm:             normal,
+                curves:           curves,
+                startHookOrient:  startHookOrient,
+                endHookOrient:    endHookOrient,
+                useExistingShapeIfPossible: true,
+                createNewShape:   true);
+
+            // If shape pin was requested AND fallback created the bar, try to
+            // re-stamp the shape via the shape-driven accessor. Prior testing
+            // (PR #76) showed SetRebarShapeId can re-fit a bar to the shape's
+            // DEFAULT parameters, scrambling segment correspondence — so this
+            // is best-effort: a wrong shape with right geometry is preferable to
+            // a wrong-shape-and-Revit-auto-picks-the-other-custom-family bar.
+            // We swallow exceptions here intentionally: the bar already exists,
+            // and any failure leaves it with the auto-matched shape (logged above).
+            if (shape is not null)
+            {
+                try
+                {
+                    var acc = rebar.GetShapeDrivenAccessor();
+                    if (acc is not null && rebar.GetShapeId() != shape.Id)
+                        acc.SetRebarShapeId(shape.Id);
+                }
+                catch { /* leave it auto-matched */ }
+            }
+        }
 
         ExistingRebarCleaner.Tag(rebar, tag);
         return rebar;
+    }
+
+    // ── Shape-pin diagnostics ───────────────────────────────────────────
+    // When CreateFromCurvesAndShape rejects a bar (the shape family's parametric
+    // constraints don't accept the curves), the engine silently falls back to the
+    // auto-match path — which, in projects with multiple matching shape families,
+    // can pick the WRONG one. We accumulate failures into a static list so the
+    // command layer can drain it after a run and show the user what Revit
+    // complained about.
+
+    private static readonly object _failureLock = new();
+    private static readonly List<ShapePinFailure> _failures = new();
+
+    /// <summary>One captured CreateFromCurvesAndShape rejection.</summary>
+    public record ShapePinFailure(
+        long HostId,
+        string HostCategory,
+        string ShapeName,
+        string BarTypeName,
+        string ExceptionType,
+        string Message);
+
+    private static void RecordShapePinFailure(Element host, RebarShape shape, RebarBarType barType, Exception ex)
+    {
+        lock (_failureLock)
+        {
+            // Cap at 50 to bound memory if a run has thousands of failures.
+            if (_failures.Count >= 50) return;
+            _failures.Add(new ShapePinFailure(
+                HostId:        host.Id.Value,
+                HostCategory:  host.Category?.Name ?? "?",
+                ShapeName:     shape.Name,
+                BarTypeName:   barType.Name,
+                ExceptionType: ex.GetType().Name,
+                Message:       ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Take all shape-pin failures recorded since the last drain and clear the
+    /// accumulator. Call at the end of a run; show non-empty results to the user.
+    /// </summary>
+    public static IReadOnlyList<ShapePinFailure> DrainShapePinFailures()
+    {
+        lock (_failureLock)
+        {
+            var copy = _failures.ToArray();
+            _failures.Clear();
+            return copy;
+        }
     }
 }
