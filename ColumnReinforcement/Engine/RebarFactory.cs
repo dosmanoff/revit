@@ -173,6 +173,22 @@ public static class RebarFactory
             }
         }
 
+        // Post-creation verification: even when CreateFromCurvesAndShape returns
+        // without throwing, in practice Revit sometimes silently overrides the
+        // requested shape (it appears the API treats the shape argument as a hint
+        // when the curves don't satisfy the family's parametric constraints
+        // — different behaviour than rejecting with an exception). Compare the
+        // actual GetShapeId() against the requested shape and record a mismatch
+        // so the user knows the pin didn't stick.
+        if (shape is not null && rebar.GetShapeId() != shape.Id)
+        {
+            ElementId actualId = rebar.GetShapeId();
+            string actualName = actualId == ElementId.InvalidElementId
+                ? "<invalid>"
+                : doc.GetElement(actualId)?.Name ?? "<unknown>";
+            RecordShapeMismatch(host, shape, barType, actualName);
+        }
+
         ExistingRebarCleaner.Tag(rebar, tag);
         return rebar;
     }
@@ -210,6 +226,21 @@ public static class RebarFactory
                 BarTypeName:   barType.Name,
                 ExceptionType: ex.GetType().Name,
                 Message:       ex.Message));
+        }
+    }
+
+    private static void RecordShapeMismatch(Element host, RebarShape requested, RebarBarType barType, string actualShapeName)
+    {
+        lock (_failureLock)
+        {
+            if (_failures.Count >= 50) return;
+            _failures.Add(new ShapePinFailure(
+                HostId:        host.Id.Value,
+                HostCategory:  host.Category?.Name ?? "?",
+                ShapeName:     requested.Name,
+                BarTypeName:   barType.Name,
+                ExceptionType: "ShapeOverride",
+                Message:       $"API accepted shape '{requested.Name}' (id {requested.Id.Value}) without throwing, but the resulting Rebar.GetShapeId() resolves to '{actualShapeName}' — Revit silently re-matched the shape based on the curves."));
         }
     }
 
