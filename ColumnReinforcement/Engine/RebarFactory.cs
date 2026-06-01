@@ -119,31 +119,24 @@ public static class RebarFactory
         Rebar? rebar = null;
         if (shape is not null)
         {
-            // CreateFromCurvesAndShape maps our curves[i] onto the shape's
-            // i-th parametric segment AND validates that consecutive curves
-            // share endpoints (forms a CurveLoop). The standard ACI shape
-            // 19 appears to enumerate segments TOP→BOTTOM, while our
-            // CrankedBar builds BOTTOM→TOP. Reversing only the LIST (PR #81)
-            // broke the endpoint chain (p2→p3 followed by p1→p2 doesn't
-            // continue: p3 ≠ p1), so 16 bars hit
-            // 'ArgumentException: curves do not form a valid CurveLoop'.
-            //
-            // Reverse BOTH the list AND each individual curve so the chain
-            // is explicit: [p3→p2, p2→p1, p1→p0]. Hooks and orientations
-            // are swapped to match (start hook stays at the physical bottom
-            // of the bar even though it's now the curve list's end).
-            var pinnedCurves = curves
-                .Reverse()
-                .Select(c => (Curve)Line.CreateBound(c.GetEndPoint(1), c.GetEndPoint(0)))
-                .ToList();
+            // CreateFromCurvesAndShape pins the shape, but in practice (PR #82
+            // testing) the API uses our curves only as a position/normal hint
+            // and re-fits the bar to the shape family's DEFAULT parametric
+            // values — producing a short symmetric Z at the transition rather
+            // than the long-bottom + short-top splice geometry we built.
+            // Reversing the curve list (PR #81/#82) only flipped chirality.
+            // The pinned path is left for now so users have something better
+            // than nothing, but the geometry will be defaults-driven — a
+            // future fix is to switch to Rebar.CreateFromRebarShape and push
+            // our segment dimensions through RebarShapeDrivenAccessor.
             try
             {
                 rebar = Rebar.CreateFromCurvesAndShape(
-                    doc, shape, barType, endHook, startHook, host,
+                    doc, shape, barType, startHook, endHook, host,
                     norm:                       normal,
-                    curves:                     pinnedCurves,
-                    startHookOrient:            endHookOrient,
-                    endHookOrient:              startHookOrient,
+                    curves:                     curves,
+                    startHookOrient:            startHookOrient,
+                    endHookOrient:              endHookOrient,
                     hookRotationAngleAtStart:   0.0,
                     hookRotationAngleAtEnd:     0.0,
                     endTreatmentTypeIdAtStart:  ElementId.InvalidElementId,
