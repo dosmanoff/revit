@@ -119,14 +119,29 @@ public static class RebarFactory
         Rebar? rebar = null;
         if (shape is not null)
         {
+            // CreateFromCurvesAndShape maps our curves[i] onto the shape's
+            // i-th parametric segment. The standard ACI shape 19 (cranked
+            // splice / Z) appears to enumerate segments TOP→BOTTOM, while
+            // our CrankedBar builds BOTTOM→TOP — so the long lower-column
+            // leg lands on the shape's top slot, scrambling the geometry
+            // (diagonals at the ends, vertical in the middle). Reverse the
+            // curve list on the shape-pinned path so segment[0] is the
+            // top-leg → bend → bottom-leg, matching shape 19's parameter
+            // order. (The curve-driven CreateFromCurves fallback below
+            // preserves direction either way.)
+            //
+            // The hook orientation is bound to the curve direction; swap
+            // start/end accordingly so the hook still ends up on the
+            // intended physical end of the bar.
+            var pinnedCurves = curves.Reverse().ToList();
             try
             {
                 rebar = Rebar.CreateFromCurvesAndShape(
-                    doc, shape, barType, startHook, endHook, host,
+                    doc, shape, barType, endHook, startHook, host,
                     norm:                       normal,
-                    curves:                     curves,
-                    startHookOrient:            startHookOrient,
-                    endHookOrient:              endHookOrient,
+                    curves:                     pinnedCurves,
+                    startHookOrient:            endHookOrient,
+                    endHookOrient:              startHookOrient,
                     hookRotationAngleAtStart:   0.0,
                     hookRotationAngleAtEnd:     0.0,
                     endTreatmentTypeIdAtStart:  ElementId.InvalidElementId,
