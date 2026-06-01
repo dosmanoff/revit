@@ -229,6 +229,74 @@ public static class RebarFactory
                 if (def is RebarShapeDefinitionBySegments bySeg)
                 {
                     sb.AppendLine($"  Segments: {bySeg.NumberOfSegments}");
+                    for (int i = 0; i < bySeg.NumberOfSegments; i++)
+                    {
+                        var seg = bySeg.GetSegment(i);
+                        sb.AppendLine($"  Seg {i}: ({seg.GetType().Name})");
+                        var cs = seg.GetConstraints();
+                        sb.AppendLine($"    Constraints: {cs.Count}");
+                        foreach (var c in cs)
+                        {
+                            string ctype = c.GetType().Name;
+                            string extra = "";
+                            try
+                            {
+                                ElementId paramId = c.GetParamId();
+                                string pname = "?";
+                                if (paramId != ElementId.InvalidElementId)
+                                {
+                                    var pelem = doc.GetElement(paramId);
+                                    if (pelem != null) pname = pelem.Name;
+                                }
+                                extra = $"  paramId={paramId.Value}  paramName={pname}";
+                            }
+                            catch { /* not every constraint has a param */ }
+                            sb.AppendLine($"      {ctype}{extra}");
+                        }
+                    }
+                    // Vertices: 0..NumberOfSegments (one more than segments).
+                    // Use reflection so we don't depend on specific property names
+                    // (RebarShapeVertex API surface differs across Revit versions).
+                    for (int i = 0; i <= bySeg.NumberOfSegments; i++)
+                    {
+                        try
+                        {
+                            var v = bySeg.GetVertex(i);
+                            sb.Append($"  Vertex {i}:");
+                            foreach (var pi in v.GetType().GetProperties())
+                            {
+                                if (pi.GetIndexParameters().Length > 0) continue;
+                                object? val = null;
+                                try { val = pi.GetValue(v); } catch { continue; }
+                                if (val == null) continue;
+                                string s = val.ToString() ?? "";
+                                if (s.Length > 40) s = s.Substring(0, 40) + "…";
+                                sb.Append($" {pi.Name}={s}");
+                            }
+                            sb.AppendLine();
+                            var vcs = v.GetConstraints();
+                            sb.AppendLine($"    constraints={vcs.Count}");
+                            foreach (var c in vcs)
+                            {
+                                string ctype = c.GetType().Name;
+                                string extra = "";
+                                try
+                                {
+                                    ElementId paramId = c.GetParamId();
+                                    string pname = "?";
+                                    if (paramId != ElementId.InvalidElementId)
+                                    {
+                                        var pelem = doc.GetElement(paramId);
+                                        if (pelem != null) pname = pelem.Name;
+                                    }
+                                    extra = $"  paramId={paramId.Value}  paramName={pname}";
+                                }
+                                catch { }
+                                sb.AppendLine($"      {ctype}{extra}");
+                            }
+                        }
+                        catch (Exception ex) { sb.AppendLine($"  Vertex {i}: (read failed: {ex.Message})"); break; }
+                    }
                 }
             }
             catch (Exception ex) { sb.AppendLine($"  (definition read failed: {ex.Message})"); }
