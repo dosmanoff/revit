@@ -198,6 +198,26 @@ public class LongitudinalConfig
     /// penetration (unchanged behaviour).
     /// </summary>
     [JsonPropertyName("crankEqualizeEndHeight")] public bool CrankEqualizeEndHeight { get; set; } = false;
+
+    /// <summary>
+    /// Optional <see cref="Autodesk.Revit.DB.Structure.RebarShape"/> <c>.Name</c> to
+    /// pin for <see cref="BarTopMode.Cranked"/> bars (Z/offset bars). When set, the
+    /// plugin calls <c>Rebar.CreateFromCurvesAndShape</c> with this shape instead of
+    /// letting Revit pick by geometry auto-match — which non-deterministically picks
+    /// among multiple loaded shape families that match the same Z geometry. Standard
+    /// Imperial library Z shape is named <c>"19"</c> (file <c>19.rfa</c> in
+    /// <c>%ProgramData%\Autodesk\RVT 2025\Libraries\English-Imperial\US\Structural Rebar Shapes</c>).
+    /// <c>null</c>/empty = let Revit auto-match (legacy behaviour).
+    /// </summary>
+    [JsonPropertyName("crankedShape")] public string? CrankedShape { get; set; }
+
+    /// <summary>
+    /// Optional <see cref="Autodesk.Revit.DB.Structure.RebarShape"/> <c>.Name</c> to
+    /// pin for <see cref="BarTopMode.BentToSlab"/> bars (L-shaped main bars bending
+    /// into the slab above). Same auto-match override as <see cref="CrankedShape"/>.
+    /// <c>null</c>/empty = auto-match.
+    /// </summary>
+    [JsonPropertyName("topBentShape")] public string? TopBentShape { get; set; }
 }
 
 /// <summary>Transverse (tie) reinforcement.</summary>
@@ -250,6 +270,14 @@ public class StirrupsConfig
     /// as the outer tie. Disabled by default. Rectangular columns only.
     /// </summary>
     [JsonPropertyName("crossties")] public CrosstiesConfig Crossties { get; set; } = new();
+
+    /// <summary>
+    /// Optional <see cref="Autodesk.Revit.DB.Structure.RebarShape"/> <c>.Name</c> to
+    /// pin for the outer tie (closed rectangle). When set, the plugin calls
+    /// <c>Rebar.CreateFromCurvesAndShape</c> with this shape instead of letting Revit
+    /// auto-match. <c>null</c>/empty = auto-match (legacy behaviour).
+    /// </summary>
+    [JsonPropertyName("shape")] public string? Shape { get; set; }
 }
 
 /// <summary>
@@ -288,6 +316,12 @@ public class CrosstiesConfig
     /// <c>x:all</c> / <c>y:all</c> select every interior line on that axis. Example: <c>x:1 y:1</c>.
     /// </summary>
     [JsonPropertyName("manual")] public string? Manual { get; set; }
+
+    /// <summary>
+    /// Optional <see cref="Autodesk.Revit.DB.Structure.RebarShape"/> <c>.Name</c> to
+    /// pin for crossties (straight bar, hooks at both ends). <c>null</c>/empty = auto-match.
+    /// </summary>
+    [JsonPropertyName("shape")] public string? Shape { get; set; }
 }
 
 /// <summary>Top and bottom confinement-zone settings.</summary>
@@ -412,6 +446,12 @@ public class DowelsConfig
     /// column bent part of its cage into the slab, dowel just those faces.
     /// </summary>
     [JsonPropertyName("positions")] public string? Positions { get; set; }
+
+    /// <summary>
+    /// Optional <see cref="Autodesk.Revit.DB.Structure.RebarShape"/> <c>.Name</c> to
+    /// pin for foundation/column dowels (Straight or L-form). <c>null</c>/empty = auto-match.
+    /// </summary>
+    [JsonPropertyName("shape")] public string? Shape { get; set; }
 }
 
 /// <summary>Shape variants for upper splices.</summary>
