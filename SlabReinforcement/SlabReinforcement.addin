@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>SlabReinforcement</Name>
+    <Assembly>SlabReinforcement.dll</Assembly>
+    <FullClassName>SlabReinforcement.App</FullClassName>
+    <ClientId>2A9CE8D0-C4FB-43A8-887C-ABF8E00DA00F</ClientId>
+    <VendorId>SlabReinforcement</VendorId>
+    <VendorDescription>Slab Reinforcement plugin for RC floor slabs in Revit 2025 (ACI 318)</VendorDescription>
+  </AddIn>
+</RevitAddIns>
