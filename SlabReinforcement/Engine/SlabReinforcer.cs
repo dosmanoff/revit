@@ -51,6 +51,9 @@ public sealed class SlabReinforcer
                 if (cfg.Edges.UBarsEnabled)
                     created += new EdgeUBarBuilder(_doc).Build(geom, cfg, slabId, ctx);
 
+                if (cfg.Openings.TrimEnabled)
+                    created += new OpeningTrimBuilder(_doc).Build(geom, cfg, slabId);
+
                 outcome.Created = created;
                 outcome.Replaced = replaced;
                 outcome.Status = created > 0 ? SlabStatus.Success : SlabStatus.Skipped;
