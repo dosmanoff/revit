@@ -15,6 +15,7 @@ public sealed class SlabViewsEngine
     private readonly Document _doc;
     private readonly SlabViewsConfig _cfg;
     private readonly HashSet<string> _existingViewNames;
+    private readonly HashSet<string> _existingSheetNumbers;
 
     private static readonly (SlabLayer Layer, int Num, string Label)[] LayerSet =
     {
@@ -30,6 +31,9 @@ public sealed class SlabViewsEngine
         _cfg = cfg;
         _existingViewNames = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>()
             .Where(v => !v.IsTemplate).Select(v => v.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _existingSheetNumbers = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()
+            .Select(s => s.SheetNumber)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -82,7 +86,54 @@ public sealed class SlabViewsEngine
             result.ViewsCreated++;
         }
 
+        List<ViewSchedule> schedules = BuildSchedule(mark, result);
+        if (_cfg.PlaceOnSheet)
+            BuildSheet(mark, created.Select(c => c.View).ToList(), schedules, result);
+
         tx.Commit();
+    }
+
+    private List<ViewSchedule> BuildSchedule(string mark, ViewRunResult result)
+    {
+        var list = new List<ViewSchedule>();
+        if (!_cfg.CreateSchedule || string.IsNullOrWhiteSpace(mark)) return list;
+        try
+        {
+            string name = UniqueName(Token(_cfg.ScheduleNameTemplate, mark));
+            list.Add(new SlabScheduleBuilder(_doc).BuildRebarSchedule(mark, name));
+            result.SchedulesCreated++;
+        }
+        catch (Exception ex) { result.Error($"Schedule for {mark}: {ex.Message}"); }
+        return list;
+    }
+
+    private void BuildSheet(string mark, IReadOnlyList<View> views, IReadOnlyList<ViewSchedule> schedules, ViewRunResult result)
+    {
+        try
+        {
+            var builder = new SlabSheetBuilder(_doc, _cfg);
+            string number = UniqueSheetNumber(Token(_cfg.SheetNumberTemplate, mark));
+            string name = Token(_cfg.SheetNameTemplate, mark);
+            ViewSheet sheet = builder.CreateSheet(number, name);
+            builder.PlaceOnSheet(sheet, views, schedules);
+            result.SheetsCreated++;
+        }
+        catch (Exception ex) { result.Error($"Sheet for {mark}: {ex.Message}"); }
+    }
+
+    private static string Token(string template, string mark) => template.Replace("{Mark}", mark);
+
+    private string UniqueSheetNumber(string desired)
+    {
+        if (_existingSheetNumbers.Add(desired)) return desired;
+        for (int i = 1; i <= 999; i++)
+        {
+            string candidate = $"{desired}-{i}";
+            if (_existingSheetNumbers.Add(candidate)) return candidate;
+        }
+        string fallback = $"{desired}-{Guid.NewGuid().ToString("N")[..6]}";
+        _existingSheetNumbers.Add(fallback);
+        return fallback;
     }
 
     private void CropAndRange(ViewPlan plan, BoundingBoxXYZ bbox, Level level)
