@@ -51,11 +51,21 @@ public class ExportSlabsCommand : IExternalCommand
             try
             {
                 SlabGeometry g = SlabGeometry.For(floor);
+                SlabContext ctx = SlabContext.For(g);
+                IReadOnlyList<SlabOpening> ops = SlabOpenings.For(g);
+
+                int free = ctx.Edges.Count(e => e.Kind == EdgeKind.Free);
+                int wall = ctx.Edges.Count(e => e.Kind == EdgeKind.Wall);
+                int beam = ctx.Edges.Count(e => e.Kind == EdgeKind.Beam);
+                int slab = ctx.Edges.Count(e => e.Kind == EdgeKind.Slab);
+
+                sb.AppendLine($"{label}:");
                 sb.AppendLine(
-                    $"{label}:  t = {UnitConv.FtToIn(g.ThicknessFt):0.#}\"   " +
-                    $"basisX = {g.XWorldDeg:0.#}°   " +
-                    $"area = {g.NetAreaSf:0.#} sf   " +
-                    $"openings = {g.SketchOpenings.Count}");
+                    $"   t = {UnitConv.FtToIn(g.ThicknessFt):0.#}\"   basisX = {g.XWorldDeg:0.#}°   area = {g.NetAreaSf:0.#} sf");
+                sb.AppendLine(
+                    $"   edges: free={free} wall={wall} beam={beam} slab={slab} (of {ctx.Edges.Count})");
+                sb.AppendLine(
+                    $"   supports below = {ctx.Supports.Count}   openings = {ops.Count} (trim {SlabOpenings.TrimCount(ops)})");
             }
             catch (Exception ex)
             {
