@@ -1,0 +1,5 @@
+# slab-assignments.csv — one row per slab Mark. Empty cell = plugin default.
+# See slab-assignments-csv-guide.md for the full field reference.
+Mark,BottomXBarType,BottomXSpacing,BottomYBarType,BottomYSpacing,TopMode,MaxBarLength,EdgeUBarsEnabled,EdgeUBarType,EdgeUBarSelector,OpeningTrimEnabled
+S-101,#5,12,#5,12,OverSupports,40'-0",true,#5,free,true
+S-102,#5,10,#5,10,Continuous,40'-0",true,#5,free,false

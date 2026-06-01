@@ -1,0 +1,6 @@
+# slab-zones.csv — one row per top/bottom strengthening zone.
+# Shape: SupportMark:<mark>:<stripWidth> | BBox:x1 y1 x2 y2 | Polygon:x y x y ...
+SlabMark,ZoneName,Face,Direction,BarType,Spacing,Shape,Extent
+S-101,C-3 strip X,Top,X,#6,8,SupportMark:C-3:5'-0",6'-0"
+S-101,C-3 strip Y,Top,Y,#6,8,SupportMark:C-3:5'-0",6'-0"
+S-102,band,Top,X,#6,8,BBox:0 8 20 12,
