@@ -162,6 +162,42 @@ public class LongitudinalConfig
 
     /// <summary>Cranked mode: how far the bar penetrates up INTO the upper column past the second bend (lap with the upper cage).</summary>
     [JsonPropertyName("crankPenetration")] public Length CrankPenetration { get; set; } = new(24);
+
+    /// <summary>
+    /// Per-face / per-bar override of <see cref="TopBentOutward"/> using the same
+    /// selector vocabulary as <see cref="TopModes"/> (indices, <c>all</c>,
+    /// <c>corners</c>, <c>edges</c>, <c>±x</c>, <c>±y</c>). Each token's value is
+    /// <c>true</c>/<c>false</c>/<c>outward</c>/<c>inward</c>/<c>in</c>/<c>out</c>/
+    /// <c>yes</c>/<c>no</c>/<c>y</c>/<c>n</c>/<c>1</c>/<c>0</c> (case-insensitive).
+    /// Example: <c>"-x:inward +x:outward corners:inward"</c>. <c>null</c>/empty →
+    /// every <see cref="BarTopMode.BentToSlab"/> bar uses <see cref="TopBentOutward"/>
+    /// (unchanged behaviour).
+    /// </summary>
+    [JsonPropertyName("topBentDirs")] public string? TopBentDirs { get; set; }
+
+    /// <summary>
+    /// Per-bar explicit crank target <c>(xu, yu)</c> in column-local INCHES, same
+    /// selector vocabulary as <see cref="TopModes"/>. When set for a bar, the
+    /// engine uses those coordinates instead of computing them via
+    /// <c>xu = x − sign(x)·<see cref="CrankUpperInset"/></c>. Useful for asymmetric
+    /// upper-column transitions where the inset formula misses the actual upper
+    /// cage positions. Tokens look like <c>"0:(-3.56,-3.56) 1:(0,-3.56)"</c>.
+    /// Because the value embeds a comma, the CSV cell must be quoted.
+    /// <c>null</c>/empty → use the inset formula (unchanged behaviour).
+    /// </summary>
+    [JsonPropertyName("crankTargets")] public string? CrankTargets { get; set; }
+
+    /// <summary>
+    /// When <c>true</c>, the engine post-adjusts every <see cref="BarTopMode.Cranked"/>
+    /// bar's <see cref="CrankPenetration"/> so every Cranked bar terminates at the
+    /// same elevation (target = the natural max <c>zTop</c> across all Cranked bars).
+    /// Fixes the ~2·d_b height difference between corner bars (offset on both axes,
+    /// <c>offsetMag = inset·√2</c>) and mid-face bars (offset on one axis,
+    /// <c>offsetMag = inset</c>) at the standard ACI 1:6 slope.
+    /// Bars in other modes are not touched. Default <c>false</c> = uniform global
+    /// penetration (unchanged behaviour).
+    /// </summary>
+    [JsonPropertyName("crankEqualizeEndHeight")] public bool CrankEqualizeEndHeight { get; set; } = false;
 }
 
 /// <summary>Transverse (tie) reinforcement.</summary>
