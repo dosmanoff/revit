@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "name": "default",
+  "units": "Imperial",
+  "fieldMode": "Bars",
+  "cover": { "top": 1.5, "bottom": 1.5, "side": 1.5 },
+  "field": {
+    "bottomX": { "barType": "#5", "spacing": 12 },
+    "bottomY": { "barType": "#5", "spacing": 12 },
+    "topMode": "OverSupports",
+    "topX": { "barType": "#5", "spacing": 12 },
+    "topY": { "barType": "#5", "spacing": 12 }
+  },
+  "lengths": { "maxBarLength": "40'-0\"", "lapMode": "Factor", "lapFactor": 40, "lapStagger": true },
+  "edges": { "uBarsEnabled": true, "barType": "#5", "spacing": 12, "leg": 12, "selector": "free" },
+  "openings": {
+    "trimEnabled": true, "barType": "#5", "extraEachSide": 2,
+    "uBars": true, "diagonals": true, "diagBarType": "#5", "selector": "all"
+  },
+  "anchors": { "edgeAnchorMode": "Straight", "edgeAnchorLen": 24 },
+  "cleanExisting": true
+}
