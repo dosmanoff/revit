@@ -103,12 +103,42 @@ public static class RebarFactory
         RebarHookOrientation endHookOrient = RebarHookOrientation.Right,
         RebarShape? shape = null)
     {
-        // Always go through CreateFromCurves first — it tolerates null hooks (Cranked
-        // main bars and many other cases have no top hook in our configs). Then, if
-        // the caller asked for a pinned shape, swap it via the shape-driven accessor.
-        // The first attempt with Rebar.CreateFromCurvesAndShape on this overload threw
-        // NRE inside Revit when either hook was null (PR #75 → #76 regression).
-        Rebar rebar = Rebar.CreateFromCurves(
+        // Shape pinning route: CreateFromCurvesAndShape PRESERVES the curves (the bar
+        // matches our parametric definition AND lands in the requested shape family).
+        // Post-creation rebar.GetShapeDrivenAccessor().SetRebarShapeId(...) was the
+        // earlier attempt (#76) — but that re-fits the bar to the new shape's DEFAULT
+        // parameters and ends up with the segments reshuffled (Z with diagonals at the
+        // ends instead of in the middle for shape 19). So we go direct here.
+        //
+        // The try/catch is for the rare case where the supplied curves violate the
+        // shape family's parametric constraints (a slope/angle/length outside its
+        // allowed range — manifests as an internal Revit NRE on specific bars). On
+        // failure we fall through to the curves-driven auto-match: geometry stays
+        // correct, the user just gets whichever shape Revit auto-picks for THAT bar
+        // (which is the pre-#75 behaviour for all bars).
+        Rebar? rebar = null;
+        if (shape is not null)
+        {
+            try
+            {
+                rebar = Rebar.CreateFromCurvesAndShape(
+                    doc, shape, barType, startHook, endHook, host,
+                    norm:                       normal,
+                    curves:                     curves,
+                    startHookOrient:            startHookOrient,
+                    endHookOrient:              endHookOrient,
+                    hookRotationAngleAtStart:   0.0,
+                    hookRotationAngleAtEnd:     0.0,
+                    endTreatmentTypeIdAtStart:  ElementId.InvalidElementId,
+                    endTreatmentTypeIdAtEnd:    ElementId.InvalidElementId);
+            }
+            catch
+            {
+                // Shape-pin failed — fall through to auto-match below.
+                rebar = null;
+            }
+        }
+        rebar ??= Rebar.CreateFromCurves(
             doc, style, barType, startHook, endHook, host,
             norm:             normal,
             curves:           curves,
@@ -116,17 +146,6 @@ public static class RebarFactory
             endHookOrient:    endHookOrient,
             useExistingShapeIfPossible: true,
             createNewShape:   true);
-
-        if (shape is not null)
-        {
-            // CreateFromCurves with useExistingShapeIfPossible=true produces a
-            // shape-driven bar, so the accessor is non-null in practice. Defensive
-            // null-check anyway: a missing accessor means we can't pin the shape and
-            // the user will see whichever shape Revit auto-matched — preferable to a
-            // hard crash on an otherwise-valid run.
-            RebarShapeDrivenAccessor? accessor = rebar.GetShapeDrivenAccessor();
-            accessor?.SetRebarShapeId(shape.Id);
-        }
 
         ExistingRebarCleaner.Tag(rebar, tag);
         return rebar;
