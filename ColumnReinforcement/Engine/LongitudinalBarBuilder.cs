@@ -41,6 +41,20 @@ public class LongitudinalBarBuilder
         var positions = ComputeCagePositions(_doc, cfg, geom);
         BarTopMode[] modes = ResolveTopModes(cfg.Longitudinal, positions);
 
+        // Per-bar bent direction (true = outward). Default = the column-wide TopBentOutward.
+        bool[] bentOutwardPerBar = SelectorListResolver.Resolve(
+            positions,
+            cfg.Longitudinal.TopBentDirs,
+            defaultValue: cfg.Longitudinal.TopBentOutward,
+            parser: SelectorListResolver.ParseOutwardToken);
+
+        // Per-bar crank target in column-local FEET. null = use the inset formula.
+        (double xu, double yu)?[] crankTargetPerBar = SelectorListResolver.Resolve<(double xu, double yu)?>(
+            positions,
+            cfg.Longitudinal.CrankTargets,
+            defaultValue: null,
+            parser: ParseCrankTargetTokenFeet);
+
         // Resolve geometry shared by all bars of a given mode, lazily.
         double zLocalSlabBend = 0;
         double bentLeg = 0;
@@ -79,6 +93,19 @@ public class LongitudinalBarBuilder
                     $"({UnitConv.FtToIn(zBottom):0.##}\"). Reduce crankLowerBendOffset or check the column height.");
         }
 
+        // Per-bar Cranked penetration. Starts uniform from the global config; if the user
+        // asks for end-height equalisation, EqualizeEndHeights shortens each bar's
+        // penetration so all Cranked bars terminate at the SAME elevation (fixes the
+        // ~2·d_b height step between corner offsetMag = inset·√2 and mid offsetMag = inset).
+        double[] penetrationPerBar = new double[positions.Count];
+        for (int i = 0; i < penetrationPerBar.Length; i++) penetrationPerBar[i] = crankPen;
+        if (needsCrank && cfg.Longitudinal.CrankEqualizeEndHeight)
+        {
+            EqualizeEndHeights(
+                positions, modes, crankTargetPerBar, penetrationPerBar,
+                crankInset, crankSlope, crankBendLowZ);
+        }
+
         int created = 0;
         for (int i = 0; i < positions.Count; i++)
         {
@@ -88,8 +115,8 @@ public class LongitudinalBarBuilder
             (IList<Curve> curves, XYZ normal, bool hasTopHook) = mode switch
             {
                 BarTopMode.Straight   => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
-                BarTopMode.BentToSlab => (BentBar(geom, x, y, zBottom, zLocalSlabBend, bentLeg, cfg.Longitudinal.TopBentOutward), geom.NormalForBendAt(x, y), false),
-                BarTopMode.Cranked    => CrankedBar(geom, x, y, zBottom, crankBendLowZ, crankInset, crankSlope, crankPen),
+                BarTopMode.BentToSlab => (BentBar(geom, x, y, zBottom, zLocalSlabBend, bentLeg, bentOutwardPerBar[i]), geom.NormalForBendAt(x, y), false),
+                BarTopMode.Cranked    => CrankedBar(geom, x, y, zBottom, crankBendLowZ, crankInset, crankSlope, penetrationPerBar[i], crankTargetPerBar[i]),
                 _ => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
             };
 
@@ -130,13 +157,22 @@ public class LongitudinalBarBuilder
     /// offset → vertical penetration into the upper column. Returns curves, the
     /// bend-plane normal, and whether a top hook applies (no — the bar ends inside
     /// the upper column).
+    ///
+    /// <para><paramref name="explicitTarget"/>, when set, overrides the default
+    /// inset formula <c>(xu, yu) = (x − sign(x)·inset, y − sign(y)·inset)</c> with a
+    /// caller-supplied target — used by <see cref="LongitudinalConfig.CrankTargets"/>
+    /// to handle asymmetric upper-column transitions where the upper-cage positions
+    /// don't sit on the inset diagonal. Target is in column-local FEET (the resolver
+    /// converts from the CSV's inches).</para>
     /// </summary>
     private static (IList<Curve>, XYZ, bool) CrankedBar(
         ColumnGeometry geom, double x, double y, double zBottom, double zBendLow,
-        double inset, double slope, double penetration)
+        double inset, double slope, double penetration,
+        (double xu, double yu)? explicitTarget = null)
     {
-        double xu = x - Math.Sign(x) * inset;
-        double yu = y - Math.Sign(y) * inset;
+        double xu, yu;
+        if (explicitTarget is { } t) { xu = t.xu; yu = t.yu; }
+        else { xu = x - Math.Sign(x) * inset; yu = y - Math.Sign(y) * inset; }
         double offsetMag = Math.Sqrt((xu - x) * (xu - x) + (yu - y) * (yu - y));
 
         if (offsetMag < 1e-9)
@@ -174,6 +210,72 @@ public class LongitudinalBarBuilder
     }
 
     /// <summary>
+    /// Post-adjusts every <see cref="BarTopMode.Cranked"/> bar's <c>penetration</c>
+    /// so all Cranked bars terminate at the same elevation. Target zTop = max over
+    /// natural zTop across all Cranked bars (so no penetration becomes longer than
+    /// the uniform value — only corners shrink). Bars in other modes are not touched.
+    /// Throws when the math would require non-positive penetration for any bar.
+    /// </summary>
+    private static void EqualizeEndHeights(
+        IReadOnlyList<(double x, double y)> positions,
+        IReadOnlyList<BarTopMode> modes,
+        IReadOnlyList<(double xu, double yu)?> crankTargets,
+        double[] penetrationPerBar,
+        double crankInset, double crankSlope, double crankBendLowZ)
+    {
+        int n = positions.Count;
+        var diagonalRise = new double[n];
+        double maxZTop = double.NegativeInfinity;
+
+        // Pass 1: compute each Cranked bar's natural zTop with its current penetration.
+        for (int i = 0; i < n; i++)
+        {
+            if (modes[i] != BarTopMode.Cranked) continue;
+            var (x, y) = positions[i];
+            double xu, yu;
+            if (crankTargets[i] is { } t) { xu = t.xu; yu = t.yu; }
+            else { xu = x - Math.Sign(x) * crankInset; yu = y - Math.Sign(y) * crankInset; }
+            double offsetMag = Math.Sqrt((xu - x) * (xu - x) + (yu - y) * (yu - y));
+            diagonalRise[i] = crankSlope * offsetMag;
+            double naturalZTop = crankBendLowZ + diagonalRise[i] + penetrationPerBar[i];
+            if (naturalZTop > maxZTop) maxZTop = naturalZTop;
+        }
+        if (double.IsNegativeInfinity(maxZTop)) return;     // no Cranked bars
+
+        // Pass 2: shrink each Cranked bar's penetration so its zTop hits the max.
+        // (Always ≤ the original uniform penetration: less diagonalRise → MORE penetration
+        //  to reach the same maxZTop; more diagonalRise → LESS. The bar with the largest
+        //  diagonalRise drives maxZTop and keeps its original penetration.)
+        for (int i = 0; i < n; i++)
+        {
+            if (modes[i] != BarTopMode.Cranked) continue;
+            double newPen = maxZTop - crankBendLowZ - diagonalRise[i];
+            if (newPen <= 0)
+                throw new InvalidOperationException(
+                    $"crankEqualizeEndHeight produced a non-positive penetration " +
+                    $"({UnitConv.FtToIn(newPen):0.##}\") for bar index {i}; check crankUpperInset / " +
+                    $"crankSlope / crankLowerBendOffset / crankPenetration in the config.");
+            penetrationPerBar[i] = newPen;
+        }
+    }
+
+    /// <summary>
+    /// Parser for <see cref="LongitudinalConfig.CrankTargets"/> tokens — the CSV
+    /// value is in INCHES; this wrapper converts to column-local FEET so the
+    /// resolved tuple is consumable directly by <see cref="CrankedBar"/>.
+    /// </summary>
+    private static bool ParseCrankTargetTokenFeet(string s, out (double xu, double yu)? v)
+    {
+        if (SelectorListResolver.ParseXyTokenInches(s, out (double xIn, double yIn) pair))
+        {
+            v = (pair.xIn / 12.0, pair.yIn / 12.0);
+            return true;
+        }
+        v = null;
+        return false;
+    }
+
+    /// <summary>
     /// Resolve a <see cref="BarTopMode"/> for every cage position. Starts from
     /// <see cref="LongitudinalConfig.TopDefault"/> and applies the
     /// <see cref="LongitudinalConfig.TopModes"/> override string. Precedence
@@ -187,12 +289,12 @@ public class LongitudinalBarBuilder
 
         if (string.IsNullOrWhiteSpace(cfg.TopModes)) return modes;
 
-        bool[] isCorner = ClassifyExtremal(positions, cornersOnly: true);
-        bool[] isPerim  = ClassifyExtremal(positions, cornersOnly: false);
+        bool[] isCorner = SelectorListResolver.ClassifyExtremal(positions, cornersOnly: true);
+        bool[] isPerim  = SelectorListResolver.ClassifyExtremal(positions, cornersOnly: false);
         // Per-face membership (a corner bar belongs to two faces). After the
         // canonical short-side orientation in ColumnGeometry, ±X are the long
         // faces and ±Y are the short faces.
-        var (onPlusX, onMinusX, onPlusY, onMinusY) = ClassifyFaces(positions);
+        var (onPlusX, onMinusX, onPlusY, onMinusY) = SelectorListResolver.ClassifyFaces(positions);
 
         // Two passes so that index overrides always beat group/face keywords
         // regardless of token order: pass 1 applies keywords, pass 2 applies indices.
@@ -258,9 +360,9 @@ public class LongitudinalBarBuilder
             return mask;
         }
 
-        bool[] isCorner = ClassifyExtremal(positions, cornersOnly: true);
-        bool[] isPerim  = ClassifyExtremal(positions, cornersOnly: false);
-        var (px, mx, py, my) = ClassifyFaces(positions);
+        bool[] isCorner = SelectorListResolver.ClassifyExtremal(positions, cornersOnly: true);
+        bool[] isPerim  = SelectorListResolver.ClassifyExtremal(positions, cornersOnly: false);
+        var (px, mx, py, my) = SelectorListResolver.ClassifyFaces(positions);
 
         void Mark(Func<int, bool> pred) { for (int i = 0; i < n; i++) if (pred(i)) mask[i] = true; }
 
@@ -282,32 +384,6 @@ public class LongitudinalBarBuilder
         return mask;
     }
 
-    /// <summary>
-    /// Classify each position by which face(s) it sits on: +X (x = max), −X (x = min),
-    /// +Y (y = max), −Y (y = min). Corner bars are on two faces. For round columns,
-    /// faces map to quadrants of the cage circle by the dominant axis sign.
-    /// </summary>
-    private static (bool[] px, bool[] mx, bool[] py, bool[] my) ClassifyFaces(
-        IReadOnlyList<(double x, double y)> positions)
-    {
-        int n = positions.Count;
-        var px = new bool[n]; var mx = new bool[n]; var py = new bool[n]; var my = new bool[n];
-        if (n == 0) return (px, mx, py, my);
-
-        double xMax = positions.Max(p => p.x), xMin = positions.Min(p => p.x);
-        double yMax = positions.Max(p => p.y), yMin = positions.Min(p => p.y);
-        const double tol = 1e-9;
-        for (int i = 0; i < n; i++)
-        {
-            var (x, y) = positions[i];
-            px[i] = Math.Abs(x - xMax) < tol;
-            mx[i] = Math.Abs(x - xMin) < tol;
-            py[i] = Math.Abs(y - yMax) < tol;
-            my[i] = Math.Abs(y - yMin) < tol;
-        }
-        return (px, mx, py, my);
-    }
-
     private static bool TryParseMode(string s, out BarTopMode mode)
     {
         switch (s.Trim().ToLowerInvariant())
@@ -317,23 +393,6 @@ public class LongitudinalBarBuilder
             case "b": case "benttoslab":  mode = BarTopMode.BentToSlab; return true;
             default: mode = BarTopMode.Straight; return false;
         }
-    }
-
-    private static bool[] ClassifyExtremal(IReadOnlyList<(double x, double y)> positions, bool cornersOnly)
-    {
-        var flags = new bool[positions.Count];
-        if (positions.Count == 0) return flags;
-        double maxAbsX = positions.Max(p => Math.Abs(p.x));
-        double maxAbsY = positions.Max(p => Math.Abs(p.y));
-        const double tol = 1e-9;
-        for (int i = 0; i < positions.Count; i++)
-        {
-            var (x, y) = positions[i];
-            bool onMaxX = Math.Abs(Math.Abs(x) - maxAbsX) < tol;
-            bool onMaxY = Math.Abs(Math.Abs(y) - maxAbsY) < tol;
-            flags[i] = cornersOnly ? (onMaxX && onMaxY) : (onMaxX || onMaxY);
-        }
-        return flags;
     }
 
     /// <summary>

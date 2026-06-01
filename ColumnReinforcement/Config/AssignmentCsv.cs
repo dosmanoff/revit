@@ -119,8 +119,9 @@ public static class AssignmentCsv
         "Units",
         "CoverSides", "CoverEnds",
         "LongBarType", "LongBarsW", "LongBarsD", "LongBarsAround", "LongCornersOnly", "LongHookTop", "LongHookBot",
-        "LongTopDefault", "LongTopModes", "LongTopBentLeg", "LongTopBentOutward",
+        "LongTopDefault", "LongTopModes", "LongTopBentLeg", "LongTopBentOutward", "LongTopBentDirs",
         "LongCrankUpperInset", "LongCrankSlope", "LongCrankLowerBendOffset", "LongCrankPenetration",
+        "LongCrankTargets", "LongCrankEqualizeEndHeight",
         "StirrupBarType", "StirrupSpacing", "StirrupHookType", "StirrupOffsetTop", "StirrupOffsetBot", "StirrupRotate45",
         "ConfBotEnabled", "ConfBotSpacing", "ConfBotZoneFraction", "ConfBotZoneLength",
         "ConfTopEnabled", "ConfTopSpacing", "ConfTopZoneFraction", "ConfTopZoneLength",
@@ -155,10 +156,13 @@ public static class AssignmentCsv
         SetOptStr(fields, idx, "LongTopModes", v => cfg.Longitudinal.TopModes = v);
         SetLength(fields, idx, "LongTopBentLeg", v => cfg.Longitudinal.TopBentLeg = v, issues, lineNo);
         SetBool  (fields, idx, "LongTopBentOutward", v => cfg.Longitudinal.TopBentOutward = v, issues, lineNo);
+        SetOptStr(fields, idx, "LongTopBentDirs",    v => cfg.Longitudinal.TopBentDirs    = v);
         SetLength(fields, idx, "LongCrankUpperInset",      v => cfg.Longitudinal.CrankUpperInset      = v, issues, lineNo);
         SetDouble(fields, idx, "LongCrankSlope",           v => cfg.Longitudinal.CrankSlope           = v, issues, lineNo);
         SetLength(fields, idx, "LongCrankLowerBendOffset", v => cfg.Longitudinal.CrankLowerBendOffset = v, issues, lineNo);
         SetLength(fields, idx, "LongCrankPenetration",     v => cfg.Longitudinal.CrankPenetration     = v, issues, lineNo);
+        SetOptStr(fields, idx, "LongCrankTargets",            v => cfg.Longitudinal.CrankTargets = v);
+        SetBool  (fields, idx, "LongCrankEqualizeEndHeight",  v => cfg.Longitudinal.CrankEqualizeEndHeight = v, issues, lineNo);
 
         SetBool  (fields, idx, "StirrupEnabled",   v => cfg.Stirrups.Enabled  = v, issues, lineNo);
         SetString(fields, idx, "StirrupBarType",   v => cfg.Stirrups.BarType  = v);
@@ -469,10 +473,13 @@ public static class AssignmentCsv
             "LongTopModes"       => c.Longitudinal.TopModes ?? "",
             "LongTopBentLeg"     => c.Longitudinal.TopBentLeg.ToString(),
             "LongTopBentOutward" => c.Longitudinal.TopBentOutward.ToString().ToLowerInvariant(),
+            "LongTopBentDirs"    => c.Longitudinal.TopBentDirs ?? "",
             "LongCrankUpperInset"      => c.Longitudinal.CrankUpperInset.ToString(),
             "LongCrankSlope"           => c.Longitudinal.CrankSlope.ToString("G", CultureInfo.InvariantCulture),
             "LongCrankLowerBendOffset" => c.Longitudinal.CrankLowerBendOffset.ToString(),
             "LongCrankPenetration"     => c.Longitudinal.CrankPenetration.ToString(),
+            "LongCrankTargets"            => c.Longitudinal.CrankTargets ?? "",
+            "LongCrankEqualizeEndHeight"  => c.Longitudinal.CrankEqualizeEndHeight.ToString().ToLowerInvariant(),
 
             "StirrupBarType"   => c.Stirrups.BarType,
             "StirrupSpacing"   => c.Stirrups.Spacing.ToString(),
