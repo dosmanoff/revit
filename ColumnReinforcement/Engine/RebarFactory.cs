@@ -120,20 +120,22 @@ public static class RebarFactory
         if (shape is not null)
         {
             // CreateFromCurvesAndShape maps our curves[i] onto the shape's
-            // i-th parametric segment. The standard ACI shape 19 (cranked
-            // splice / Z) appears to enumerate segments TOP→BOTTOM, while
-            // our CrankedBar builds BOTTOM→TOP — so the long lower-column
-            // leg lands on the shape's top slot, scrambling the geometry
-            // (diagonals at the ends, vertical in the middle). Reverse the
-            // curve list on the shape-pinned path so segment[0] is the
-            // top-leg → bend → bottom-leg, matching shape 19's parameter
-            // order. (The curve-driven CreateFromCurves fallback below
-            // preserves direction either way.)
+            // i-th parametric segment AND validates that consecutive curves
+            // share endpoints (forms a CurveLoop). The standard ACI shape
+            // 19 appears to enumerate segments TOP→BOTTOM, while our
+            // CrankedBar builds BOTTOM→TOP. Reversing only the LIST (PR #81)
+            // broke the endpoint chain (p2→p3 followed by p1→p2 doesn't
+            // continue: p3 ≠ p1), so 16 bars hit
+            // 'ArgumentException: curves do not form a valid CurveLoop'.
             //
-            // The hook orientation is bound to the curve direction; swap
-            // start/end accordingly so the hook still ends up on the
-            // intended physical end of the bar.
-            var pinnedCurves = curves.Reverse().ToList();
+            // Reverse BOTH the list AND each individual curve so the chain
+            // is explicit: [p3→p2, p2→p1, p1→p0]. Hooks and orientations
+            // are swapped to match (start hook stays at the physical bottom
+            // of the bar even though it's now the curve list's end).
+            var pinnedCurves = curves
+                .Reverse()
+                .Select(c => (Curve)Line.CreateBound(c.GetEndPoint(1), c.GetEndPoint(0)))
+                .ToList();
             try
             {
                 rebar = Rebar.CreateFromCurvesAndShape(
