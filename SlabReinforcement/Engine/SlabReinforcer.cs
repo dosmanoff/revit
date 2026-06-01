@@ -15,7 +15,9 @@ public sealed class SlabReinforcer
 
     public SlabReinforcer(Document doc) => _doc = doc;
 
-    public RunResult Run(IDictionary<ElementId, SlabReinforcementConfig> perSlab, bool dryRun)
+    public RunResult Run(
+        IDictionary<ElementId, SlabReinforcementConfig> perSlab,
+        IReadOnlyList<ZoneSpec> zones, bool dryRun)
     {
         var result = new RunResult { DryRun = dryRun };
 
@@ -53,6 +55,13 @@ public sealed class SlabReinforcer
 
                 if (cfg.Openings.TrimEnabled)
                     created += new OpeningTrimBuilder(_doc).Build(geom, cfg, slabId);
+
+                string? mark = floor.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
+                List<ZoneSpec> slabZones = zones
+                    .Where(zn => string.Equals(zn.SlabMark, mark, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (slabZones.Count > 0)
+                    created += new SupportZoneBuilder(_doc).Build(geom, cfg, slabId, ctx, slabZones);
 
                 outcome.Created = created;
                 outcome.Replaced = replaced;
