@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure 2-D plan geometry for slab reinforcement. NO Revit API dependency on purpose:
+    the Revit-facing SlabGeometry (in the plugin) converts CurveLoop/XYZ into these
+    types and delegates the math here, so the algorithms are unit-testable without Revit.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+</Project>
