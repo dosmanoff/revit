@@ -379,38 +379,60 @@ public class ColumnReinforcementDialog : Window
 
     private UIElement BuildCoverSection()
     {
-        var panel = NewSectionPanel();
-        AddLengthRow(panel, "Sides", () => Config!.Cover.Sides, v => Config!.Cover.Sides = v);
-        AddLengthRow(panel, "Ends",  () => Config!.Cover.Ends,  v => Config!.Cover.Ends  = v);
-        return panel;
+        var (left, _, root) = NewTwoColumnPanel();
+        AddLengthRow(left, "Sides", () => Config!.Cover.Sides, v => Config!.Cover.Sides = v);
+        AddLengthRow(left, "Ends",  () => Config!.Cover.Ends,  v => Config!.Cover.Ends  = v);
+        return root;
     }
 
     private UIElement BuildLongitudinalSection()
     {
-        var panel = NewSectionPanel();
-        AddTextRow (panel, "Bar type",  () => Config!.Longitudinal.BarType,       s => Config!.Longitudinal.BarType = s);
-        AddCheckRow(panel, "Corners only", () => Config!.Longitudinal.CornerOnly, b => Config!.Longitudinal.CornerOnly = b);
-        AddIntRow  (panel, "Bars along width", 2, 20, () => Config!.Longitudinal.BarsAlongWidth, v => Config!.Longitudinal.BarsAlongWidth = v);
-        AddIntRow  (panel, "Bars along depth", 2, 20, () => Config!.Longitudinal.BarsAlongDepth, v => Config!.Longitudinal.BarsAlongDepth = v);
-        AddTextRow (panel, "Hook type top",    () => Config!.Longitudinal.HookTopType ?? "",    s => Config!.Longitudinal.HookTopType    = string.IsNullOrWhiteSpace(s) ? null : s);
-        AddTextRow (panel, "Hook type bottom", () => Config!.Longitudinal.HookBottomType ?? "", s => Config!.Longitudinal.HookBottomType = string.IsNullOrWhiteSpace(s) ? null : s);
-        return panel;
+        var (left, right, root) = NewTwoColumnPanel();
+        AddTextRow (left,  "Bar type",         () => Config!.Longitudinal.BarType,       s => Config!.Longitudinal.BarType = s);
+        AddCheckRow(left,  "Corners only",     () => Config!.Longitudinal.CornerOnly,    b => Config!.Longitudinal.CornerOnly = b);
+        AddIntRow  (left,  "Bars along width", 2, 20, () => Config!.Longitudinal.BarsAlongWidth, v => Config!.Longitudinal.BarsAlongWidth = v);
+        AddIntRow  (left,  "Bars along depth", 2, 20, () => Config!.Longitudinal.BarsAlongDepth, v => Config!.Longitudinal.BarsAlongDepth = v);
+        AddTextRow (right, "Hook type top",    () => Config!.Longitudinal.HookTopType ?? "",     s => Config!.Longitudinal.HookTopType    = string.IsNullOrWhiteSpace(s) ? null : s);
+        AddTextRow (right, "Hook type bottom", () => Config!.Longitudinal.HookBottomType ?? "",  s => Config!.Longitudinal.HookBottomType = string.IsNullOrWhiteSpace(s) ? null : s);
+        AddTextRow (right, "Cranked shape",    () => Config!.Longitudinal.CrankedShape ?? "",    s => Config!.Longitudinal.CrankedShape    = string.IsNullOrWhiteSpace(s) ? null : s);
+        AddTextRow (right, "BentToSlab shape", () => Config!.Longitudinal.TopBentShape ?? "",    s => Config!.Longitudinal.TopBentShape    = string.IsNullOrWhiteSpace(s) ? null : s);
+        return root;
     }
 
     private UIElement BuildStirrupsSection()
     {
-        var panel = NewSectionPanel();
-        AddCheckRow (panel, "Enabled",   () => Config!.Stirrups.Enabled,           b => Config!.Stirrups.Enabled = b);
-        AddTextRow  (panel, "Bar type",  () => Config!.Stirrups.BarType,           s => Config!.Stirrups.BarType = s);
-        AddLengthRow(panel, "Spacing",   () => Config!.Stirrups.Spacing,           v => Config!.Stirrups.Spacing = v);
-        AddTextRow  (panel, "Hook type", () => Config!.Stirrups.HookType ?? "",    s => Config!.Stirrups.HookType = string.IsNullOrWhiteSpace(s) ? null : s);
-        AddCheckRow (panel, "Rotate 45° (Phase 2)", () => Config!.Stirrups.Rotate45, b => Config!.Stirrups.Rotate45 = b);
-        return panel;
+        var (left, right, root) = NewTwoColumnPanel();
+        AddCheckRow (left,  "Enabled",   () => Config!.Stirrups.Enabled,           b => Config!.Stirrups.Enabled = b);
+        AddTextRow  (left,  "Bar type",  () => Config!.Stirrups.BarType,           s => Config!.Stirrups.BarType = s);
+        AddLengthRow(left,  "Spacing",   () => Config!.Stirrups.Spacing,           v => Config!.Stirrups.Spacing = v);
+        AddTextRow  (right, "Hook type", () => Config!.Stirrups.HookType ?? "",    s => Config!.Stirrups.HookType = string.IsNullOrWhiteSpace(s) ? null : s);
+        AddCheckRow (right, "Rotate 45° (Phase 2)", () => Config!.Stirrups.Rotate45, b => Config!.Stirrups.Rotate45 = b);
+        AddTextRow  (right, "Tie shape", () => Config!.Stirrups.Shape ?? "",       s => Config!.Stirrups.Shape    = string.IsNullOrWhiteSpace(s) ? null : s);
+        return root;
     }
 
     // ── Field-row helpers ───────────────────────────────────────────────────
 
-    private static StackPanel NewSectionPanel() => new() { Orientation = Orientation.Vertical, Margin = new Thickness(2) };
+    /// <summary>
+    /// Two side-by-side StackPanels in a 3-column Grid (star / gutter / star). Each
+    /// caller assigns fields to <paramref name="left"/> or <paramref name="right"/>.
+    /// Lets large config sections fit screen height without scrolling.
+    /// </summary>
+    private static (StackPanel left, StackPanel right, UIElement root) NewTwoColumnPanel()
+    {
+        var grid = new WpfGrid { Margin = new Thickness(2) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var left  = new StackPanel { Orientation = Orientation.Vertical };
+        var right = new StackPanel { Orientation = Orientation.Vertical };
+        WpfGrid.SetColumn(left,  0);
+        WpfGrid.SetColumn(right, 2);
+        grid.Children.Add(left);
+        grid.Children.Add(right);
+        return (left, right, grid);
+    }
 
     private void AddLengthRow(StackPanel parent, string label, Func<Length> get, Action<Length> set)
     {
