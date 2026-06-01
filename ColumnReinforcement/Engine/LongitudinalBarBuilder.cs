@@ -30,6 +30,10 @@ public class LongitudinalBarBuilder
         RebarHookType? hookTop    = RebarFactory.GetHookType(_doc, cfg.Longitudinal.HookTopType);
         RebarHookType? hookBottom = RebarFactory.GetHookType(_doc, cfg.Longitudinal.HookBottomType);
 
+        // Optional pinned RebarShape per top mode — bypass Revit's auto-match when set.
+        RebarShape? crankedShape    = RebarFactory.GetRebarShape(_doc, cfg.Longitudinal.CrankedShape);
+        RebarShape? topBentShape    = RebarFactory.GetRebarShape(_doc, cfg.Longitudinal.TopBentShape);
+
         double endCover = cfg.Ft(cfg.Cover.Ends);
         double zBottom  = endCover;
         double zTop     = geom.Height - endCover;
@@ -120,6 +124,13 @@ public class LongitudinalBarBuilder
                 _ => (StraightBar(geom, x, y, zBottom, zTop), geom.LocalX, true),
             };
 
+            RebarShape? shapeOverride = mode switch
+            {
+                BarTopMode.Cranked    => crankedShape,
+                BarTopMode.BentToSlab => topBentShape,
+                _                     => null,
+            };
+
             RebarFactory.Create(
                 _doc,
                 RebarStyle.Standard,
@@ -129,7 +140,8 @@ public class LongitudinalBarBuilder
                 curves,
                 tag,
                 startHook: hookBottom,
-                endHook:   hasTopHook ? hookTop : null);
+                endHook:   hasTopHook ? hookTop : null,
+                shape:     shapeOverride);
             created++;
         }
 

@@ -82,6 +82,7 @@ public class FoundationDowelBuilder
         RebarBarType barType = RebarFactory.GetBarType(_doc, d.BarType);
         RebarHookType? hookTop    = RebarFactory.GetHookType(_doc, d.HookTopType);
         RebarHookType? hookBottom = RebarFactory.GetHookType(_doc, d.HookBottomType);
+        RebarShape?    dowelShape = RebarFactory.GetRebarShape(_doc, d.Shape);
 
         double extension = cfg.Ft(d.Extension);
         double embedment = cfg.Ft(d.Embedment);
@@ -123,7 +124,7 @@ public class FoundationDowelBuilder
 
             RebarFactory.Create(
                 _doc, RebarStyle.Standard, barType, geom.Instance, normal, curves, tag,
-                startHook: hookBottom, endHook: hookTop);
+                startHook: hookBottom, endHook: hookTop, shape: dowelShape);
             created++;
         }
 
@@ -156,6 +157,7 @@ public class FoundationDowelBuilder
         RebarBarType barType = RebarFactory.GetBarType(_doc, barTypeName);
         RebarHookType? hookTop    = RebarFactory.GetHookType(_doc, d.HookTopType);
         RebarHookType? hookBottom = RebarFactory.GetHookType(_doc, d.HookBottomType);
+        RebarShape?    dowelShape = RebarFactory.GetRebarShape(_doc, d.Shape);
 
         double extension = cfg.Ft(d.Extension);
         double lapInLower = cfg.Ft(d.Embedment);   // reused as "lap inside lower column"
@@ -194,7 +196,7 @@ public class FoundationDowelBuilder
             RebarFactory.Create(
                 _doc, RebarStyle.Standard, barType, geom.Instance, geom.LocalX,
                 new List<Curve> { Line.CreateBound(p0, p1) }, tag,
-                startHook: hookBottom, endHook: hookTop);
+                startHook: hookBottom, endHook: hookTop, shape: dowelShape);
             created++;
         }
 

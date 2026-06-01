@@ -28,6 +28,8 @@ public class StirrupBuilder
 
         RebarBarType tieBar = RebarFactory.GetBarType(_doc, s.BarType);
         RebarHookType? hook = RebarFactory.GetHookType(_doc, s.HookType);
+        RebarShape? tieShape = RebarFactory.GetRebarShape(_doc, s.Shape);
+        RebarShape? ctShape  = RebarFactory.GetRebarShape(_doc, cfg.Stirrups.Crossties.Shape);
 
         double dTie     = tieBar.BarModelDiameter;
         double cover    = cfg.Ft(cfg.Cover.Sides);
@@ -133,7 +135,8 @@ public class StirrupBuilder
                 startHook: hook,
                 endHook:   hook,
                 startHookOrient: RebarHookOrientation.Left,
-                endHookOrient:   RebarHookOrientation.Left);
+                endHookOrient:   RebarHookOrientation.Left,
+                shape:           tieShape);
             created++;
 
             // Crossties at this elevation: one straight bar per (a, b) span, hooked at
@@ -151,7 +154,8 @@ public class StirrupBuilder
                     startHook: ctHook,
                     endHook:   ctHook,
                     startHookOrient: RebarHookOrientation.Left,
-                    endHookOrient:   RebarHookOrientation.Left);
+                    endHookOrient:   RebarHookOrientation.Left,
+                    shape:           ctShape);
                 created++;
             }
         }

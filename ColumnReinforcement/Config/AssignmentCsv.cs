@@ -121,12 +121,13 @@ public static class AssignmentCsv
         "LongBarType", "LongBarsW", "LongBarsD", "LongBarsAround", "LongCornersOnly", "LongHookTop", "LongHookBot",
         "LongTopDefault", "LongTopModes", "LongTopBentLeg", "LongTopBentOutward", "LongTopBentDirs",
         "LongCrankUpperInset", "LongCrankSlope", "LongCrankLowerBendOffset", "LongCrankPenetration",
-        "LongCrankTargets", "LongCrankEqualizeEndHeight",
+        "LongCrankTargets", "LongCrankEqualizeEndHeight", "LongCrankedShape", "LongTopBentShape",
         "StirrupBarType", "StirrupSpacing", "StirrupHookType", "StirrupOffsetTop", "StirrupOffsetBot", "StirrupRotate45",
         "ConfBotEnabled", "ConfBotSpacing", "ConfBotZoneFraction", "ConfBotZoneLength",
         "ConfTopEnabled", "ConfTopSpacing", "ConfTopZoneFraction", "ConfTopZoneLength",
-        "CrosstiesEnabled", "CrosstiesAuto", "CrosstiesBarType", "CrosstiesHookType", "CrosstiesMaxClear", "CrosstiesManual",
-        "DowelsEnabled", "DowelForm", "DowelHost", "DowelBarType", "DowelExt", "DowelEmbed", "DowelLeg", "DowelOnlyFoundation", "DowelHookTop", "DowelHookBot", "DowelPositions",
+        "StirrupShape",
+        "CrosstiesEnabled", "CrosstiesAuto", "CrosstiesBarType", "CrosstiesHookType", "CrosstiesMaxClear", "CrosstiesManual", "CrosstieShape",
+        "DowelsEnabled", "DowelForm", "DowelHost", "DowelBarType", "DowelExt", "DowelEmbed", "DowelLeg", "DowelOnlyFoundation", "DowelHookTop", "DowelHookBot", "DowelPositions", "DowelShape",
         "SplicesEnabled", "SpliceForm", "SpliceBarType", "SpliceLap", "SpliceExt", "SpliceBentLeg",
         "SpliceUpperInset", "SpliceCrankedSlope", "SpliceLowerBendOffset", "SpliceIgnoreSlabAbove", "SpliceHookTop", "SpliceHookBot",
         "CleanExisting",
@@ -163,11 +164,14 @@ public static class AssignmentCsv
         SetLength(fields, idx, "LongCrankPenetration",     v => cfg.Longitudinal.CrankPenetration     = v, issues, lineNo);
         SetOptStr(fields, idx, "LongCrankTargets",            v => cfg.Longitudinal.CrankTargets = v);
         SetBool  (fields, idx, "LongCrankEqualizeEndHeight",  v => cfg.Longitudinal.CrankEqualizeEndHeight = v, issues, lineNo);
+        SetOptStr(fields, idx, "LongCrankedShape",            v => cfg.Longitudinal.CrankedShape = v);
+        SetOptStr(fields, idx, "LongTopBentShape",            v => cfg.Longitudinal.TopBentShape = v);
 
         SetBool  (fields, idx, "StirrupEnabled",   v => cfg.Stirrups.Enabled  = v, issues, lineNo);
         SetString(fields, idx, "StirrupBarType",   v => cfg.Stirrups.BarType  = v);
         SetLength(fields, idx, "StirrupSpacing",   v => cfg.Stirrups.Spacing  = v, issues, lineNo);
         SetOptStr(fields, idx, "StirrupHookType",  v => cfg.Stirrups.HookType = v);
+        SetOptStr(fields, idx, "StirrupShape",     v => cfg.Stirrups.Shape    = v);
         SetOptLen(fields, idx, "StirrupOffsetTop", v => cfg.Stirrups.OffsetTop    = v, issues, lineNo);
         SetOptLen(fields, idx, "StirrupOffsetBot", v => cfg.Stirrups.OffsetBottom = v, issues, lineNo);
         SetBool  (fields, idx, "StirrupRotate45",  v => cfg.Stirrups.Rotate45 = v, issues, lineNo);
@@ -188,6 +192,7 @@ public static class AssignmentCsv
         SetOptStr(fields, idx, "CrosstiesHookType", v => cfg.Stirrups.Crossties.HookType = v);
         SetLength(fields, idx, "CrosstiesMaxClear", v => cfg.Stirrups.Crossties.MaxClearSpacing = v, issues, lineNo);
         SetOptStr(fields, idx, "CrosstiesManual",   v => cfg.Stirrups.Crossties.Manual = v);
+        SetOptStr(fields, idx, "CrosstieShape",     v => cfg.Stirrups.Crossties.Shape  = v);
 
         SetBool         (fields, idx, "DowelsEnabled",       v => cfg.Dowels.Enabled   = v, issues, lineNo);
         SetEnum<DowelForm>(fields, idx, "DowelForm",         v => cfg.Dowels.Form      = v, issues, lineNo);
@@ -200,6 +205,7 @@ public static class AssignmentCsv
         SetOptStr       (fields, idx, "DowelHookTop", v => cfg.Dowels.HookTopType    = v);
         SetOptStr       (fields, idx, "DowelHookBot", v => cfg.Dowels.HookBottomType = v);
         SetOptStr       (fields, idx, "DowelPositions", v => cfg.Dowels.Positions    = v);
+        SetOptStr       (fields, idx, "DowelShape",     v => cfg.Dowels.Shape        = v);
 
         SetBool                  (fields, idx, "SplicesEnabled",        v => cfg.UpperSplices.Enabled  = v, issues, lineNo);
         SetEnum<UpperSpliceForm> (fields, idx, "SpliceForm",            v => cfg.UpperSplices.Form     = v, issues, lineNo);
@@ -480,10 +486,13 @@ public static class AssignmentCsv
             "LongCrankPenetration"     => c.Longitudinal.CrankPenetration.ToString(),
             "LongCrankTargets"            => c.Longitudinal.CrankTargets ?? "",
             "LongCrankEqualizeEndHeight"  => c.Longitudinal.CrankEqualizeEndHeight.ToString().ToLowerInvariant(),
+            "LongCrankedShape"            => c.Longitudinal.CrankedShape ?? "",
+            "LongTopBentShape"            => c.Longitudinal.TopBentShape ?? "",
 
             "StirrupBarType"   => c.Stirrups.BarType,
             "StirrupSpacing"   => c.Stirrups.Spacing.ToString(),
             "StirrupHookType"  => c.Stirrups.HookType ?? "",
+            "StirrupShape"     => c.Stirrups.Shape    ?? "",
             "StirrupOffsetTop" => c.Stirrups.OffsetTop?.ToString() ?? "",
             "StirrupOffsetBot" => c.Stirrups.OffsetBottom?.ToString() ?? "",
             "StirrupRotate45"  => c.Stirrups.Rotate45.ToString().ToLowerInvariant(),
@@ -504,6 +513,7 @@ public static class AssignmentCsv
             "CrosstiesHookType" => c.Stirrups.Crossties.HookType ?? "",
             "CrosstiesMaxClear" => c.Stirrups.Crossties.MaxClearSpacing.ToString(),
             "CrosstiesManual"   => c.Stirrups.Crossties.Manual ?? "",
+            "CrosstieShape"     => c.Stirrups.Crossties.Shape  ?? "",
 
             "DowelsEnabled"       => c.Dowels.Enabled.ToString().ToLowerInvariant(),
             "DowelForm"           => c.Dowels.Form.ToString(),
@@ -516,6 +526,7 @@ public static class AssignmentCsv
             "DowelHookTop"        => c.Dowels.HookTopType    ?? "",
             "DowelHookBot"        => c.Dowels.HookBottomType ?? "",
             "DowelPositions"      => c.Dowels.Positions      ?? "",
+            "DowelShape"          => c.Dowels.Shape          ?? "",
 
             "SplicesEnabled"        => c.UpperSplices.Enabled.ToString().ToLowerInvariant(),
             "SpliceForm"            => c.UpperSplices.Form.ToString(),

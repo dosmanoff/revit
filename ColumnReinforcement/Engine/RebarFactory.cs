@@ -55,8 +55,39 @@ public static class RebarFactory
     }
 
     /// <summary>
+    /// Look up a <see cref="RebarShape"/> by exact <c>.Name</c>. Returns <c>null</c>
+    /// when <paramref name="name"/> is null/empty (engine uses Revit's curves-driven
+    /// auto-match instead). Throws with a descriptive message if a non-empty name
+    /// does not match — same strict policy as the bar-type/hook lookups.
+    /// </summary>
+    public static RebarShape? GetRebarShape(Document doc, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        var shapes = new FilteredElementCollector(doc)
+            .OfClass(typeof(RebarShape))
+            .Cast<RebarShape>()
+            .ToList();
+
+        var hit = shapes.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.Ordinal));
+        if (hit is not null) return hit;
+
+        string available = string.Join(", ", shapes.Select(s => s.Name).OrderBy(n => n));
+        throw new InvalidOperationException(
+            $"RebarShape '{name}' not found in document. Available: {available}");
+    }
+
+    /// <summary>
     /// Create a <see cref="Rebar"/> from a list of curves and tag it for
     /// idempotent re-runs. Returns the created Rebar; throws on failure.
+    ///
+    /// <para>When <paramref name="shape"/> is non-null the bar is created via
+    /// <see cref="Rebar.CreateFromCurvesAndShape"/> with that shape pinned —
+    /// bypasses Revit's geometry-based auto-match, which non-deterministically
+    /// picks among multiple matching shape families in a project (a real-world
+    /// problem when the project has both a standard <c>19</c> and a custom
+    /// <c>28_Z_Frame</c> loaded). When <paramref name="shape"/> is null the
+    /// curves-driven auto-match is used (the original behaviour).</para>
     /// </summary>
     public static Rebar Create(
         Document doc,
@@ -69,21 +100,28 @@ public static class RebarFactory
         RebarHookType? startHook = null,
         RebarHookType? endHook = null,
         RebarHookOrientation startHookOrient = RebarHookOrientation.Right,
-        RebarHookOrientation endHookOrient = RebarHookOrientation.Right)
+        RebarHookOrientation endHookOrient = RebarHookOrientation.Right,
+        RebarShape? shape = null)
     {
-        Rebar rebar = Rebar.CreateFromCurves(
-            doc,
-            style,
-            barType,
-            startHook,
-            endHook,
-            host,
-            norm:             normal,
-            curves:           curves,
-            startHookOrient:  startHookOrient,
-            endHookOrient:    endHookOrient,
-            useExistingShapeIfPossible: true,
-            createNewShape:   true);
+        Rebar rebar = shape is null
+            ? Rebar.CreateFromCurves(
+                doc, style, barType, startHook, endHook, host,
+                norm:             normal,
+                curves:           curves,
+                startHookOrient:  startHookOrient,
+                endHookOrient:    endHookOrient,
+                useExistingShapeIfPossible: true,
+                createNewShape:   true)
+            : Rebar.CreateFromCurvesAndShape(
+                doc, shape, barType, startHook, endHook, host,
+                norm:                       normal,
+                curves:                     curves,
+                startHookOrient:            startHookOrient,
+                endHookOrient:              endHookOrient,
+                hookRotationAngleAtStart:   0.0,
+                hookRotationAngleAtEnd:     0.0,
+                endTreatmentTypeIdAtStart:  ElementId.InvalidElementId,
+                endTreatmentTypeIdAtEnd:    ElementId.InvalidElementId);
 
         ExistingRebarCleaner.Tag(rebar, tag);
         return rebar;
