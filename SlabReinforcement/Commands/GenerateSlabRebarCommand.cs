@@ -68,7 +68,9 @@ public class GenerateSlabRebarCommand : IExternalCommand
             return Result.Cancelled;
         }
 
-        RunResult result = new SlabReinforcer(doc).Run(perSlab, dlg.DryRun);
+        IReadOnlyList<ZoneSpec> zones = LoadZones(dlg);
+
+        RunResult result = new SlabReinforcer(doc).Run(perSlab, zones, dlg.DryRun);
         ShowResults(result, skipped);
         return Result.Succeeded;
     }
@@ -110,6 +112,12 @@ public class GenerateSlabRebarCommand : IExternalCommand
             map[f.Id] = cfg;
         }
         return map;
+    }
+
+    private static IReadOnlyList<ZoneSpec> LoadZones(SlabRebarGenDialog dlg)
+    {
+        if (dlg.ZonesPath is null || !File.Exists(dlg.ZonesPath)) return [];
+        return AssignmentCsv.ParseZones(File.ReadAllText(dlg.ZonesPath), dlg.ZonesPath).Zones;
     }
 
     private static void ApplyMaxOverride(SlabReinforcementConfig cfg, string? maxBar)
