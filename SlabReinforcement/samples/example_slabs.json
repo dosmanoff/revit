@@ -1,0 +1,121 @@
+{
+  "document": {
+    "title": "ExampleTower",
+    "path": "C:\\Projects\\ExampleTower.rvt"
+  },
+  "generated_at": "2026-06-01T12:00:00",
+  "schema_version": 1,
+  "units_note": "Section dimensions and cover are in inches; elevations and plan coords in feet (Revit internal). Angles in degrees from world +X.",
+  "levels": [
+    { "name": "LEVEL 1", "elevation_ft": 0.0, "id": 311 },
+    { "name": "LEVEL 2", "elevation_ft": 12.0, "id": 480 }
+  ],
+  "floor_types_in_use": {
+    "742": {
+      "family": "Floor",
+      "type": "10\" Concrete",
+      "id": 742,
+      "thickness_in": 10.0,
+      "structural_material": "Concrete, Cast-in-Place gray"
+    }
+  },
+  "available_rebar_bar_types": [
+    { "name": "#4", "nominal_diameter_in": 0.5 },
+    { "name": "#5", "nominal_diameter_in": 0.625 },
+    { "name": "#6", "nominal_diameter_in": 0.75 },
+    { "name": "#7", "nominal_diameter_in": 0.875 },
+    { "name": "#8", "nominal_diameter_in": 1.0 }
+  ],
+  "available_rebar_hook_types": [
+    { "name": "Standard - 90 deg." },
+    { "name": "Standard - 180 deg." },
+    { "name": "Stirrup/Tie - 135 deg." }
+  ],
+  "warnings": [],
+  "slabs": [
+    {
+      "element_id": 920145,
+      "mark": "S-101",
+      "comments": "B: #5@12 EW; T: #5@12 EW over cols",
+      "family": "Floor",
+      "type": "10\" Concrete",
+      "type_id": 742,
+      "level": { "name": "LEVEL 2", "id": 480, "elevation_ft": 12.0 },
+      "thickness_in": 10.0,
+      "top_elevation_ft": 12.0,
+      "bottom_elevation_ft": 11.1667,
+      "is_structural": true,
+      "is_foundation": false,
+      "area_sf": 391.0,
+      "rebar_cover": {
+        "top": { "name": "Slab - top", "distance_in": 1.5 },
+        "bottom": { "name": "Slab - bottom", "distance_in": 1.5 }
+      },
+      "local_basis": {
+        "origin_ft": [0.0, 0.0, 11.1667],
+        "x_dir": [1.0, 0.0],
+        "y_dir": [0.0, 1.0],
+        "x_world_deg": 0.0
+      },
+      "bbox": { "min_ft": [0.0, 0.0], "max_ft": [20.0, 20.0] },
+      "boundary": [
+        {
+          "index": 0, "kind": "line",
+          "start_ft": [0.0, 0.0], "end_ft": [20.0, 0.0], "length_ft": 20.0,
+          "mid_normal_world_deg": -90.0,
+          "edge": "wall",
+          "adjacent": { "kind": "Wall", "element_id": 51020, "mark": "W-1" }
+        },
+        {
+          "index": 1, "kind": "line",
+          "start_ft": [20.0, 0.0], "end_ft": [20.0, 20.0], "length_ft": 20.0,
+          "mid_normal_world_deg": 0.0,
+          "edge": "slab",
+          "adjacent": { "kind": "Slab", "element_id": 920180, "mark": "S-102" }
+        },
+        {
+          "index": 2, "kind": "line",
+          "start_ft": [20.0, 20.0], "end_ft": [0.0, 20.0], "length_ft": 20.0,
+          "mid_normal_world_deg": 90.0,
+          "edge": "free"
+        },
+        {
+          "index": 3, "kind": "line",
+          "start_ft": [0.0, 20.0], "end_ft": [0.0, 0.0], "length_ft": 20.0,
+          "mid_normal_world_deg": 180.0,
+          "edge": "free"
+        }
+      ],
+      "openings": [
+        {
+          "id": 1, "source": "FloorOpening", "element_id": 920300,
+          "area_sf": 9.0, "needs_trim": true,
+          "bbox": { "min_ft": [8.0, 8.0], "max_ft": [11.0, 11.0] },
+          "boundary": [
+            { "index": 0, "start_ft": [8.0, 8.0],  "end_ft": [11.0, 8.0],  "length_ft": 3.0 },
+            { "index": 1, "start_ft": [11.0, 8.0], "end_ft": [11.0, 11.0], "length_ft": 3.0 },
+            { "index": 2, "start_ft": [11.0, 11.0],"end_ft": [8.0, 11.0],  "length_ft": 3.0 },
+            { "index": 3, "start_ft": [8.0, 11.0], "end_ft": [8.0, 8.0],   "length_ft": 3.0 }
+          ]
+        }
+      ],
+      "context": {
+        "supports_below": [
+          { "kind": "Column", "element_id": 60111, "mark": "C-3", "center_ft": [10.0, 10.0], "width_in": 16.0, "depth_in": 16.0 }
+        ],
+        "walls_bounding": [ { "element_id": 51020, "mark": "W-1", "boundary_indices": [0] } ],
+        "beams": [],
+        "slabs_coplanar": [ { "element_id": 920180, "mark": "S-102", "boundary_indices": [1] } ]
+      },
+      "hints": {
+        "free_edge_indices": [2, 3],
+        "needs_edge_u_bars": true,
+        "openings_need_trim": [1],
+        "supports": [ { "mark": "C-3", "suggested_strip_width_in": 64.0 } ],
+        "max_span_ft": 20.0,
+        "is_two_way": true,
+        "recommended_layers": ["BottomX", "BottomY", "TopX", "TopY"]
+      }
+    }
+  ]
+}
