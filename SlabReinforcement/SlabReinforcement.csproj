@@ -20,6 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SlabReinforcement.Geometry\SlabReinforcement.Geometry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="SlabReinforcement.addin" CopyToOutputDirectory="PreserveNewest" />
     <!-- Ship sample configs alongside the DLL so the in-dialog config picker finds them. -->
     <None Include="samples\*.json" CopyToOutputDirectory="PreserveNewest">
