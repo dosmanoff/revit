@@ -52,7 +52,7 @@ public class FoundationDowelBuilder
         {
             DowelHost.Foundation or DowelHost.Floor => BuildSlabHosted(geom, cfg, tag, hostBb),
             DowelHost.Beam                          => BuildBeamHosted(geom, cfg, tag, hostBb),
-            DowelHost.Column                        => BuildColumnHosted(geom, cfg, tag, hostBb),
+            DowelHost.Column                        => BuildColumnHosted(geom, cfg, tag, hostBb, host),
             _ => throw new InvalidOperationException($"Unsupported dowel host kind: {kind}"),
         };
     }
@@ -140,7 +140,7 @@ public class FoundationDowelBuilder
 
     // ── Column below: lap inside the lower column, offset 1·d_bar along face ──
 
-    private Result BuildColumnHosted(ColumnGeometry geom, ColumnReinforcementConfig cfg, string tag, BoundingBoxXYZ hostBb)
+    private Result BuildColumnHosted(ColumnGeometry geom, ColumnReinforcementConfig cfg, string tag, BoundingBoxXYZ hostBb, Element hostColumn)
     {
         DowelsConfig d = cfg.Dowels;
 
@@ -193,8 +193,13 @@ public class FoundationDowelBuilder
             XYZ p0 = geom.At(xd, yd, zLocalDowelBottom);
             XYZ p1 = geom.At(xd, yd, zLocalDowelTop);
 
+            // Host the dowel in the LOWER column (where it physically lives) so it shows up
+            // in that column's schedule and Revit doesn't flag the bottom portion as
+            // "rebar outside its host". The upper-column portion above hostTopZ is partially
+            // outside the host bb — same expected behaviour as Cranked main bars that extend
+            // up into the upper column.
             RebarFactory.Create(
-                _doc, RebarStyle.Standard, barType, geom.Instance, geom.LocalX,
+                _doc, RebarStyle.Standard, barType, hostColumn, geom.LocalX,
                 new List<Curve> { Line.CreateBound(p0, p1) }, tag,
                 startHook: hookBottom, endHook: hookTop, shape: dowelShape);
             created++;
