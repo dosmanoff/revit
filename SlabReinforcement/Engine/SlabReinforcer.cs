@@ -46,7 +46,7 @@ public sealed class SlabReinforcer
                 if (cfg.FieldMode == FieldMode.Bars)
                     created += new FieldBarBuilder(_doc).Build(geom, cfg, slabId);
                 else
-                    outcome.Reason = "AreaSystem mode lands in PR-11 — nothing placed.";
+                    created += new FieldMeshBuilder(_doc).Build(geom, cfg, slabId);
 
                 if (cfg.Edges.UBarsEnabled)
                     created += new EdgeUBarBuilder(_doc).Build(geom, cfg, slabId, ctx);
