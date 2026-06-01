@@ -1,18 +1,17 @@
+using System.IO;
 using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
-using SlabReinforcement.Domain;
-using SlabReinforcement.Engine;
+using SlabReinforcement.Export;
 
 namespace SlabReinforcement.Commands;
 
 /// <summary>
-/// Stage 1 of the pipeline: dump a JSON description of the selected slabs for the
-/// external reinforcement agent. PR-02 interim: summarizes the extracted geometry
-/// (thickness, local basis, area, openings) so SlabGeometry can be smoke-tested.
-/// Full JSON export lands in PR-04.
+/// Stage 1 of the pipeline: dump a JSON description of the selected slabs for the external
+/// reinforcement agent (geometry, edge adjacency, openings, supports below, available
+/// bar/hook types, hints). Schema documented in slab-dump-schema.md.
 /// </summary>
 [Transaction(TransactionMode.Manual)]
 public class ExportSlabsCommand : IExternalCommand
@@ -29,7 +28,7 @@ public class ExportSlabsCommand : IExternalCommand
             {
                 IList<Reference> refs = uidoc.Selection.PickObjects(
                     ObjectType.Element, new SlabSelectionFilter(),
-                    "Select floor slabs to summarize, then click Finish");
+                    "Select floor slabs to export, then click Finish");
                 floors = refs.Select(r => doc.GetElement(r.ElementId)).OfType<Floor>().ToList();
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
@@ -44,37 +43,62 @@ public class ExportSlabsCommand : IExternalCommand
             return Result.Cancelled;
         }
 
-        var sb = new StringBuilder();
-        foreach (Floor floor in floors)
+        SlabDump dump = new SlabDumpBuilder(doc).Build(floors, DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"));
+
+        string? path = AskSavePath(doc);
+        if (path is null) return Result.Cancelled;
+
+        try
         {
-            string label = Describe(floor);
-            try
-            {
-                SlabGeometry g = SlabGeometry.For(floor);
-                SlabContext ctx = SlabContext.For(g);
-                IReadOnlyList<SlabOpening> ops = SlabOpenings.For(g);
-
-                int free = ctx.Edges.Count(e => e.Kind == EdgeKind.Free);
-                int wall = ctx.Edges.Count(e => e.Kind == EdgeKind.Wall);
-                int beam = ctx.Edges.Count(e => e.Kind == EdgeKind.Beam);
-                int slab = ctx.Edges.Count(e => e.Kind == EdgeKind.Slab);
-
-                sb.AppendLine($"{label}:");
-                sb.AppendLine(
-                    $"   t = {UnitConv.FtToIn(g.ThicknessFt):0.#}\"   basisX = {g.XWorldDeg:0.#}°   area = {g.NetAreaSf:0.#} sf");
-                sb.AppendLine(
-                    $"   edges: free={free} wall={wall} beam={beam} slab={slab} (of {ctx.Edges.Count})");
-                sb.AppendLine(
-                    $"   supports below = {ctx.Supports.Count}   openings = {ops.Count} (trim {SlabOpenings.TrimCount(ops)})");
-            }
-            catch (Exception ex)
-            {
-                sb.AppendLine($"{label}:  ERROR — {ex.Message}");
-            }
+            File.WriteAllText(path, dump.ToJson(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
+        catch (Exception ex)
+        {
+            message = $"Could not write '{path}': {ex.Message}";
+            return Result.Failed;
         }
 
-        TaskDialog.Show("Export Slabs — geometry (PR-02 interim)", sb.ToString());
+        ShowSummary(dump, path);
         return Result.Succeeded;
+    }
+
+    private static string? AskSavePath(Document doc)
+    {
+        string initialDir = !string.IsNullOrWhiteSpace(doc.PathName)
+            ? Path.GetDirectoryName(doc.PathName)!
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        string title = string.IsNullOrWhiteSpace(doc.Title) ? "model" : Path.GetFileNameWithoutExtension(doc.Title);
+
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export slabs JSON",
+            Filter = "JSON (*.json)|*.json",
+            FileName = $"{title}_slabs.json",
+            InitialDirectory = initialDir,
+            OverwritePrompt = true,
+        };
+
+        return dlg.ShowDialog() == true ? dlg.FileName : null;
+    }
+
+    private static void ShowSummary(SlabDump dump, string path)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"Exported {dump.Slabs.Count} slab(s) to:");
+        sb.AppendLine(path);
+        sb.AppendLine();
+        sb.AppendLine($"Bar types: {dump.AvailableRebarBarTypes.Count}   hook types: {dump.AvailableRebarHookTypes.Count}");
+
+        if (dump.Warnings.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Warnings ({dump.Warnings.Count}):");
+            foreach (string w in dump.Warnings.Take(5)) sb.AppendLine($"  • {w}");
+            if (dump.Warnings.Count > 5) sb.AppendLine($"  … and {dump.Warnings.Count - 5} more.");
+        }
+
+        TaskDialog.Show("Export Slabs", sb.ToString());
     }
 
     private static List<Floor> GetSelectedFloors(UIDocument uidoc)
@@ -84,12 +108,5 @@ public class ExportSlabsCommand : IExternalCommand
             .Select(id => doc.GetElement(id))
             .OfType<Floor>()
             .ToList();
-    }
-
-    private static string Describe(Floor floor)
-    {
-        string? mark = floor.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
-        string id = $"Floor {floor.Id.Value}";
-        return string.IsNullOrWhiteSpace(mark) ? id : $"{mark} ({id})";
     }
 }
