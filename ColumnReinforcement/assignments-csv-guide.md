@@ -121,10 +121,13 @@ Rectangular columns use `LongBarsW` and `LongBarsD`. Round columns use `LongBars
 | `LongTopModes` | string (selector:mode list) | (empty) | Per-bar override of `LongTopDefault`. Space/`;`-separated `selector:mode` tokens. **Selector** (prefer the keywords over raw indices — they're robust to bar count and column orientation): `corners`, `edges`, `all`, the face keywords `+x` / `-x` / `+y` / `-y` (after the canonical short-side orientation, ±X = long faces, ±Y = short faces; a corner bar belongs to two faces), or a 0-based bar index. **Mode**: `Straight`/`Cranked`/`BentToSlab` (or short `S`/`C`/`B`). Precedence: explicit index > keyword > `LongTopDefault`; later keyword tokens override earlier ones. Example: `+x:Cranked -x:Cranked -y:BentToSlab` — bars on both long faces crank, bars on the bottom short face bend to slab. **No commas inside the cell** (they're the CSV delimiter) — use spaces. |
 | `LongTopBentLeg` | length | `12` in | `BentToSlab` bars: horizontal leg length inside the slab above. |
 | `LongTopBentOutward` | bool | `true` | `BentToSlab` bars: bend the leg OUTWARD (along the bar's outward face normal) when `true` (default), so legs from opposite faces fan apart into the slab. Set `false` for the legacy inward bend toward the column centre — only safe on large columns where inward legs don't cross. |
+| `LongTopBentDirs` | string (selector:value list) | (empty) | Per-bar override of `LongTopBentOutward`, same selector vocabulary as `LongTopModes` (indices, `all`, `corners`, `edges`, `±x`, `±y`). Value accepts `true`/`false`/`outward`/`inward`/`in`/`out`/`yes`/`no`/`y`/`n`/`1`/`0` (case-insensitive). Use for corner columns at a slab edge — bars on faces facing AWAY from the slab bend inward, bars facing INTO the slab bend outward. Example: `-x:inward +x:outward corners:inward`. Empty = every `BentToSlab` bar uses `LongTopBentOutward` (unchanged behaviour). |
 | `LongCrankUpperInset` | length | `2` in | `Cranked` bars: how much the upper column's cage is inset on each side — the offset the bar cranks to. For a standard offset-bend lap splice (column-to-column, same/similar size), set this to one bar diameter. |
 | `LongCrankSlope` | number | `6` | `Cranked` bars: vertical/horizontal slope of the diagonal. ACI 318-19 §10.7.4.1 caps at 1:6, so keep ≥ 6. |
 | `LongCrankLowerBendOffset` | length | `6` in | `Cranked` bars: distance from the column top down to the first bend. |
 | `LongCrankPenetration` | length | `24` in | `Cranked` bars: how far the bar penetrates UP into the upper column past the second bend (lap with the upper cage). |
+| `LongCrankTargets` | string (selector:`(x,y)` list) | (empty) | Per-bar explicit crank target `(xu, yu)` in column-local INCHES; selector vocabulary as in `LongTopModes`. When set for a bar, the engine uses that target instead of `xu = x − sign(x)·LongCrankUpperInset` — useful for asymmetric upper-column transitions (e.g. upper column shifted off-axis) where the inset formula misses the actual upper-cage positions. Example: `0:(-3.56,-3.56) 1:(0,-3.56) 2:(+3.56,-3.56)`. **Because the value embeds commas, the CSV cell must be quoted** (e.g. wrap the whole field in `"…"`). Empty = use the inset formula (unchanged behaviour). |
+| `LongCrankEqualizeEndHeight` | bool | `false` | When `true`, the engine post-shrinks each `Cranked` bar's `LongCrankPenetration` so every Cranked bar terminates at the same elevation (target = the natural max zTop across all Cranked bars). Fixes the ~2·d_b height difference between corner bars (`offsetMag = inset·√2`) and mid-face bars (`offsetMag = inset`) at the standard ACI 1:6 slope. Bars in other modes are not touched. Default `false` = uniform global penetration (unchanged behaviour). |
 
 > **Cage enumeration order** (for `LongTopModes` indices). Rectangular: bottom face left→right (indices `0 … nx−1`), then top face left→right (`nx … 2·nx−1`), then the interior side bars row by row, left side then right side (`2·nx …`). Round: bar at angle 0 (along local X) is index `0`, then counter-clockwise. When unsure, use the `corners`/`edges` keywords instead of raw indices — they're robust to changing the bar counts.
 
@@ -315,6 +318,23 @@ Row C1.2 (the 12×12 upper column):
 - Dowels from the lower column (`DowelHost=Column`), positions offset 1·db along the face from the upper cage, 36″ lap inside lower column, 36″ extension into upper cage
 - Standard `#8` cage continues straight to the next floor (or roof)
 - Bent splice into the roof slab if this is the top level
+
+### 4.8 Per-bar tuning — equal end heights, per-face bent direction, explicit crank targets
+
+Three optional per-bar fields let you handle the cases the column-wide defaults miss. All three are no-ops when unset, so adding any of them to an existing CSV doesn't disturb the rest.
+
+```csv
+Mark,LongBarType,LongTopDefault,LongCrankUpperInset,LongCrankPenetration,LongCrankEqualizeEndHeight,LongTopBentDirs,LongCrankTargets
+C1.4,#6,Cranked,0.875,27,true,,
+C-corner,#6,BentToSlab,,,,"corners:inward edges:outward",
+C1.2,#7,Cranked,0.875,27,,,"0:(-3.56,-3.56) 1:(0,-3.56) 2:(3.56,-3.56)"
+```
+
+- **C1.4** — straight 3×3 Cranked column. `LongCrankEqualizeEndHeight=true` tells the engine to shrink the corner bars' penetration so every Cranked bar terminates at the same elevation. (At inset `0.875"` and slope 6, corner `offsetMag = 0.875·√2 ≈ 1.24"` gives a diagonal rise ~7.42", while a mid-face bar's `offsetMag = 0.875"` gives only ~5.25" — a ~2.17" step that this field removes.)
+- **C-corner** — angle column at the slab edge. `LongTopBentDirs="corners:inward edges:outward"` bends the corner bars *toward* the column centre while keeping the face-mid bars fanning outward. Useful when an outward bend would push the hook past the slab edge.
+- **C1.2** — asymmetric upper column. `LongCrankTargets="0:(-3.56,-3.56) …"` gives explicit `(xu, yu)` targets in column-local inches for bars 0–2 so they crank into the actual upper-cage positions instead of along the inset diagonal. **The cell is quoted** because the values embed commas.
+
+You can combine all three on the same column. When `LongCrankTargets` is set for a bar, `LongCrankUpperInset` is ignored for that bar; the equalisation pass picks each bar's actual `offsetMag` correctly regardless.
 
 ---
 
