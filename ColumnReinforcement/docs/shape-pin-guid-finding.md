@@ -99,6 +99,60 @@ correct geometry AND correct schedule binding without editing one of:
    automatically rebound to the new A by name. Verify visually.
 4. Load family back into the project, overwriting existing values.
 
+### API-driven family edit — working approach
+
+The API rebind works via a **two-step swap through a non-shared
+intermediate**. `FamilyManager.ReplaceParameter(currentFp, externalDef,
+…)` refuses (`Parameter replacement failed.`) when both sides are
+shared — Revit silently rejects swapping the GUID under a segment
+constraint. But `ReplaceParameter(currentFp, name, group, isInstance)`
+(converts shared → non-shared family param, keeping the
+`FamilyParameter` id) succeeds, and then `ReplaceParameter(tmpFp,
+externalDef, …)` (non-shared → shared with the new GUID) succeeds too.
+Both calls preserve the `FamilyParameter` id, so the segment-length
+constraint that was bound to it just follows along — no orphaned
+constraints, no `not fully defined` error on `LoadFamily`.
+
+The full pseudo-code per parameter (`A`, `B`, `C`, `D`, `J`):
+
+```
+shared A (GUID=b5ef18b4-… old)  →ReplaceParameter→  family-param "A_tmp"
+family-param "A_tmp"            →ReplaceParameter→  shared A (GUID=a2eef903-… shape 19)
+```
+
+(Each step needs its own transaction inside the family doc.)
+
+Verified outcome: bar created in the rebuilt family has **both** sets
+of `A`/`B`/`C`/`D`/`J` parameters (the shape 19 ones inherited from the
+new shared definitions, the old `28_Z_Frame` ones inherited from the
+underlying `Rebar` element's category). The shape 19 ones are the
+**active** ones — driven by the segment-length constraints, holding the
+correct values from our curves (`A = 27.04"`, `C = 94.54"`, etc.). The
+old `28_Z_Frame` GUIDs hold family defaults (`A = 11.81"` etc.) but no
+schedule references them, so they're inert.
+
+Reproducible artifacts in `../samples/`:
+
+- `rebind-shape19-guids.csx` — the standalone script (run via revit-mcp
+  `send_code_to_revit`, `transactionMode: none`).
+- `shape19-params.txt` — the temp shared parameters file with shape
+  19's GUIDs and `DATATYPE = REINFORCEMENT_LENGTH`. Required input for
+  the script.
+- `28_Z_Frame_v19.rfa` — the pre-built output for the 21STR project.
+  Load directly with Family → Insert from Library; verify the
+  resulting RebarShape's parameters via `LookupParameter("A").GUID`
+  reads `a2eef903-c2bd-4d7f-9075-450374459eb3`.
+- `21STR-rev4-v19.csv` — assignments CSV variant pointing
+  `LongCrankedShape=28_Z_Frame_v19`. Same as `21STR-rev4.csv` for the
+  rest. Use this once the v19 family is loaded.
+
+(The earlier `21STR-rev4-28zframe.csv` was the V-D-V variant with the
+unmerged GUID caveat; renamed/replaced by `-v19.csv`.)
+
+The manual Family Editor instructions above are still valid as a
+fallback if the API path errors on a project with different shape-19
+shared params (e.g. a non-Imperial project where `J` GUID differs).
+
 After this one-time edit:
 - `28_Z_Frame` bars created by the plugin have parameter values bound
   to the SharedParameterElement ids that all 60+ project schedules
