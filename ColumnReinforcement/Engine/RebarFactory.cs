@@ -199,138 +199,8 @@ public static class RebarFactory
             RecordShapeMismatch(host, shape, barType, actualName);
         }
 
-        // One-shot per shape: dump the shape's parametric dimensions and the
-        // resulting bar's actual values, so we know exactly what parameter names
-        // (A, B, C, D, etc.) the family exposes and what units. Needed before
-        // switching to Rebar.CreateFromRebarShape + parametric setters.
-        if (shape is not null && rebar.GetShapeId() == shape.Id)
-            TryRecordShapeParameterDump(doc, shape, rebar);
-
         ExistingRebarCleaner.Tag(rebar, tag);
         return rebar;
-    }
-
-    private static readonly HashSet<long> _dumpedShapeIds = new();
-
-    private static void TryRecordShapeParameterDump(Document doc, RebarShape shape, Rebar rebar)
-    {
-        lock (_failureLock)
-        {
-            if (!_dumpedShapeIds.Add(shape.Id.Value)) return;
-
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"Shape '{shape.Name}' (id {shape.Id.Value}, style {shape.RebarStyle})");
-
-            // Shape definition: enumerate segments / arcs / parameters if accessible.
-            try
-            {
-                var def = shape.GetRebarShapeDefinition();
-                sb.AppendLine($"  Definition type: {def?.GetType().Name ?? "<null>"}");
-                if (def is RebarShapeDefinitionBySegments bySeg)
-                {
-                    sb.AppendLine($"  Segments: {bySeg.NumberOfSegments}");
-                    for (int i = 0; i < bySeg.NumberOfSegments; i++)
-                    {
-                        var seg = bySeg.GetSegment(i);
-                        sb.AppendLine($"  Seg {i}: ({seg.GetType().Name})");
-                        var cs = seg.GetConstraints();
-                        sb.AppendLine($"    Constraints: {cs.Count}");
-                        foreach (var c in cs)
-                        {
-                            string ctype = c.GetType().Name;
-                            string extra = "";
-                            try
-                            {
-                                ElementId paramId = c.GetParamId();
-                                string pname = "?";
-                                if (paramId != ElementId.InvalidElementId)
-                                {
-                                    var pelem = doc.GetElement(paramId);
-                                    if (pelem != null) pname = pelem.Name;
-                                }
-                                extra = $"  paramId={paramId.Value}  paramName={pname}";
-                            }
-                            catch { /* not every constraint has a param */ }
-                            sb.AppendLine($"      {ctype}{extra}");
-                        }
-                    }
-                    // Vertices: 0..NumberOfSegments (one more than segments).
-                    // Use reflection so we don't depend on specific property names
-                    // (RebarShapeVertex API surface differs across Revit versions).
-                    for (int i = 0; i <= bySeg.NumberOfSegments; i++)
-                    {
-                        try
-                        {
-                            var v = bySeg.GetVertex(i);
-                            sb.Append($"  Vertex {i}:");
-                            foreach (var pi in v.GetType().GetProperties())
-                            {
-                                if (pi.GetIndexParameters().Length > 0) continue;
-                                object? val = null;
-                                try { val = pi.GetValue(v); } catch { continue; }
-                                if (val == null) continue;
-                                string s = val.ToString() ?? "";
-                                if (s.Length > 40) s = s.Substring(0, 40) + "…";
-                                sb.Append($" {pi.Name}={s}");
-                            }
-                            sb.AppendLine();
-                            var vcs = v.GetConstraints();
-                            sb.AppendLine($"    constraints={vcs.Count}");
-                            foreach (var c in vcs)
-                            {
-                                string ctype = c.GetType().Name;
-                                string extra = "";
-                                try
-                                {
-                                    ElementId paramId = c.GetParamId();
-                                    string pname = "?";
-                                    if (paramId != ElementId.InvalidElementId)
-                                    {
-                                        var pelem = doc.GetElement(paramId);
-                                        if (pelem != null) pname = pelem.Name;
-                                    }
-                                    extra = $"  paramId={paramId.Value}  paramName={pname}";
-                                }
-                                catch { }
-                                sb.AppendLine($"      {ctype}{extra}");
-                            }
-                        }
-                        catch (Exception ex) { sb.AppendLine($"  Vertex {i}: (read failed: {ex.Message})"); break; }
-                    }
-                }
-            }
-            catch (Exception ex) { sb.AppendLine($"  (definition read failed: {ex.Message})"); }
-
-            // Parameter list from the SAMPLE bar — these are what we'd set via
-            // LookupParameter to drive the shape.
-            sb.AppendLine("  Sample bar Double parameters (likely family dimensions):");
-            try
-            {
-                foreach (Parameter p in rebar.Parameters)
-                {
-                    if (p.StorageType != StorageType.Double) continue;
-                    string n = p.Definition?.Name ?? "?";
-                    // Skip the standard rebar built-ins; family-defined dimension
-                    // params on a shape are typically short single-letter names.
-                    if (n.Length == 0 || n.Length > 6) continue;
-                    if (p.IsReadOnly) continue;
-                    double v = p.AsDouble();   // internal ft
-                    sb.AppendLine($"    {n} = {v:0.####} ft  ({UnitConv.FtToIn(v):0.##}\")  id {p.Id.Value} shared={p.IsShared}");
-                }
-            }
-            catch (Exception ex) { sb.AppendLine($"  (parameter scan failed: {ex.Message})"); }
-
-            // Record under a special "ShapeParameterDump" entry so the existing
-            // ResultsDialog plumbing surfaces it without a new pipe.
-            if (_failures.Count >= 50) return;
-            _failures.Add(new ShapePinFailure(
-                HostId:        rebar.Id.Value,
-                HostCategory:  "<diag>",
-                ShapeName:     shape.Name,
-                BarTypeName:   "",
-                ExceptionType: "ShapeParameterDump",
-                Message:       sb.ToString()));
-        }
     }
 
     // ── Shape-pin diagnostics ───────────────────────────────────────────
@@ -394,7 +264,6 @@ public static class RebarFactory
         {
             var copy = _failures.ToArray();
             _failures.Clear();
-            _dumpedShapeIds.Clear();   // re-dump on next run too
             return copy;
         }
     }
