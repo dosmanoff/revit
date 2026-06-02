@@ -149,9 +149,12 @@ public sealed class SlabViewsEngine
         };
 
         double lvl = level.ProjectElevation;
-        double top = bbox.Max.Z - lvl + 0.5;
+        // Cut plane ABOVE the slab so the whole mat projects into the downward plan; each
+        // layer's bars are then drawn via SetUnobscuredInView (rebar that is only "beyond" the
+        // cut plane is not rendered otherwise). Verified in-Revit on a real slab.
+        double top = bbox.Max.Z - lvl + 1.5;
+        double cut = bbox.Max.Z - lvl + 1.0;
         double bottom = bbox.Min.Z - lvl - 0.5;
-        double cut = (bbox.Min.Z + bbox.Max.Z) / 2 - lvl;
 
         PlanViewRange vr = plan.GetViewRange();
         vr.SetLevelId(PlanViewPlane.TopClipPlane, level.Id);
@@ -167,8 +170,16 @@ public sealed class SlabViewsEngine
 
     private void IsolateLayer(View view, ElementId slabId, SlabLayer layer)
     {
-        if (_cfg.Isolation == LayerIsolation.Show) return;
         string suffix = $":{slabId.Value}:{layer}";
+
+        // This layer's bars: show as unobscured solid lines. Without this, horizontal slab bars
+        // (seen in projection, not cut) are not drawn in a plan view at all — verified in-Revit.
+        foreach (Element e in new FilteredElementCollector(_doc, view.Id)
+                     .OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType().ToList())
+            if (TagMatches(e, suffix) && e is Autodesk.Revit.DB.Structure.Rebar bar)
+                try { bar.SetUnobscuredInView(view, true); } catch { /* best-effort */ }
+
+        if (_cfg.Isolation == LayerIsolation.Show) return;
 
         List<Element> others = new FilteredElementCollector(_doc, view.Id)
             .OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType()
