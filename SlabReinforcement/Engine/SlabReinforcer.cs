@@ -44,11 +44,12 @@ public sealed class SlabReinforcer
                 SlabGeometry geom = SlabGeometry.For(floor);
                 SlabContext ctx = SlabContext.For(geom);
 
-                int created = 0;
-                if (cfg.FieldMode == FieldMode.Bars)
-                    created += new FieldBarBuilder(_doc).Build(geom, cfg, slabId);
-                else
-                    created += new FieldMeshBuilder(_doc).Build(geom, cfg, slabId);
+                int created = cfg.FieldMode switch
+                {
+                    FieldMode.Bars => new FieldBarBuilder(_doc).Build(geom, cfg, slabId),
+                    FieldMode.Sets => new FieldSetBuilder(_doc).Build(geom, cfg, slabId),
+                    _ => new FieldMeshBuilder(_doc).Build(geom, cfg, slabId),
+                };
 
                 if (cfg.Edges.UBarsEnabled)
                     created += new EdgeUBarBuilder(_doc).Build(geom, cfg, slabId, ctx);

@@ -87,6 +87,35 @@ public class FieldLayoutTests
         Assert.Equal(12.0, spans[1], 6);   // right rail starts at the hole's far edge
     }
 
+    // ── Bands (rebar sets) ────────────────────────────────────────────────────
+
+    [Fact]
+    public void Bands_Square_IsOneBand()
+    {
+        var rails = FieldLayout.LocalRails(Square(20), [], new Pt2(1, 0), spacing: 5, sideInset: 1, endInset: 1);
+        var bands = FieldLayout.Bands(rails, 5);
+
+        Assert.Single(bands);
+        Assert.Equal(4, bands[0].Count);              // scan y = 1,6,11,16
+        Assert.Equal(1.0, bands[0].Start, 6);
+        Assert.Equal(19.0, bands[0].End, 6);
+        Assert.Equal(1.0, bands[0].Perp0, 6);
+    }
+
+    [Fact]
+    public void Bands_WithHole_SplitsIntoRegions()
+    {
+        var hole = new Loop2([new(8, 8), new(12, 8), new(12, 12), new(8, 12)]);
+        var rails = FieldLayout.LocalRails(Square(20), [hole], new Pt2(1, 0), spacing: 1, sideInset: 1, endInset: 0);
+        var bands = FieldLayout.Bands(rails, 1);
+
+        Assert.True(bands.Count >= 3);                              // above, below, left, right of the hole
+        Assert.Contains(bands, b => Math.Abs(b.End - 8) < 1e-3);    // a band stops at the hole's left edge
+        Assert.Contains(bands, b => Math.Abs(b.Start - 12) < 1e-3); // a band starts at the hole's right edge
+        // full-width bands above & below the hole still exist
+        Assert.Contains(bands, b => Math.Abs(b.Start) < 1e-3 && Math.Abs(b.End - 20) < 1e-3);
+    }
+
     [Fact]
     public void Rails_YDirection_RunsVertically()
     {
