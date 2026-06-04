@@ -97,5 +97,5 @@ public class OpeningsConfig
     public bool UBars { get; set; } = true;
     public bool Diagonals { get; set; } = true;
     public string DiagBarType { get; set; } = "#5";
-    public string Selector { get; set; } = "all";
+    public string Selector { get; set; } = "auto";   // only openings the classifier flags (skips shafts / edge-adjacent)
 }

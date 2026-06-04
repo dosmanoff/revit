@@ -149,8 +149,9 @@ public sealed class AdjacentInfo
 public sealed class OpeningInfo
 {
     public int Id { get; set; }
-    public string Source { get; set; } = "";            // SketchLoop | FloorOpening | ShaftOpening
-    public long ElementId { get; set; }
+    public string Source { get; set; } = "";            // Void (geometry hole)
+    public string Class { get; set; } = "";             // Trim | Shaft | EdgeAdjacent
+    public string ClassReason { get; set; } = "";
     public double AreaSf { get; set; }
     public bool NeedsTrim { get; set; }
     public BboxInfo Bbox { get; set; } = new();

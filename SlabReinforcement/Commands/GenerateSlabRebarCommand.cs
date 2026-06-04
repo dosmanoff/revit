@@ -9,6 +9,7 @@ using SlabReinforcement.Config;
 using SlabReinforcement.Domain;
 using SlabReinforcement.Engine;
 using SlabReinforcement.UI;
+using UnitSystem = SlabReinforcement.Config.UnitSystem;
 
 namespace SlabReinforcement.Commands;
 
@@ -49,11 +50,14 @@ public class GenerateSlabRebarCommand : IExternalCommand
 
         var skipped = new List<string>();
         Dictionary<ElementId, SlabReinforcementConfig> perSlab;
+        Dictionary<ElementId, BriefSlab>? briefs = null;
+        UnitSystem units = UnitSystem.Imperial;
         try
         {
-            perSlab = dlg.FromCsv
-                ? FromCsv(doc, floors, dlg, skipped)
-                : SameForAll(floors, dlg);
+            if (dlg.FromBrief)
+                (perSlab, briefs, units) = FromBrief(doc, floors, dlg, skipped);
+            else
+                perSlab = dlg.FromCsv ? FromCsv(doc, floors, dlg, skipped) : SameForAll(floors, dlg);
         }
         catch (Exception ex)
         {
@@ -70,7 +74,7 @@ public class GenerateSlabRebarCommand : IExternalCommand
 
         IReadOnlyList<ZoneSpec> zones = LoadZones(dlg);
 
-        RunResult result = new SlabReinforcer(doc).Run(perSlab, zones, dlg.DryRun);
+        RunResult result = new SlabReinforcer(doc).Run(perSlab, zones, dlg.DryRun, briefs, units);
         ShowResults(result, skipped);
         return Result.Succeeded;
     }
@@ -112,6 +116,33 @@ public class GenerateSlabRebarCommand : IExternalCommand
             map[f.Id] = cfg;
         }
         return map;
+    }
+
+    private static (Dictionary<ElementId, SlabReinforcementConfig>, Dictionary<ElementId, BriefSlab>, UnitSystem)
+        FromBrief(Document doc, List<Floor> floors, SlabRebarGenDialog dlg, List<string> skipped)
+    {
+        if (dlg.BriefPath is null || !File.Exists(dlg.BriefPath))
+            throw new InvalidOperationException("JSON brief not found. Browse to a valid file.");
+
+        SlabBrief brief = BriefLoader.Load(dlg.BriefPath);
+        var cfgs = new Dictionary<ElementId, SlabReinforcementConfig>();
+        var briefs = new Dictionary<ElementId, BriefSlab>();
+
+        foreach (Floor f in floors)
+        {
+            string? mark = MarkOf(f);
+            BriefSlab? bs = BriefLoader.Match(brief, mark, f.Id.Value);
+            if (bs is null)
+            {
+                skipped.Add($"{Describe(f)}: no brief entry for Mark '{mark ?? "(none)"}' / id {f.Id.Value}.");
+                continue;
+            }
+            SlabReinforcementConfig cfg = BriefMapper.ToConfig(brief, bs);
+            ApplyMaxOverride(cfg, dlg.MaxBarOverride);
+            cfgs[f.Id] = cfg;
+            briefs[f.Id] = bs;
+        }
+        return (cfgs, briefs, brief.Units);
     }
 
     private static IReadOnlyList<ZoneSpec> LoadZones(SlabRebarGenDialog dlg)
