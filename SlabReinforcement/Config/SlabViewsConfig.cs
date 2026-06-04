@@ -23,6 +23,14 @@ public sealed class SlabViewsConfig
     public string? PlanViewTypeName { get; set; }
     public string? ViewTemplateName { get; set; }
 
+    // 3D isolated cage + bending-detail "details" (like ColumnViews)
+    public bool Create3DView { get; set; } = true;
+    public int View3DScale { get; set; } = 24;
+    public string View3DNameTemplate { get; set; } = "{Mark} - 3D Cage";
+    public bool CreateBendingDetails { get; set; } = true;
+    public int BendingDetailScale { get; set; } = 12;
+    public string BendingDetailNameTemplate { get; set; } = "{Mark} - Bending Details";
+
     // Schedules + sheets (wired in PR-14)
     public bool CreateSchedule { get; set; } = true;
     public string ScheduleNameTemplate { get; set; } = "{Mark} - Rebar Schedule";
