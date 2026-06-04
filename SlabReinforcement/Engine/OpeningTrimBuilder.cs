@@ -157,10 +157,14 @@ public sealed class OpeningTrimBuilder
     private static IReadOnlyList<int> ResolveOpenings(string selector, IReadOnlyList<SlabOpening> openings)
     {
         string s = selector.Trim().ToLowerInvariant();
-        if (s is "all" or "")
-            return Enumerable.Range(0, openings.Count).ToList();
-        if (s == "trim")
+        // "auto"/"trim" (default): only openings the classifier says need it (skips shafts and
+        // openings hard against the slab edge / another big opening — the "excessive trim" fix).
+        if (s is "auto" or "trim" or "")
             return Enumerable.Range(0, openings.Count).Where(i => openings[i].NeedsTrim).ToList();
+        if (s == "none")
+            return [];
+        if (s == "all")
+            return Enumerable.Range(0, openings.Count).ToList();
 
         var idx = new List<int>();
         foreach (string tok in s.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries))

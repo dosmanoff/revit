@@ -14,18 +14,22 @@ namespace SlabReinforcement.UI;
 public sealed class SlabRebarGenDialog : Window
 {
     private readonly RadioButton _rbCsv;
+    private readonly RadioButton _rbBrief;
     private readonly TextBox _folder;
     private readonly ComboBox _configFile;
     private readonly TextBox _csv;
     private readonly TextBox _zones;
+    private readonly TextBox _brief;
     private readonly TextBox _maxBar;
     private readonly CheckBox _dryRun;
 
     public bool FromCsv => _rbCsv.IsChecked == true;
+    public bool FromBrief => _rbBrief.IsChecked == true;
     public string? ConfigFolder => Clean(_folder.Text);
     public string? ConfigPath => _configFile.SelectedItem as string;
     public string? CsvPath => Clean(_csv.Text);
     public string? ZonesPath => Clean(_zones.Text);
+    public string? BriefPath => Clean(_brief.Text);
     public string? MaxBarOverride => Clean(_maxBar.Text);
     public bool DryRun => _dryRun.IsChecked == true;
 
@@ -39,11 +43,13 @@ public sealed class SlabRebarGenDialog : Window
 
         var rbSame = new RadioButton { Content = "Same for all — single JSON config", IsChecked = true, FontWeight = FontWeights.Bold };
         _rbCsv = new RadioButton { Content = "From CSV — per-slab by Mark", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 6, 0, 0) };
+        _rbBrief = new RadioButton { Content = "From JSON brief — full per-slab spec (edges, groups)", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 6, 0, 0) };
 
         _folder = new TextBox { Text = FolderStorage.GetConfigFolder(doc) ?? "" };
         _configFile = new ComboBox();
         _csv = new TextBox { Text = FolderStorage.GetCsvPath(doc) ?? "" };
         _zones = new TextBox { Text = FolderStorage.GetZonesPath(doc) ?? "" };
+        _brief = new TextBox();
         _maxBar = new TextBox();
         _dryRun = new CheckBox { Content = "Dry run (place, then roll back — preview only)", Margin = new Thickness(0, 8, 0, 8) };
 
@@ -54,6 +60,7 @@ public sealed class SlabRebarGenDialog : Window
         });
         var browseCsv = MakeButton("Browse…", () => PickFile(_csv));
         var browseZones = MakeButton("Browse…", () => PickFile(_zones));
+        var browseBrief = MakeButton("Browse…", () => PickFile(_brief));
 
         var ok = new Button { Content = "Run", Width = 90, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         ok.Click += (_, _) => { DialogResult = true; };
@@ -68,6 +75,8 @@ public sealed class SlabRebarGenDialog : Window
         root.Children.Add(_rbCsv);
         root.Children.Add(LabeledRow("Assignments CSV:", _csv, browseCsv));
         root.Children.Add(LabeledRow("Zones CSV (optional):", _zones, browseZones));
+        root.Children.Add(_rbBrief);
+        root.Children.Add(LabeledRow("JSON brief:", _brief, browseBrief));
         root.Children.Add(new Separator { Margin = new Thickness(0, 10, 0, 8) });
         root.Children.Add(LabeledRow("Max bar length override:", _maxBar, null));
         root.Children.Add(_dryRun);

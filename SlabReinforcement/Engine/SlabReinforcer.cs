@@ -1,6 +1,7 @@
 using Autodesk.Revit.DB;
 using SlabReinforcement.Config;
 using SlabReinforcement.Domain;
+using UnitSystem = SlabReinforcement.Config.UnitSystem;
 
 namespace SlabReinforcement.Engine;
 
@@ -17,7 +18,9 @@ public sealed class SlabReinforcer
 
     public RunResult Run(
         IDictionary<ElementId, SlabReinforcementConfig> perSlab,
-        IReadOnlyList<ZoneSpec> zones, bool dryRun)
+        IReadOnlyList<ZoneSpec> zones, bool dryRun,
+        IReadOnlyDictionary<ElementId, BriefSlab>? briefs = null,
+        UnitSystem briefUnits = UnitSystem.Imperial)
     {
         var result = new RunResult { DryRun = dryRun };
 
@@ -51,11 +54,19 @@ public sealed class SlabReinforcer
                     _ => new FieldMeshBuilder(_doc).Build(geom, cfg, slabId),
                 };
 
-                if (cfg.Edges.UBarsEnabled)
+                BriefSlab? bs = null;
+                briefs?.TryGetValue(slabId, out bs);
+
+                if (bs is { Edges.Count: > 0 })
+                    created += new EdgeTreatmentBuilder(_doc).Build(geom, ctx, slabId, cfg, bs.Edges, briefUnits);
+                else if (cfg.Edges.UBarsEnabled)
                     created += new EdgeUBarBuilder(_doc).Build(geom, cfg, slabId, ctx);
 
                 if (cfg.Openings.TrimEnabled)
                     created += new OpeningTrimBuilder(_doc).Build(geom, cfg, slabId);
+
+                if (bs is { Groups.Count: > 0 })
+                    created += new GroupBuilder(_doc).Build(geom, ctx, slabId, cfg, bs.Groups);
 
                 string? mark = floor.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
                 List<ZoneSpec> slabZones = zones

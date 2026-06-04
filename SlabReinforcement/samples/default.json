@@ -15,7 +15,7 @@
   "edges": { "uBarsEnabled": true, "barType": "#5", "spacing": 12, "leg": 12, "selector": "free" },
   "openings": {
     "trimEnabled": true, "barType": "#5", "extraEachSide": 2,
-    "uBars": true, "diagonals": true, "diagBarType": "#5", "selector": "all"
+    "uBars": true, "diagonals": true, "diagBarType": "#5", "selector": "auto"
   },
   "anchors": { "edgeAnchorMode": "Straight", "edgeAnchorLen": 24 },
   "cleanExisting": true
