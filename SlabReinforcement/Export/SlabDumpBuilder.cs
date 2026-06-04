@@ -141,9 +141,14 @@ public sealed class SlabDumpBuilder
             WallsBounding = GroupEdges(ctx, EdgeKind.Wall),
             Beams = GroupEdges(ctx, EdgeKind.Beam),
             SlabsCoplanar = GroupEdges(ctx, EdgeKind.Slab),
+            SlabAbove = ToNeighborSlab(ctx.SlabAbove),
+            SlabBelow = ToNeighborSlab(ctx.SlabBelow),
         };
         return info;
     }
+
+    private static NeighborSlabInfo? ToNeighborSlab(NeighborSlab? n) =>
+        n is null ? null : new NeighborSlabInfo { ElementId = n.ElementId, Mark = n.Mark, ThicknessIn = n.ThicknessIn };
 
     private static List<NeighborGroupInfo> GroupEdges(SlabContext ctx, EdgeKind kind) =>
         ctx.Edges

@@ -37,10 +37,21 @@ public sealed class SupportBelow
 /// neighboring slab) and which columns / walls / beams sit underneath it. Revit-facing —
 /// the geometric predicates live in the Revit-free <c>Geometry2D</c> and are unit-tested.
 /// </summary>
+/// <summary>A slab directly above or below this one (overlapping in plan) — dowel/starter context.</summary>
+public sealed class NeighborSlab
+{
+    public required long ElementId { get; init; }
+    public string? Mark { get; init; }
+    public double ThicknessIn { get; init; }
+    public double GapFt { get; init; }
+}
+
 public sealed class SlabContext
 {
     public required IReadOnlyList<BoundaryEdge> Edges { get; init; }
     public required IReadOnlyList<SupportBelow> Supports { get; init; }
+    public NeighborSlab? SlabAbove { get; init; }
+    public NeighborSlab? SlabBelow { get; init; }
 
     public IReadOnlyList<int> FreeEdgeIndices =>
         Edges.Where(e => e.Kind == EdgeKind.Free).Select(e => e.Index).ToList();
@@ -70,8 +81,49 @@ public sealed class SlabContext
         var usedOnEdges = new HashSet<long>(edges.Where(e => e.AdjacentElementId != 0).Select(e => e.AdjacentElementId));
         List<SupportBelow> supports = FindSupports(geom, columns, walls, beams, usedOnEdges);
 
-        return new SlabContext { Edges = edges, Supports = supports };
+        return new SlabContext
+        {
+            Edges = edges,
+            Supports = supports,
+            SlabAbove = FindVerticalNeighbor(doc, floor, bb, above: true),
+            SlabBelow = FindVerticalNeighbor(doc, floor, bb, above: false),
+        };
     }
+
+    private static NeighborSlab? FindVerticalNeighbor(Document doc, Floor self, BoundingBoxXYZ? bb, bool above)
+    {
+        if (bb is null) return null;
+        const double pad = 1.0, band = 30.0;
+        var min = new XYZ(bb.Min.X - pad, bb.Min.Y - pad, above ? bb.Max.Z + 0.01 : bb.Min.Z - band);
+        var max = new XYZ(bb.Max.X + pad, bb.Max.Y + pad, above ? bb.Max.Z + band : bb.Min.Z - 0.01);
+        var filter = new BoundingBoxIntersectsFilter(new Outline(min, max));
+
+        NeighborSlab? best = null;
+        double bestGap = double.MaxValue;
+        foreach (Element e in new FilteredElementCollector(doc).OfClass(typeof(Floor)).WherePasses(filter))
+        {
+            if (e is not Floor f || f.Id == self.Id) continue;
+            BoundingBoxXYZ? fb = f.get_BoundingBox(null);
+            if (fb is null || !PlanOverlaps(bb, fb)) continue;
+
+            double gap = above ? fb.Min.Z - bb.Max.Z : bb.Min.Z - fb.Max.Z;
+            if (gap < -0.5 || gap >= bestGap) continue;
+
+            bestGap = gap;
+            double thick = (doc.GetElement(f.GetTypeId()) as FloorType)?.GetCompoundStructure()?.GetWidth() ?? 0;
+            best = new NeighborSlab
+            {
+                ElementId = f.Id.Value,
+                Mark = MarkOf(f),
+                ThicknessIn = UnitConv.FtToIn(thick),
+                GapFt = Math.Round(gap, 3),
+            };
+        }
+        return best;
+    }
+
+    private static bool PlanOverlaps(BoundingBoxXYZ a, BoundingBoxXYZ b) =>
+        a.Min.X < b.Max.X && a.Max.X > b.Min.X && a.Min.Y < b.Max.Y && a.Max.Y > b.Min.Y;
 
     // ── Boundary edges ────────────────────────────────────────────────────────
 
