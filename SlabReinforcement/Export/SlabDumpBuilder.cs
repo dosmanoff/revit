@@ -114,7 +114,6 @@ public sealed class SlabDumpBuilder
             {
                 Id = i + 1,
                 Source = o.Source.ToString(),
-                ElementId = o.ElementId,
                 AreaSf = o.AreaSf,
                 NeedsTrim = o.NeedsTrim,
                 Bbox = BoundsToBbox(o.Bounds),

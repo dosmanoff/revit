@@ -275,7 +275,7 @@ public sealed class SlabContext
     }
 
     private static bool InAnyOpening(SlabGeometry geom, Pt2 p) =>
-        geom.SketchOpenings.Any(o => Geometry2D.PointInLoop(o.Points, p));
+        geom.Openings.Any(o => Geometry2D.PointInLoop(o.Points, p));
 
     private static string? MarkOf(Element e)
     {
