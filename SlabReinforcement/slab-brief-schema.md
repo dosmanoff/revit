@@ -47,9 +47,18 @@ edge is reinforced:
 > `UBar` or `Bend90`; beam/wall edges → `IntoSupport` or `Bend90` anchored into the support.
 
 ## `openings`
-`trim`: `auto` (size threshold) \| `all` \| `none` \| index list. Plus `barType`, `extraEachSide`,
-`uBars`, `diagonals`. Openings (any geometry) are detected from the slab face — you don't list them,
-you only set the policy.
+`trim`: **`auto`** (default) \| `all` \| `none` \| index list. Plus `barType`, `extraEachSide`,
+`uBars`, `diagonals`. You don't list openings — they're detected from the slab **face geometry**
+(any shape/authoring method, arcs tessellated) and **auto-classified**, so trim lands only where
+it's useful:
+
+- **Trim** — an isolated small/medium penetration → trim bars + diagonals.
+- **Shaft** — a large opening (stair/elevator, ≥ 3.5 ft or ≥ 16 sf) → NOT trimmed (it gets edge
+  reinforcement, like a free edge).
+- **EdgeAdjacent** — hard against the slab edge or another big opening → NOT trimmed (redundant).
+
+`auto` trims only **Trim**-class openings; the dump reports each opening's `class` + `class_reason`
+so you can override with `all` / `none` / explicit ids when the engineer disagrees.
 
 ## `groups[]` — arbitrary additional reinforcement (#4)
 A fully-specified bar group. Typical (top over supports, bottom in span) **and** non-typical
@@ -79,5 +88,17 @@ A fully-specified bar group. Typical (top over supports, bottom in span) **and**
    dowels/starters into adjacent or future elements (walls starting above, stairs).
 6. Emit only valid bar/hook names (from the dump's available lists). Keep it explicit and complete.
 
-**Implementation status:** the schema and loader land in PR-17. The engine consumes it across
-PR-18 (field Bars/Sets/AreaSystem), PR-19 (per-segment edges) and PR-20 (groups/dowels).
+## What the generator does automatically (you don't specify)
+- **Void detection** from the real slab face — openings of any shape/method, arcs tessellated;
+  no rebar is placed where there's no concrete.
+- **Field clipping** around every opening; in `Sets` mode the mat is split into uniform rebar
+  **sets** (representative/middle bar) that lap by splitting.
+- **Opening classification** (Trim / Shaft / EdgeAdjacent) — `trim: auto` uses it.
+- **Layer tagging** `SR:{config}:{slabId}:{layer}` so Slab Views can isolate Layer 1–4 and re-runs
+  clean idempotently.
+
+**Implementation status (in the build):** schema + loader (PR-17); field Bars/**Sets**/AreaSystem
+(PR-08/11/18); per-segment edges + groups/dowels + smart opening trim + brief consumption (PR-19);
+geometry+adjacency export incl. slab above/below (PR-16/20); Slab Views Layer 1–4 + schedules +
+sheets + 3D cage + bending details (PR-13/14/15/21). Edge anchorage into beams/walls and the
+AreaSystem-with-holes partition remain refinements.
