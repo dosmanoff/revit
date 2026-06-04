@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "units": "Imperial",
+  "slabs": [
+    {
+      "mark": "S-101",
+      "cleanExisting": true,
+      "cover": { "top": 1.5, "bottom": 1.5, "side": 1.5 },
+      "lengths": {
+        "maxBarLength": "40'-0\"",
+        "lap": { "mode": "Factor", "factor": 40, "stagger": true }
+      },
+
+      "field": {
+        "mode": "Sets",
+        "bottom": {
+          "x": { "barType": "#5", "spacing": 12 },
+          "y": { "barType": "#5", "spacing": 12 }
+        },
+        "top": {
+          "coverage": "OverSupports",
+          "x": { "barType": "#5", "spacing": 12 },
+          "y": { "barType": "#5", "spacing": 12 }
+        }
+      },
+
+      "edges": [
+        {
+          "segments": "free",
+          "support": "free",
+          "treatment": { "type": "UBar", "barType": "#5", "spacing": 12, "leg": "1'-0\"", "face": "both" }
+        },
+        {
+          "segments": [1],
+          "support": "beam",
+          "adjacent": "B-12",
+          "treatment": { "type": "Bend90", "barType": "#5", "spacing": 12, "leg": "1'-6\"", "anchorInto": "beam", "anchorLen": "1'-0\"", "direction": "down" }
+        },
+        {
+          "segments": [3],
+          "support": "wall",
+          "adjacent": "W-2",
+          "treatment": { "type": "IntoSupport", "barType": "#5", "spacing": 12, "anchorInto": "wall", "anchorLen": "1'-6\"" }
+        }
+      ],
+
+      "openings": { "trim": "auto", "barType": "#5", "extraEachSide": 2, "uBars": true, "diagonals": true },
+
+      "groups": [
+        {
+          "name": "Top over column C-3",
+          "layer": "Top",
+          "barType": "#6",
+          "spacing": 8,
+          "shape": "Straight",
+          "direction": { "kind": "Axis", "axis": "X" },
+          "region": { "kind": "SupportStrip", "support": "C-3", "width": "5'-0\"", "extent": "6'-0\"" },
+          "face": "Top",
+          "anchor": { "start": { "type": "Straight" }, "end": { "type": "Straight" } }
+        },
+        {
+          "name": "Bottom additional mid-span band",
+          "layer": "Bottom",
+          "barType": "#6",
+          "spacing": 8,
+          "shape": "Straight",
+          "direction": { "kind": "Axis", "axis": "Y" },
+          "region": { "kind": "BBox", "bBox": [4, 18, 24, 30] },
+          "face": "Bottom"
+        },
+        {
+          "name": "Dowels into wall that starts above",
+          "layer": "Dowel",
+          "barType": "#5",
+          "spacing": 12,
+          "shape": "L",
+          "direction": { "kind": "AlongEdge", "edge": 3 },
+          "region": { "kind": "EdgeRange", "segment": 3, "from": 0, "to": "20'-0\"" },
+          "dowel": { "into": "Wall", "target": "W-2", "embedLen": "1'-6\"", "projectLen": "2'-0\"", "bend": "90", "direction": "up" }
+        },
+        {
+          "name": "Stair landing starters",
+          "layer": "Dowel",
+          "barType": "#5",
+          "count": 10,
+          "spacing": 6,
+          "shape": "L",
+          "region": { "kind": "Line", "lineFrom": [12, 2], "lineTo": [12, 7] },
+          "dowel": { "into": "Stair", "projectLen": "3'-0\"", "embedLen": "1'-0\"", "direction": "up", "angleDeg": 0 }
+        }
+      ]
+    }
+  ]
+}
