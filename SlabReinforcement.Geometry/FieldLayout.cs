@@ -1,17 +1,46 @@
 namespace SlabReinforcement.Geometry;
 
+/// <summary>One clipped bar position in the bar's local frame: a scan line at <see cref="Perp"/>
+/// running from <see cref="Start"/> to <see cref="End"/> along the bar direction.</summary>
+public readonly struct LocalRail
+{
+    public double Perp { get; }    // local-Y (scan position, perpendicular to the bars)
+    public double Start { get; }   // local-X start
+    public double End { get; }     // local-X end
+
+    public LocalRail(double perp, double start, double end) { Perp = perp; Start = start; End = end; }
+
+    public double Length => End - Start;
+}
+
+/// <summary>A run of equally-spaced parallel bars of the same length — one Revit rebar set.</summary>
+public readonly struct Band
+{
+    public double Perp0 { get; }   // perpendicular position of the first bar (minimum)
+    public int Count { get; }      // number of bar positions
+    public double Spacing { get; }
+    public double Start { get; }   // local-X extent (shared by every bar)
+    public double End { get; }
+
+    public Band(double perp0, int count, double spacing, double start, double end)
+    {
+        Perp0 = perp0; Count = count; Spacing = spacing; Start = start; End = end;
+    }
+
+    public double Length => End - Start;
+}
+
 /// <summary>
 /// Pure layout math for a slab field mat: scan-line clipping of parallel bars to the slab
-/// boundary minus openings, and splitting long runs at a max bar length with laps. No Revit
-/// dependency — fully unit-tested. The engine maps the results onto a plane and creates rebar.
+/// boundary minus openings, grouping them into uniform bands (one rebar set each), and splitting
+/// long runs at a max bar length with laps. No Revit dependency — fully unit-tested.
 /// </summary>
 public static class FieldLayout
 {
     /// <summary>
     /// Split a 1-D run of length <paramref name="length"/> into bar segments (start,end) along
-    /// the run, each no longer than <paramref name="maxLen"/>, adjacent segments overlapping by
-    /// <paramref name="lap"/>. <paramref name="firstBarLen"/> caps the first segment (pass
-    /// <c>maxLen/2</c> to stagger splices on alternating rails); ≤ 0 means use <paramref name="maxLen"/>.
+    /// the run, each ≤ <paramref name="maxLen"/>, adjacent segments overlapping by <paramref name="lap"/>.
+    /// <paramref name="firstBarLen"/> caps the first segment (pass <c>maxLen/2</c> to stagger).
     /// </summary>
     public static List<(double Start, double End)> SplitWithLaps(
         double length, double maxLen, double lap, double firstBarLen = 0)
@@ -34,27 +63,27 @@ public static class FieldLayout
             if (e >= length - 1e-9) break;
 
             double next = e - lap;
-            if (next <= s + 1e-9) next = e;   // lap ≥ bar (degenerate): butt joint, keep advancing
+            if (next <= s + 1e-9) next = e;
             s = next;
         }
         return segs;
     }
 
     /// <summary>
-    /// Parallel bars (as world-XY segments) running along <paramref name="dir"/>, spaced
-    /// <paramref name="spacing"/> apart across the slab, clipped to <paramref name="outer"/> minus
-    /// <paramref name="holes"/>. Scan positions are inset from the perpendicular edges by
-    /// <paramref name="sideInset"/>; each bar's ends are pulled in by <paramref name="endInset"/>.
+    /// Clipped bar positions in the bar's local frame (local-X = <paramref name="dir"/>), spaced
+    /// <paramref name="spacing"/> apart, clipped to <paramref name="outer"/> minus
+    /// <paramref name="holes"/>; scan positions inset by <paramref name="sideInset"/>, ends pulled
+    /// in by <paramref name="endInset"/>.
     /// </summary>
-    public static List<Seg2> Rails(
+    public static List<LocalRail> LocalRails(
         Loop2 outer, IReadOnlyList<Loop2> holes, Pt2 dir,
         double spacing, double sideInset, double endInset)
     {
-        var result = new List<Seg2>();
+        var result = new List<LocalRail>();
         if (spacing <= 1e-9) return result;
 
         Pt2 u = dir.Normalized;
-        double cos = u.X, sin = u.Y;     // local frame: +X along the bar direction
+        double cos = u.X, sin = u.Y;
 
         var loops = new List<List<Pt2>> { outer.Points.Select(p => ToLocal(p, cos, sin)).ToList() };
         foreach (Loop2 h in holes) loops.Add(h.Points.Select(p => ToLocal(p, cos, sin)).ToList());
@@ -71,11 +100,64 @@ public static class FieldLayout
                 double xa = xs[i] + endInset;
                 double xb = xs[i + 1] - endInset;
                 if (xb - xa < 1e-6) continue;
-                result.Add(new Seg2(ToWorld(new Pt2(xa, y), cos, sin), ToWorld(new Pt2(xb, y), cos, sin)));
+                result.Add(new LocalRail(y, xa, xb));
             }
         }
         return result;
     }
+
+    /// <summary>Clipped bars as world-XY segments (FieldMode=Bars). Thin wrapper over
+    /// <see cref="LocalRails"/>.</summary>
+    public static List<Seg2> Rails(
+        Loop2 outer, IReadOnlyList<Loop2> holes, Pt2 dir,
+        double spacing, double sideInset, double endInset)
+    {
+        Pt2 u = dir.Normalized;
+        double cos = u.X, sin = u.Y;
+        var rails = LocalRails(outer, holes, dir, spacing, sideInset, endInset);
+        var result = new List<Seg2>(rails.Count);
+        foreach (LocalRail r in rails)
+            result.Add(new Seg2(ToWorld(new Pt2(r.Start, r.Perp), cos, sin),
+                                ToWorld(new Pt2(r.End, r.Perp), cos, sin)));
+        return result;
+    }
+
+    /// <summary>
+    /// Group clipped rails into uniform <see cref="Band"/>s — maximal runs of bars sharing the same
+    /// local-X extent at consecutive scan positions (one rebar set each). Around a hole the bars
+    /// split into the bands above, below, left and right of it.
+    /// </summary>
+    public static List<Band> Bands(IReadOnlyList<LocalRail> rails, double spacing)
+    {
+        var bands = new List<Band>();
+        if (rails.Count == 0) return bands;
+
+        const double extentTol = 1e-3;
+        double stepTol = Math.Max(1e-3, spacing * 0.1);
+
+        // Bucket by extent (rounded), then split each bucket into runs of consecutive scan lines.
+        var byExtent = rails
+            .GroupBy(r => (Math.Round(r.Start / extentTol), Math.Round(r.End / extentTol)));
+
+        foreach (var group in byExtent)
+        {
+            List<LocalRail> g = group.OrderBy(r => r.Perp).ToList();
+            int runStart = 0;
+            for (int i = 1; i <= g.Count; i++)
+            {
+                bool breakHere = i == g.Count || Math.Abs(g[i].Perp - g[i - 1].Perp - spacing) > stepTol;
+                if (!breakHere) continue;
+
+                int count = i - runStart;
+                LocalRail f = g[runStart];
+                bands.Add(new Band(f.Perp, count, spacing, f.Start, f.End));
+                runStart = i;
+            }
+        }
+        return bands;
+    }
+
+    // ── internals ────────────────────────────────────────────────────────────────
 
     private static List<double> ScanCrossings(List<List<Pt2>> loops, double y)
     {
@@ -96,7 +178,6 @@ public static class FieldLayout
         return xs;
     }
 
-    // Rotate world → local (so the bar direction becomes +X) and back.
     private static Pt2 ToLocal(Pt2 p, double cos, double sin) => new(p.X * cos + p.Y * sin, -p.X * sin + p.Y * cos);
     private static Pt2 ToWorld(Pt2 q, double cos, double sin) => new(q.X * cos - q.Y * sin, q.X * sin + q.Y * cos);
 }
