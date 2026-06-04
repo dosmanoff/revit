@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Structure;
 using SlabReinforcement.Config;
 using SlabReinforcement.Domain;
 using View = Autodesk.Revit.DB.View;
@@ -86,9 +87,22 @@ public sealed class SlabViewsEngine
             result.ViewsCreated++;
         }
 
+        var sheetViews = created.Select(c => c.View).ToList();
+
+        if (_cfg.Create3DView && Create3D(floor, bbox, mark, result) is { } v3d)
+        {
+            sheetViews.Add(v3d);
+            result.ViewsCreated++;
+        }
+        if (_cfg.CreateBendingDetails && CreateBendingDetailView(floor, mark, result) is { } bd)
+        {
+            sheetViews.Add(bd);
+            result.ViewsCreated++;
+        }
+
         List<ViewSchedule> schedules = BuildSchedule(mark, result);
         if (_cfg.PlaceOnSheet)
-            BuildSheet(mark, created.Select(c => c.View).ToList(), schedules, result);
+            BuildSheet(mark, sheetViews, schedules, result);
 
         tx.Commit();
     }
@@ -120,6 +134,89 @@ public sealed class SlabViewsEngine
         }
         catch (Exception ex) { result.Error($"Sheet for {mark}: {ex.Message}"); }
     }
+
+    // ── 3D isolated cage + bending details (like ColumnViews) ─────────────────────
+
+    private View? Create3D(Floor floor, BoundingBoxXYZ bbox, string mark, ViewRunResult result)
+    {
+        try
+        {
+            ViewFamilyType vft = FindViewFamilyType(ViewFamily.ThreeDimensional, null);
+            View3D v = View3D.CreateIsometric(_doc, vft.Id);
+
+            double p = _cfg.CropPadding;
+            v.SetSectionBox(new BoundingBoxXYZ
+            {
+                Min = new XYZ(bbox.Min.X - p, bbox.Min.Y - p, bbox.Min.Z - p),
+                Max = new XYZ(bbox.Max.X + p, bbox.Max.Y + p, bbox.Max.Z + p),
+            });
+            v.IsSectionBoxActive = true;
+            v.Name = UniqueName(Token(_cfg.View3DNameTemplate, mark));
+            TrySet(() => v.Scale = _cfg.View3DScale);
+            TrySet(() => v.DetailLevel = _cfg.DetailLevel);
+
+            _doc.Regenerate();
+            List<Rebar> rebar = HostSrRebar(floor.Id);
+            var keep = new HashSet<ElementId>(rebar.Select(r => r.Id));
+            List<ElementId> hide = new FilteredElementCollector(_doc, v.Id)
+                .WhereElementIsNotElementType()
+                .Where(e => !keep.Contains(e.Id) && e.CanBeHidden(v))
+                .Select(e => e.Id).ToList();
+            if (hide.Count > 0) try { v.HideElements(hide); } catch { }
+            foreach (Rebar r in rebar) try { r.SetUnobscuredInView(v, true); } catch { }
+            return v;
+        }
+        catch (Exception ex) { result.Error($"3D cage for {mark}: {ex.Message}"); return null; }
+    }
+
+    private View? CreateBendingDetailView(Floor floor, string mark, ViewRunResult result)
+    {
+        try
+        {
+            List<Rebar> rebar = HostSrRebar(floor.Id);
+            if (rebar.Count == 0) return null;
+
+            ViewFamilyType vft = FindViewFamilyType(ViewFamily.Drafting, null);
+            ViewDrafting view = ViewDrafting.Create(_doc, vft.Id);
+            view.Name = UniqueName(Token(_cfg.BendingDetailNameTemplate, mark));
+            TrySet(() => view.Scale = _cfg.BendingDetailScale);
+
+            RebarBendingDetailType? bdType = new FilteredElementCollector(_doc)
+                .OfClass(typeof(RebarBendingDetailType)).Cast<RebarBendingDetailType>().FirstOrDefault();
+            if (bdType is null) { result.Error($"Bending details for {mark}: no RebarBendingDetailType in project."); return view; }
+
+            List<Rebar> unique = rebar
+                .GroupBy(r => (BarTypeName(r), BarShapeName(r), Math.Round(BarTotalLength(r), 4)))
+                .Select(g => g.First()).ToList();
+
+            const double colGap = 5.0, rowGap = 3.0;
+            const int cols = 3;
+            for (int i = 0; i < unique.Count; i++)
+            {
+                var pos = new XYZ((i % cols) * colGap, -(i / cols) * rowGap, 0);
+                try
+                {
+                    var bd = RebarBendingDetail.Create(_doc, view.Id, unique[i].Id, 0, bdType, XYZ.Zero, 0);
+                    try { RebarBendingDetail.SetPosition(bd, pos); } catch { }
+                }
+                catch { /* one detail failing must not sink the view */ }
+            }
+            return view;
+        }
+        catch (Exception ex) { result.Error($"Bending details for {mark}: {ex.Message}"); return null; }
+    }
+
+    private List<Rebar> HostSrRebar(ElementId floorId) =>
+        new FilteredElementCollector(_doc).OfCategory(BuiltInCategory.OST_Rebar)
+            .WhereElementIsNotElementType().OfType<Rebar>()
+            .Where(r => r.GetHostId() == floorId)
+            .Where(r => r.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString()?.StartsWith("SR:") == true)
+            .ToList();
+
+    private string BarTypeName(Rebar r) => _doc.GetElement(r.GetTypeId())?.Name ?? "";
+    private static string BarShapeName(Rebar r) => r.LookupParameter("Shape")?.AsValueString() ?? "";
+    private static double BarTotalLength(Rebar r) =>
+        r.LookupParameter("Total Bar Length")?.AsDouble() ?? r.LookupParameter("Bar Length")?.AsDouble() ?? 0.0;
 
     private static string Token(string template, string mark) => template.Replace("{Mark}", mark);
 
