@@ -5,7 +5,10 @@ public enum FieldMode
 {
     /// <summary>Individual bars, split at <see cref="LengthsConfig.MaxBarLength"/> and lapped.</summary>
     Bars,
-    /// <summary>Native Revit AreaReinforcement system (no per-bar length control).</summary>
+    /// <summary>Rebar sets — one Rebar element per run with a spacing layout, shown as the
+    /// representative (middle) bar; laps by splitting the set lengthwise.</summary>
+    Sets,
+    /// <summary>Native Revit AreaReinforcement system (openings excluded via inner loops).</summary>
     AreaSystem,
 }
 
