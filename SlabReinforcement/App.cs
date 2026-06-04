@@ -27,15 +27,16 @@ public class App : IExternalApplication
 
         panel.AddItem(new PushButtonData(
             name: "SlabExport",
-            text: "Export\nSlabs",
+            text: "Slab Geometry\nAnalysis",
             assemblyName: assemblyPath,
             className: typeof(ExportSlabsCommand).FullName!)
         {
-            ToolTip = "Export a JSON description of selected slabs for the reinforcement agent.",
+            ToolTip = "Analyse and export slab + adjacent-structure geometry to JSON for the agent.",
             LongDescription =
-                "Collects geometry, edge adjacency, openings, supports below, available " +
-                "bar/hook types and reinforcement hints for the selected floors, and writes " +
-                "them to a JSON file consumed by the external AI agent.",
+                "Collects the slab's geometry and openings (any shape), boundary adjacency " +
+                "(free / beam / wall / neighbouring slab), supports below, slabs above/below, " +
+                "available bar/hook types and reinforcement hints, and writes them to a JSON " +
+                "file the external AI agent reads together with the generator guide.",
         });
 
         panel.AddItem(new PushButtonData(
