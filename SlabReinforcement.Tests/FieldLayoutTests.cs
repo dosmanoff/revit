@@ -128,4 +128,46 @@ public class FieldLayoutTests
             Assert.Equal(0.0, Math.Abs(r.A.X - r.B.X), 6);   // vertical: constant X
         }
     }
+
+    // ── ClipToFootprint ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Clip_FullyInside_ReturnedUnchanged()
+    {
+        var pieces = FieldLayout.ClipToFootprint(new Seg2(new(5, 5), new(15, 5)), Square(20), []);
+
+        Assert.Single(pieces);
+        Assert.Equal(10.0, pieces[0].Length, 6);
+    }
+
+    [Fact]
+    public void Clip_StraddlingEdge_TrimmedToInside()
+    {
+        // bar runs off the right edge (x = 20)
+        var pieces = FieldLayout.ClipToFootprint(new Seg2(new(15, 10), new(25, 10)), Square(20), []);
+
+        Assert.Single(pieces);
+        Assert.Equal(5.0, pieces[0].Length, 6);
+        double maxX = Math.Max(pieces[0].A.X, pieces[0].B.X);
+        Assert.Equal(20.0, maxX, 6);
+    }
+
+    [Fact]
+    public void Clip_FullyOutside_ReturnsEmpty()
+    {
+        var pieces = FieldLayout.ClipToFootprint(new Seg2(new(25, 10), new(35, 10)), Square(20), []);
+        Assert.Empty(pieces);
+    }
+
+    [Fact]
+    public void Clip_CrossingHole_SplitsIntoTwo()
+    {
+        var hole = new Loop2([new(8, 8), new(12, 8), new(12, 12), new(8, 12)]);
+        var pieces = FieldLayout.ClipToFootprint(new Seg2(new(5, 10), new(15, 10)), Square(20), [hole]);
+
+        Assert.Equal(2, pieces.Count);
+        double total = pieces.Sum(p => p.Length);
+        Assert.Equal(6.0, total, 6);                          // (5→8) + (12→15) = 3 + 3
+        Assert.All(pieces, p => Assert.Equal(3.0, p.Length, 6));
+    }
 }
