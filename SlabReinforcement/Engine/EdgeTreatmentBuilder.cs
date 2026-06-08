@@ -19,6 +19,8 @@ public sealed class EdgeTreatmentBuilder
 
     public EdgeTreatmentBuilder(Document doc) => _doc = doc;
 
+    private const double MinEdgeFt = 0.5;   // ignore boundary slivers shorter than 6"
+
     public int Build(SlabGeometry geom, SlabContext ctx, ElementId slabId,
         SlabReinforcementConfig cfg, IReadOnlyList<BriefEdge> edges, UnitSystem units)
     {
@@ -54,7 +56,7 @@ public sealed class EdgeTreatmentBuilder
     {
         Seg2 seg = be.Segment;
         double len = seg.Length;
-        if (len <= 2 * coverSide) return 0;
+        if (len < MinEdgeFt) return 0;       // skip only true slivers
 
         Pt2 t = seg.Dir;
         double rad = be.OutwardNormalDeg * Math.PI / 180.0;
@@ -64,7 +66,13 @@ public sealed class EdgeTreatmentBuilder
         bool bottom = tr.Face is "both" or "bottom";
 
         int created = 0;
-        foreach (double d in RebarFactory.EvenlySpaced(coverSide, len - coverSide, spacing))
+        // Seed bars at `spacing` within the end cover; an edge too short for even one such
+        // position (a small balcony return / perimeter jog) still gets one centred bar so the
+        // free edge is closed.
+        IEnumerable<double> positions = len > 2 * coverSide
+            ? RebarFactory.EvenlySpaced(coverSide, len - coverSide, spacing)
+            : new[] { len / 2 };
+        foreach (double d in positions)
         {
             Pt2 onEdge = seg.A + t * d;
             Pt2 atFace = onEdge - n * coverSide;          // inside the side cover
