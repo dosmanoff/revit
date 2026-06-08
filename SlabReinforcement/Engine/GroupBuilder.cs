@@ -37,7 +37,7 @@ public sealed class GroupBuilder
     {
         RebarBarType barType = RebarFactory.GetBarType(_doc, g.BarType);
         double db = barType.BarNominalDiameter;
-        string tag = ExistingRebarCleaner.MakeTag(cfg.Name, slabId, ParseLayer(g.Layer));
+        string tag = ExistingRebarCleaner.MakeTag(cfg.Name, slabId, ResolveLayer(g));
         double z = FaceZ(geom, cfg, g.Face, db);
         Pt2 dir = ResolveDir(g.Direction, geom, ctx);
         double spacing = g.Spacing is { } sp ? sp.ToFeet(u) : 1.0;
@@ -223,6 +223,21 @@ public sealed class GroupBuilder
         return new Seg2(mid - t * (len / 2), mid + t * (len / 2));
     }
 
-    private static SlabLayer ParseLayer(string layer) =>
-        Enum.TryParse(layer, ignoreCase: true, out SlabLayer l) ? l : SlabLayer.Support;
+    // Map a brief group's layer string to a tag layer. Explicit enum names (BottomX, TopY,
+    // Support, Dowel, …) pass through; the friendly aliases "Bottom"/"Top" resolve to the
+    // matching mesh layer by bar direction so Slab Views' Layer 1–4 pick the group up
+    // (previously "Bottom"/"Top" fell through to Support — the additional-reinforcement layer bug).
+    private static SlabLayer ResolveLayer(BriefGroup g)
+    {
+        string layer = (g.Layer ?? string.Empty).Trim();
+        if (Enum.TryParse(layer, ignoreCase: true, out SlabLayer direct)) return direct;
+        bool isY = string.Equals(g.Direction?.Axis, "Y", StringComparison.OrdinalIgnoreCase);
+        return layer.ToLowerInvariant() switch
+        {
+            "bottom" => isY ? SlabLayer.BottomY : SlabLayer.BottomX,
+            "top" => isY ? SlabLayer.TopY : SlabLayer.TopX,
+            "dowel" => SlabLayer.Dowel,
+            _ => SlabLayer.Support,
+        };
+    }
 }

@@ -99,8 +99,10 @@ public sealed class EdgeTreatmentBuilder
                     break;
 
                 case EdgeTreatmentType.Straight:
-                    if (top) created += Straight(barTypeId, geom.Floor, tag, inward, atFace, zTop);
-                    if (bottom) created += Straight(barTypeId, geom.Floor, tag, inward, atFace, zBottom);
+                    // "Cover only": the field mat already runs to the edge, so no extra edge bar
+                    // is placed here. (Previously this spawned a short perpendicular stub per
+                    // spacing position on each face — hundreds of junk bars.) For a continuous
+                    // edge bar, use a `group` with an EdgeRange region instead.
                     break;
             }
         }
