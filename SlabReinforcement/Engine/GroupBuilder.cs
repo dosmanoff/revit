@@ -58,18 +58,37 @@ public sealed class GroupBuilder
         if (region is null) return 0;
 
         double len = g.Length is { } l ? l.ToFeet(u) : 0;
-        int created = 0;
+        Pt2 perp = dir.Perp;
+
+        // Parallel bars across the region (recentred to an explicit length if given), each clipped
+        // to the slab footprint, then regrouped into uniform bands. Each band is placed as one rebar
+        // SET (distributed in-plane via SetLayoutAsNumberWithSpacing) — matching the field mats, not
+        // loose single bars. Clipping happens before grouping, so every set copy stays on concrete.
+        var clipped = new List<LocalRail>();
         foreach (Seg2 rail in FieldLayout.Rails(region, [], dir, spacing, 0, 0))
         {
             Seg2 bar = len > 0 ? Recenter(rail, len) : rail;
-            // Clip to the slab footprint so a strip centred on an edge support doesn't spill
-            // past the slab edge or over a void ("rebar completely outside its host").
             foreach (Seg2 piece in FieldLayout.ClipToFootprint(bar, geom.Outer, geom.Openings))
             {
-                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ,
-                    new List<Curve> { Line.CreateBound(new XYZ(piece.A.X, piece.A.Y, z), new XYZ(piece.B.X, piece.B.Y, z)) }, tag);
-                created++;
+                double ly = piece.A.Dot(perp);
+                double s = piece.A.Dot(dir), e = piece.B.Dot(dir);
+                if (s > e) (s, e) = (e, s);
+                clipped.Add(new LocalRail(ly, s, e));
             }
+        }
+
+        var norm = new XYZ(perp.X, perp.Y, 0);
+        int created = 0;
+        foreach (Band band in FieldLayout.Bands(clipped, spacing))
+        {
+            Pt2 a = dir * band.Start + perp * band.Perp0;
+            Pt2 b = dir * band.End + perp * band.Perp0;
+            Rebar set = RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, norm,
+                new List<Curve> { Line.CreateBound(new XYZ(a.X, a.Y, z), new XYZ(b.X, b.Y, z)) }, tag);
+            if (band.Count > 1)
+                try { set.GetShapeDrivenAccessor().SetLayoutAsNumberWithSpacing(band.Count, spacing, true, true, true); }
+                catch { /* keep the representative bar if the layout API rejects it */ }
+            created += band.Count;
         }
         return created;
     }
