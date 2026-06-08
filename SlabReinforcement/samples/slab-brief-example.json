@@ -24,20 +24,24 @@
         }
       },
 
+      "_edges_note": "Enumerate boundary[] by index; one rule per treatment. Edges in no rule get no edge bars. `segments` is a string: space-separated indices (preferred), or the shorthands \"free\"/\"all\".",
       "edges": [
         {
-          "segments": "free",
+          "_note": "free perimeter edges (boundary[].edge=='free')",
+          "segments": "0 2 4 5 6 7",
           "support": "free",
           "treatment": { "type": "UBar", "barType": "#5", "spacing": 12, "leg": "1'-0\"", "face": "both" }
         },
         {
-          "segments": [1],
+          "_note": "edge 1 sits on beam B-12 → bend the mat down into it",
+          "segments": "1",
           "support": "beam",
           "adjacent": "B-12",
           "treatment": { "type": "Bend90", "barType": "#5", "spacing": 12, "leg": "1'-6\"", "anchorInto": "beam", "anchorLen": "1'-0\"", "direction": "down" }
         },
         {
-          "segments": [3],
+          "_note": "edge 3 sits on wall W-2 → anchor into it",
+          "segments": "3",
           "support": "wall",
           "adjacent": "W-2",
           "treatment": { "type": "IntoSupport", "barType": "#5", "spacing": 12, "anchorInto": "wall", "anchorLen": "1'-6\"" }
