@@ -157,7 +157,61 @@ public static class FieldLayout
         return bands;
     }
 
+    /// <summary>
+    /// Clip a world-XY segment to the slab footprint (<paramref name="outer"/> minus
+    /// <paramref name="holes"/>), returning the sub-segments that lie on concrete. Used to stop
+    /// additional-group and opening-trim bars from projecting past the slab edge or over a void
+    /// ("one or more rebar is completely outside its host"). A segment fully outside returns an
+    /// empty list; a segment crossing a hole splits into the pieces either side.
+    /// </summary>
+    public static List<Seg2> ClipToFootprint(Seg2 seg, Loop2 outer, IReadOnlyList<Loop2> holes)
+    {
+        var result = new List<Seg2>();
+        Pt2 a = seg.A;
+        Pt2 d = seg.B - seg.A;
+        if (d.Length < 1e-9) return result;
+
+        var ts = new List<double> { 0.0, 1.0 };
+        AddCrossings(a, d, outer.Points, ts);
+        foreach (Loop2 h in holes) AddCrossings(a, d, h.Points, ts);
+        ts.Sort();
+
+        for (int i = 0; i + 1 < ts.Count; i++)
+        {
+            double t0 = ts[i], t1 = ts[i + 1];
+            if (t1 - t0 < 1e-9) continue;
+
+            Pt2 mid = a + d * ((t0 + t1) * 0.5);
+            if (!Geometry2D.PointInLoop(outer.Points, mid)) continue;
+            bool inHole = false;
+            foreach (Loop2 h in holes)
+                if (Geometry2D.PointInLoop(h.Points, mid)) { inHole = true; break; }
+            if (inHole) continue;
+
+            Pt2 pa = a + d * t0, pb = a + d * t1;
+            if ((pb - pa).Length > 1e-6) result.Add(new Seg2(pa, pb));
+        }
+        return result;
+    }
+
     // ── internals ────────────────────────────────────────────────────────────────
+
+    /// <summary>Add to <paramref name="ts"/> the parameters t∈(0,1) at which the ray
+    /// <paramref name="a"/>+t·<paramref name="d"/> crosses an edge of <paramref name="loop"/>.</summary>
+    private static void AddCrossings(Pt2 a, Pt2 d, IReadOnlyList<Pt2> loop, List<double> ts)
+    {
+        int n = loop.Count;
+        for (int i = 0; i < n; i++)
+        {
+            Pt2 p = loop[i], q = loop[(i + 1) % n];
+            Pt2 e = q - p;
+            double denom = d.Cross(e);
+            if (Math.Abs(denom) < 1e-12) continue;            // parallel
+            double t = (p - a).Cross(e) / denom;
+            double s = (p - a).Cross(d) / denom;
+            if (s >= -1e-9 && s <= 1 + 1e-9 && t > 1e-9 && t < 1 - 1e-9) ts.Add(t);
+        }
+    }
 
     private static List<double> ScanCrossings(List<List<Pt2>> loops, double y)
     {

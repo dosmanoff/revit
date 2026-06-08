@@ -62,9 +62,14 @@ public sealed class GroupBuilder
         foreach (Seg2 rail in FieldLayout.Rails(region, [], dir, spacing, 0, 0))
         {
             Seg2 bar = len > 0 ? Recenter(rail, len) : rail;
-            RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ,
-                new List<Curve> { Line.CreateBound(new XYZ(bar.A.X, bar.A.Y, z), new XYZ(bar.B.X, bar.B.Y, z)) }, tag);
-            created++;
+            // Clip to the slab footprint so a strip centred on an edge support doesn't spill
+            // past the slab edge or over a void ("rebar completely outside its host").
+            foreach (Seg2 piece in FieldLayout.ClipToFootprint(bar, geom.Outer, geom.Openings))
+            {
+                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ,
+                    new List<Curve> { Line.CreateBound(new XYZ(piece.A.X, piece.A.Y, z), new XYZ(piece.B.X, piece.B.Y, z)) }, tag);
+                created++;
+            }
         }
         return created;
     }
@@ -93,9 +98,12 @@ public sealed class GroupBuilder
             {
                 double len = g.Length is { } l ? l.ToFeet(u) : 3.0;
                 Pt2 q = p + dir * len;
-                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ,
-                    new List<Curve> { Line.CreateBound(new XYZ(p.X, p.Y, z), new XYZ(q.X, q.Y, z)) }, tag);
-                created++;
+                foreach (Seg2 piece in FieldLayout.ClipToFootprint(new Seg2(p, q), geom.Outer, geom.Openings))
+                {
+                    RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ,
+                        new List<Curve> { Line.CreateBound(new XYZ(piece.A.X, piece.A.Y, z), new XYZ(piece.B.X, piece.B.Y, z)) }, tag);
+                    created++;
+                }
             }
         }
         return created;

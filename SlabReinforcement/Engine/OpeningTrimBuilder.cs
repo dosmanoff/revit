@@ -136,9 +136,16 @@ public sealed class OpeningTrimBuilder
 
     private int Straight(SlabGeometry geom, ElementId barTypeId, string tag, Pt2 a, Pt2 b, double z)
     {
-        var curve = Line.CreateBound(new XYZ(a.X, a.Y, z), new XYZ(b.X, b.Y, z));
-        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ, new List<Curve> { curve }, tag);
-        return 1;
+        // Clip to the slab footprint: trim bars around an edge-adjacent opening must not run off
+        // the slab edge ("rebar completely outside its host").
+        int made = 0;
+        foreach (Seg2 piece in FieldLayout.ClipToFootprint(new Seg2(a, b), geom.Outer, geom.Openings))
+        {
+            var curve = Line.CreateBound(new XYZ(piece.A.X, piece.A.Y, z), new XYZ(piece.B.X, piece.B.Y, z));
+            RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ, new List<Curve> { curve }, tag);
+            made++;
+        }
+        return made;
     }
 
     private static Pt2 OutwardFromHole(Pt2 edgeDir, Pt2 edgeMid, Pt2 center)
