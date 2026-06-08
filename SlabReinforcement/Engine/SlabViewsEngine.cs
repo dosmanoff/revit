@@ -99,6 +99,8 @@ public sealed class SlabViewsEngine
             sheetViews.Add(bd);
             result.ViewsCreated++;
         }
+        if (_cfg.CreateSections)
+            sheetViews.AddRange(CreateSections(floor, bbox, mark, result));
 
         List<ViewSchedule> schedules = BuildSchedule(mark, result);
         if (_cfg.PlaceOnSheet)
@@ -204,6 +206,59 @@ public sealed class SlabViewsEngine
             return view;
         }
         catch (Exception ex) { result.Error($"Bending details for {mark}: {ex.Message}"); return null; }
+    }
+
+    // ── Cross-sections through the slab (like ColumnViews' elevations) ────────────
+
+    private List<View> CreateSections(Floor floor, BoundingBoxXYZ bbox, string mark, ViewRunResult result)
+    {
+        var views = new List<View>();
+        foreach ((XYZ look, string dir) in new[] { (XYZ.BasisX, "A-A"), (XYZ.BasisY, "B-B") })
+        {
+            try
+            {
+                ViewFamilyType vft = FindViewFamilyType(ViewFamily.Section, _cfg.SectionViewTypeName);
+                XYZ basisZ = look.Negate().Normalize();                 // toward the viewer
+                XYZ basisY = XYZ.BasisZ;                                // world up
+                XYZ basisX = basisY.CrossProduct(basisZ).Normalize();  // section "right"
+                XYZ center = (bbox.Min + bbox.Max) / 2.0;
+
+                double pad = _cfg.CropPadding;
+                double hLocal = HalfExtentAlongAxis(bbox, basisX);     // half section width
+                double vLocal = (bbox.Max.Z - bbox.Min.Z) / 2.0;       // half slab thickness
+                double dLocal = HalfExtentAlongAxis(bbox, basisZ);     // half look-depth (whole slab)
+
+                var sectionBox = new BoundingBoxXYZ
+                {
+                    Transform = new Transform(Transform.Identity)
+                    { Origin = center, BasisX = basisX, BasisY = basisY, BasisZ = basisZ },
+                    Min = new XYZ(-hLocal - pad, -vLocal - pad, -(dLocal + _cfg.SectionDepthFt)),
+                    Max = new XYZ( hLocal + pad,  vLocal + pad,  (dLocal + _cfg.SectionDepthFt)),
+                };
+
+                ViewSection view = ViewSection.CreateSection(_doc, vft.Id, sectionBox);
+                view.CropBoxActive = true;
+                view.CropBoxVisible = false;
+                view.Name = UniqueName(_cfg.SectionNameTemplate.Replace("{Mark}", mark).Replace("{Dir}", dir));
+                ApplyAppearance(view);
+                ApplyTemplate(view);
+
+                _doc.Regenerate();
+                foreach (Rebar r in HostSrRebar(floor.Id))
+                    try { r.SetUnobscuredInView(view, true); } catch { /* best-effort */ }
+
+                views.Add(view);
+                result.ViewsCreated++;
+            }
+            catch (Exception ex) { result.Error($"Section {dir} for {mark}: {ex.Message}"); }
+        }
+        return views;
+    }
+
+    private static double HalfExtentAlongAxis(BoundingBoxXYZ bbox, XYZ axis)
+    {
+        XYZ d = bbox.Max - bbox.Min;
+        return (Math.Abs(d.X * axis.X) + Math.Abs(d.Y * axis.Y) + Math.Abs(d.Z * axis.Z)) / 2.0;
     }
 
     private List<Rebar> HostSrRebar(ElementId floorId) =>

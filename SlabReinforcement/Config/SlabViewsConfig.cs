@@ -23,6 +23,13 @@ public sealed class SlabViewsConfig
     public string? PlanViewTypeName { get; set; }
     public string? ViewTemplateName { get; set; }
 
+    // Cross-sections through the slab (like ColumnViews' elevations) — two cuts (each way),
+    // through the slab centroid, with the SR rebar shown unobscured.
+    public bool CreateSections { get; set; } = true;
+    public string? SectionViewTypeName { get; set; }
+    public double SectionDepthFt { get; set; } = 2.0;        // view depth past the slab footprint
+    public string SectionNameTemplate { get; set; } = "{Mark} - Section {Dir}";
+
     // 3D isolated cage + bending-detail "details" (like ColumnViews)
     public bool Create3DView { get; set; } = true;
     public int View3DScale { get; set; } = 24;

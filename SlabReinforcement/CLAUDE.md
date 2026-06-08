@@ -11,7 +11,8 @@ panel `Slab Reinforcement`:
    supported) → create rebar. Field as `Bars` | **`Sets`** | `AreaSystem`; max bar length
    split + lapped; per-segment edges (U-bar / 90° bend / into-support); arbitrary detailed
    groups + dowels (into wall/stair/slab-above); smart opening trim (skips shafts / edge-adjacent).
-3. **Slab Views** — Layer 1–4 plans + schedules + sheets + 3D cage + bending details (like `ColumnViews`).
+3. **Slab Views** — Layer 1–4 plans + cross-sections (each way) + 3D cage + bending details +
+   schedules + sheets (≥ `ColumnViews`).
 
 ## Key decisions
 - Separate new plugin; existing `SlabRebar` (rebar *classifier*) untouched.
