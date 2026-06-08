@@ -76,10 +76,17 @@ public sealed class BriefLengths
 
 public sealed class BriefLap
 {
-    public LapMode Mode { get; set; } = LapMode.Factor;
-    public double Factor { get; set; } = 40;
-    public Length Length { get; set; } = new("2'-0\"");
+    public LapMode Mode { get; set; } = LapMode.Factor;     // Factor | Length | Aci
+    public double Factor { get; set; } = 40;                // Mode=Factor: lap = factor · d_b
+    public Length Length { get; set; } = new("2'-0\"");     // Mode=Length: fixed lap
     public bool Stagger { get; set; } = true;
+
+    // Mode=Aci — ACI 318-19 Class B tension lap inputs (f'c / fy in psi).
+    public double FcPsi { get; set; } = 4000;
+    public double FyPsi { get; set; } = 60000;
+    public bool Epoxy { get; set; }
+    public bool Lightweight { get; set; }
+    public bool AdequateSpacing { get; set; } = true;
 }
 
 // ── Field mat ────────────────────────────────────────────────────────────────────

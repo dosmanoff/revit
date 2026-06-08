@@ -62,9 +62,7 @@ public sealed class FieldBarBuilder
         double spacing = cfg.Ft(spec.Spacing);
         double side = cfg.Ft(cfg.Cover.Side);
         double maxBar = cfg.Ft(cfg.Lengths.MaxBarLength);
-        double lap = cfg.Lengths.LapMode == LapMode.Factor
-            ? cfg.Lengths.LapFactor * dbFt
-            : cfg.Ft(cfg.Lengths.LapLength);
+        double lap = cfg.LapFeet(dbFt, spec.BarType, layer is SlabLayer.TopX or SlabLayer.TopY);
 
         List<Seg2> rails = FieldLayout.Rails(geom.Outer, holes, dir, spacing, side, side);
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, slabId, layer);

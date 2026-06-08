@@ -13,12 +13,23 @@ keys, string enums. **Lengths** are a number (per `units`) or a feet-inches stri
 ```
 slabs[]                 one entry per slab, matched by `mark` or `elementId`
  ├─ cover {top,bottom,side}
- ├─ lengths { maxBarLength, lap{mode,factor,length,stagger} }
+ ├─ lengths { maxBarLength, lap{mode,factor,length,stagger, fcPsi,fyPsi,epoxy,lightweight,adequateSpacing} }
  ├─ field  { mode, bottom{x,y}, top{coverage,x,y} }
  ├─ edges[]    per-segment edge treatment
  ├─ openings   trim policy
  └─ groups[]   arbitrary additional reinforcement
 ```
+
+## `lengths` — max bar length & lap splices
+`maxBarLength` (default `40'-0"`) caps each bar; longer runs are split and lapped. `lap.mode`:
+
+| `lap.mode` | Lap length | Extra keys |
+|---|---|---|
+| `Factor` (default) | `factor · d_b` (default 40·d_b ≈ Class B rule of thumb) | `factor` |
+| `Length` | a fixed value | `length` |
+| `Aci` | **ACI 318-19** Class B tension splice ℓst = 1.3·ℓd (§25.4.2.3 / §25.5.2.1), computed per bar size and per layer (top mats get the ψt=1.3 top-bar factor automatically) | `fcPsi`, `fyPsi` (psi), `epoxy`, `lightweight`, `adequateSpacing` (default true) |
+
+`stagger` (default true) offsets adjacent splices. For `Aci`, set `fcPsi`/`fyPsi` from the project (e.g. 5000 / 60000); an unknown bar name falls back to `factor·d_b`.
 
 ---
 

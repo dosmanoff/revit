@@ -1,3 +1,5 @@
+using SlabReinforcement.Geometry;
+
 namespace SlabReinforcement.Config;
 
 /// <summary>How the field (main) reinforcement is modelled.</summary>
@@ -14,7 +16,7 @@ public enum FieldMode
 
 public enum TopMode { None, Continuous, OverSupports, Edges }
 
-public enum LapMode { Factor, Length }
+public enum LapMode { Factor, Length, Aci }
 
 public enum EdgeAnchorMode { Straight, Hook90, Hook180, IntoSupport }
 
@@ -41,6 +43,40 @@ public class SlabReinforcementConfig
 
     /// <summary>Convert a config length to Revit internal feet using this config's units.</summary>
     public double Ft(Length len) => len.ToFeet(Units);
+
+    /// <summary>
+    /// Lap-splice length in feet for a bar of size <paramref name="barSize"/> (diameter
+    /// <paramref name="dbFt"/>), per <see cref="LengthsConfig.LapMode"/>: <c>Factor</c>
+    /// (LapFactor·d_b), <c>Length</c> (fixed), or <c>Aci</c> (ACI 318-19 §25.5.2.1 Class B tension
+    /// splice from f'c / fy / top-bar / epoxy / lightweight / spacing). Falls back to
+    /// LapFactor·d_b if the ACI inputs are unusable (e.g. a non-ASTM bar name).
+    /// </summary>
+    public double LapFeet(double dbFt, string barSize, bool isTopBar)
+    {
+        switch (Lengths.LapMode)
+        {
+            case LapMode.Length:
+                return Ft(Lengths.LapLength);
+            case LapMode.Aci:
+                try
+                {
+                    double inches = AciAnchorageCalculator.TensionLapSpliceClassBIn(new AciAnchorageCalculator.Inputs
+                    {
+                        BarSize = barSize,
+                        FcPsi = Lengths.FcPsi,
+                        FyPsi = Lengths.FyPsi,
+                        IsTopBar = isTopBar,
+                        IsEpoxyCoated = Lengths.LapEpoxy,
+                        IsLightweight = Lengths.LapLightweight,
+                        AdequateSpacing = Lengths.LapAdequateSpacing,
+                    });
+                    return inches / 12.0;
+                }
+                catch { return Lengths.LapFactor * dbFt; }
+            default:
+                return Lengths.LapFactor * dbFt;
+        }
+    }
 }
 
 public class CoverConfig
@@ -72,6 +108,13 @@ public class LengthsConfig
     public Length LapLength { get; set; } = new("2'-0\"");
     public double LapFactor { get; set; } = 40;
     public bool LapStagger { get; set; } = true;
+
+    // LapMode.Aci — ACI 318-19 Class B tension splice inputs (f'c / fy in psi).
+    public double FcPsi { get; set; } = 4000;
+    public double FyPsi { get; set; } = 60000;
+    public bool LapEpoxy { get; set; }                 // ψe = 1.5
+    public bool LapLightweight { get; set; }           // λ = 0.75
+    public bool LapAdequateSpacing { get; set; } = true;
 }
 
 public class AnchorsConfig

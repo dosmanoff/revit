@@ -59,9 +59,7 @@ public sealed class FieldSetBuilder
         double spacing = cfg.Ft(spec.Spacing);
         double side = cfg.Ft(cfg.Cover.Side);
         double maxBar = cfg.Ft(cfg.Lengths.MaxBarLength);
-        double lap = cfg.Lengths.LapMode == LapMode.Factor
-            ? cfg.Lengths.LapFactor * dbFt
-            : cfg.Ft(cfg.Lengths.LapLength);
+        double lap = cfg.LapFeet(dbFt, spec.BarType, layer is SlabLayer.TopX or SlabLayer.TopY);
 
         List<LocalRail> rails = FieldLayout.LocalRails(geom.Outer, holes, dir, spacing, side, side);
         List<Band> bands = FieldLayout.Bands(rails, spacing);

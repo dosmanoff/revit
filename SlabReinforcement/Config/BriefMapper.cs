@@ -29,6 +29,11 @@ public static class BriefMapper
         cfg.Lengths.LapFactor = s.Lengths.Lap.Factor;
         cfg.Lengths.LapLength = s.Lengths.Lap.Length;
         cfg.Lengths.LapStagger = s.Lengths.Lap.Stagger;
+        cfg.Lengths.FcPsi = s.Lengths.Lap.FcPsi;
+        cfg.Lengths.FyPsi = s.Lengths.Lap.FyPsi;
+        cfg.Lengths.LapEpoxy = s.Lengths.Lap.Epoxy;
+        cfg.Lengths.LapLightweight = s.Lengths.Lap.Lightweight;
+        cfg.Lengths.LapAdequateSpacing = s.Lengths.Lap.AdequateSpacing;
 
         cfg.Openings.TrimEnabled = !string.Equals(s.Openings.Trim, "none", StringComparison.OrdinalIgnoreCase);
         cfg.Openings.Selector = s.Openings.Trim;       // "auto" | "all" | "none" | indices

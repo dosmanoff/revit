@@ -34,7 +34,7 @@ public sealed class SupportZoneBuilder
             RebarBarType barType = RebarFactory.GetBarType(_doc, zone.BarType);   // strict
             double dbFt = barType.BarNominalDiameter;
             double spacing = cfg.Ft(zone.Spacing);
-            double lap = cfg.Lengths.LapMode == LapMode.Factor ? cfg.Lengths.LapFactor * dbFt : cfg.Ft(cfg.Lengths.LapLength);
+            double lap = cfg.LapFeet(dbFt, zone.BarType, zone.Face == ZoneFace.Top);
 
             Pt2 dir = zone.Axis == ZoneAxis.X ? geom.Basis.X : geom.Basis.Y;
             Pt2 perp = dir.Perp;
