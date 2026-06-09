@@ -65,77 +65,74 @@ public sealed class EdgeTreatmentBuilder
         bool top = tr.Face is "both" or "top";
         bool bottom = tr.Face is "both" or "bottom";
 
-        int created = 0;
-        // Seed bars at `spacing` within the end cover; an edge too short for even one such
-        // position (a small balcony return / perimeter jog) still gets one centred bar so the
-        // free edge is closed.
-        IEnumerable<double> positions = len > 2 * coverSide
+        // Bars spaced along the edge — placed as ONE rebar SET distributed along the edge (the set
+        // normal is the edge direction), so the "show middle bar" presentation collapses them to a
+        // single representative П. An edge too short for spaced bars gets one centred bar.
+        List<double> ds = (len > 2 * coverSide
             ? RebarFactory.EvenlySpaced(coverSide, len - coverSide, spacing)
-            : new[] { len / 2 };
-        foreach (double d in positions)
+            : new[] { len / 2 }).ToList();
+        if (ds.Count == 0) return 0;
+        int count = ds.Count;
+        double step = count > 1 ? ds[1] - ds[0] : 0;
+
+        // first bar geometry; the set lays the rest out along +normal (= +t, the edge direction).
+        Pt2 onEdge = seg.A + t * ds[0];
+        Pt2 atFace = onEdge - n * coverSide;          // inside the side cover
+        Pt2 inward = atFace - n * leg;
+
+        switch (tr.Type)
         {
-            Pt2 onEdge = seg.A + t * d;
-            Pt2 atFace = onEdge - n * coverSide;          // inside the side cover
-            Pt2 inward = atFace - n * leg;
+            case EdgeTreatmentType.UBar:
+                return SetOf(barTypeId, geom.Floor, normal, tag, count, step, new List<Curve>
+                {
+                    Line.CreateBound(new XYZ(inward.X, inward.Y, zTop), new XYZ(atFace.X, atFace.Y, zTop)),
+                    Line.CreateBound(new XYZ(atFace.X, atFace.Y, zTop), new XYZ(atFace.X, atFace.Y, zBottom)),
+                    Line.CreateBound(new XYZ(atFace.X, atFace.Y, zBottom), new XYZ(inward.X, inward.Y, zBottom)),
+                });
 
-            switch (tr.Type)
-            {
-                case EdgeTreatmentType.UBar:
-                    created += Curve3(barTypeId, geom.Floor, normal, tag,
-                        new XYZ(inward.X, inward.Y, zTop), new XYZ(atFace.X, atFace.Y, zTop),
-                        new XYZ(atFace.X, atFace.Y, zBottom), new XYZ(inward.X, inward.Y, zBottom));
-                    break;
+            case EdgeTreatmentType.Bend90:
+                int b90 = 0;
+                if (top) b90 += SetOf(barTypeId, geom.Floor, normal, tag, count, step, new List<Curve>
+                {
+                    Line.CreateBound(new XYZ(inward.X, inward.Y, zTop), new XYZ(atFace.X, atFace.Y, zTop)),
+                    Line.CreateBound(new XYZ(atFace.X, atFace.Y, zTop), new XYZ(atFace.X, atFace.Y, zTop - leg)),
+                });
+                if (bottom) b90 += SetOf(barTypeId, geom.Floor, normal, tag, count, step, new List<Curve>
+                {
+                    Line.CreateBound(new XYZ(inward.X, inward.Y, zBottom), new XYZ(atFace.X, atFace.Y, zBottom)),
+                    Line.CreateBound(new XYZ(atFace.X, atFace.Y, zBottom), new XYZ(atFace.X, atFace.Y, zBottom + leg)),
+                });
+                return b90;
 
-                case EdgeTreatmentType.Bend90:
-                    // L-bars: a horizontal leg in the slab + a 90° vertical leg at the edge.
-                    if (top)
-                        created += Curve2(barTypeId, geom.Floor, normal, tag,
-                            new XYZ(inward.X, inward.Y, zTop), new XYZ(atFace.X, atFace.Y, zTop),
-                            new XYZ(atFace.X, atFace.Y, zTop - leg));
-                    if (bottom)
-                        created += Curve2(barTypeId, geom.Floor, normal, tag,
-                            new XYZ(inward.X, inward.Y, zBottom), new XYZ(atFace.X, atFace.Y, zBottom),
-                            new XYZ(atFace.X, atFace.Y, zBottom + leg));
-                    break;
+            case EdgeTreatmentType.IntoSupport:
+                Pt2 outPt = atFace + n * anchor;
+                Pt2 inPt = atFace - n * Math.Max(leg, anchor);
+                int isup = 0;
+                if (top) isup += SetOf(barTypeId, geom.Floor, normal, tag, count, step, new List<Curve>
+                { Line.CreateBound(new XYZ(inPt.X, inPt.Y, zTop), new XYZ(outPt.X, outPt.Y, zTop)) });
+                if (bottom) isup += SetOf(barTypeId, geom.Floor, normal, tag, count, step, new List<Curve>
+                { Line.CreateBound(new XYZ(inPt.X, inPt.Y, zBottom), new XYZ(outPt.X, outPt.Y, zBottom)) });
+                return isup;
 
-                case EdgeTreatmentType.IntoSupport:
-                    // straight bars crossing the edge into the support
-                    Pt2 outPt = atFace + n * anchor;
-                    Pt2 inPt = atFace - n * Math.Max(leg, anchor);
-                    if (top) created += Straight(barTypeId, geom.Floor, tag, inPt, outPt, zTop);
-                    if (bottom) created += Straight(barTypeId, geom.Floor, tag, inPt, outPt, zBottom);
-                    break;
+            case EdgeTreatmentType.Straight:
+                // "Cover only": the field mat already runs to the edge, so no extra edge bar here.
+                // For a continuous edge bar, use a `group` with an EdgeRange region instead.
+                return 0;
 
-                case EdgeTreatmentType.Straight:
-                    // "Cover only": the field mat already runs to the edge, so no extra edge bar
-                    // is placed here. (Previously this spawned a short perpendicular stub per
-                    // spacing position on each face — hundreds of junk bars.) For a continuous
-                    // edge bar, use a `group` with an EdgeRange region instead.
-                    break;
-            }
+            default:
+                return 0;
         }
-        return created;
     }
 
-    private int Curve3(ElementId barTypeId, Element host, XYZ normal, string tag, XYZ p1, XYZ p2, XYZ p3, XYZ p4)
+    /// <summary>Create one rebar from <paramref name="curves"/> and, when more than one position,
+    /// distribute it along the set normal as a number-with-spacing set. Returns the bar count.</summary>
+    private int SetOf(ElementId barTypeId, Element host, XYZ normal, string tag, int count, double step, List<Curve> curves)
     {
-        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, host, normal,
-            new List<Curve> { Line.CreateBound(p1, p2), Line.CreateBound(p2, p3), Line.CreateBound(p3, p4) }, tag);
-        return 1;
-    }
-
-    private int Curve2(ElementId barTypeId, Element host, XYZ normal, string tag, XYZ p1, XYZ p2, XYZ p3)
-    {
-        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, host, normal,
-            new List<Curve> { Line.CreateBound(p1, p2), Line.CreateBound(p2, p3) }, tag);
-        return 1;
-    }
-
-    private int Straight(ElementId barTypeId, Element host, string tag, Pt2 a, Pt2 b, double z)
-    {
-        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, host, XYZ.BasisZ,
-            new List<Curve> { Line.CreateBound(new XYZ(a.X, a.Y, z), new XYZ(b.X, b.Y, z)) }, tag);
-        return 1;
+        Rebar set = RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, host, normal, curves, tag);
+        if (count > 1 && step > 1e-6)
+            try { set.GetShapeDrivenAccessor().SetLayoutAsNumberWithSpacing(count, step, true, true, true); }
+            catch { /* keep the single representative bar if the layout API rejects it */ }
+        return count;
     }
 
     private static IReadOnlyList<int> ResolveSegments(string selector, SlabContext ctx)
