@@ -123,7 +123,8 @@ public sealed class SlabViewsEngine
         foreach ((View view, SlabLayer[] _) in created)
             if (view is ViewPlan) HideForeignSectionMarkers(view, ownSections);
 
-        List<ViewSchedule> schedules = BuildSchedule(mark, floor.Id, result);
+        AssignScheduleMarks(HostSrRebar(floor.Id));
+        List<ViewSchedule> schedules = BuildSchedules(mark, floor.Id, present, result);
         if (_cfg.PlaceOnSheet)
             BuildSheet(mark, sheetViews, schedules, result);
 
@@ -175,18 +176,62 @@ public sealed class SlabViewsEngine
         if (toHide.Count > 0) try { view.HideElements(toHide); } catch { /* best-effort */ }
     }
 
-    private List<ViewSchedule> BuildSchedule(string mark, ElementId slabId, ViewRunResult result)
+    // One schedule per present layer, in reading order, each grouped by Schedule Mark.
+    private static readonly (SlabLayer Layer, string Label)[] ScheduleOrder =
+    {
+        (SlabLayer.BottomX, "Bottom X"), (SlabLayer.BottomY, "Bottom Y"),
+        (SlabLayer.TopX, "Top X"), (SlabLayer.TopY, "Top Y"),
+        (SlabLayer.AddBottom, "Add'l Bottom"), (SlabLayer.AddTop, "Add'l Top"),
+        (SlabLayer.EdgeU, "Edge U-bars"), (SlabLayer.OpeningTrim, "Opening Trim"),
+        (SlabLayer.Support, "Support"), (SlabLayer.Dowel, "Dowels"),
+    };
+
+    private List<ViewSchedule> BuildSchedules(string mark, ElementId slabId, HashSet<SlabLayer> present, ViewRunResult result)
     {
         var list = new List<ViewSchedule>();
         if (!_cfg.CreateSchedule) return list;
-        try
+        var builder = new SlabScheduleBuilder(_doc);
+        foreach ((SlabLayer layer, string label) in ScheduleOrder)
         {
-            string name = UniqueName(Token(_cfg.ScheduleNameTemplate, mark));
-            list.Add(new SlabScheduleBuilder(_doc).BuildRebarSchedule(slabId, name));
-            result.SchedulesCreated++;
+            if (!present.Contains(layer)) continue;
+            try
+            {
+                string name = UniqueName($"{Token(_cfg.ScheduleNameTemplate, mark)} — {label}");
+                list.Add(builder.BuildRebarSchedule(slabId, layer, name));
+                result.SchedulesCreated++;
+            }
+            catch (Exception ex) { result.Error($"Schedule {label} for {mark}: {ex.Message}"); }
         }
-        catch (Exception ex) { result.Error($"Schedule for {mark}: {ex.Message}"); }
         return list;
+    }
+
+    /// <summary>Numbers SR rebar Schedule Mark 1..N over unique (Type, Shape, Total Bar Length)
+    /// groups so identical bars share a mark. Best-effort — skipped if the parameter is read-only.</summary>
+    private void AssignScheduleMarks(IReadOnlyList<Rebar> rebar)
+    {
+        if (rebar.Count == 0) return;
+        var groups = rebar
+            .Select(r => (Bar: r, Type: BarTypeName(r), Shape: BarShapeName(r), Len: BarTotalLength(r)))
+            .GroupBy(x => (x.Type, x.Shape, Math.Round(x.Len, 4)))
+            .OrderBy(g => g.Key.Item1, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.Item2, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.Item3)
+            .ToList();
+
+        int mark = 0;
+        foreach (var group in groups)
+        {
+            mark++;
+            foreach (var x in group) SetScheduleMark(x.Bar, mark);
+        }
+    }
+
+    private static void SetScheduleMark(Rebar rebar, int mark)
+    {
+        Parameter? p = rebar.LookupParameter("Schedule Mark");
+        if (p is null || p.IsReadOnly) return;
+        if (p.StorageType == StorageType.Integer) p.Set(mark);
+        else if (p.StorageType == StorageType.String) p.Set(mark.ToString());
     }
 
     private void BuildSheet(string mark, IReadOnlyList<View> views, IReadOnlyList<ViewSchedule> schedules, ViewRunResult result)
