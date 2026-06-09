@@ -14,7 +14,7 @@ public sealed class SlabScheduleBuilder
 
     public SlabScheduleBuilder(Document doc) => _doc = doc;
 
-    public ViewSchedule BuildRebarSchedule(string hostMark, string name)
+    public ViewSchedule BuildRebarSchedule(ElementId slabId, string name)
     {
         ViewSchedule schedule = ViewSchedule.CreateSchedule(_doc, new ElementId(BuiltInCategory.OST_Rebar));
         schedule.Name = name;
@@ -26,9 +26,10 @@ public sealed class SlabScheduleBuilder
         ScheduleField? shapeField = AddFirstAvailable(def, "Shape");
         ScheduleField? lengthField = AddFirstAvailable(def, "Total Bar Length", "Bar Length");
         AddFirstAvailable(def, "Quantity");
-        AddFirstAvailable(def, "Comments");        // shows the SR:{config}:{slabId}:{layer} tag
+        ScheduleField? commentsField = AddFirstAvailable(def, "Comments");   // holds the SR:{config}:{slabId}:{layer} tag
 
-        ApplyHostMarkFilter(def, hostMark);
+        // Filter to this slab's SR bars by the tag — robust when the floor has no/duplicate Mark.
+        ApplyTagFilter(def, commentsField, slabId);
 
         def.IsItemized = false;
         AddGroup(def, typeField);
@@ -45,15 +46,10 @@ public sealed class SlabScheduleBuilder
         catch (Autodesk.Revit.Exceptions.ArgumentException) { }
     }
 
-    private void ApplyHostMarkFilter(ScheduleDefinition def, string hostMark)
+    private static void ApplyTagFilter(ScheduleDefinition def, ScheduleField? commentsField, ElementId slabId)
     {
-        ScheduleField? hostMarkField = AddFirstAvailable(def, "Host Mark");
-        if (hostMarkField is null) return;
-        try
-        {
-            def.AddFilter(new ScheduleFilter(hostMarkField.FieldId, ScheduleFilterType.Equal, hostMark));
-            hostMarkField.IsHidden = true;
-        }
+        if (commentsField is null) return;
+        try { def.AddFilter(new ScheduleFilter(commentsField.FieldId, ScheduleFilterType.Contains, $":{slabId.Value}:")); }
         catch (Autodesk.Revit.Exceptions.ArgumentException) { }
     }
 

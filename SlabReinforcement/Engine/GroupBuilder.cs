@@ -258,11 +258,12 @@ public sealed class GroupBuilder
     {
         string layer = (g.Layer ?? string.Empty).Trim();
         if (Enum.TryParse(layer, ignoreCase: true, out SlabLayer direct)) return direct;
-        bool isY = string.Equals(g.Direction?.Axis, "Y", StringComparison.OrdinalIgnoreCase);
+        // Additional reinforcement gets its OWN layer (AddBottom / AddTop) so Slab Views can show it
+        // on a dedicated view, separate from the 4 field-mat plans.
         return layer.ToLowerInvariant() switch
         {
-            "bottom" => isY ? SlabLayer.BottomY : SlabLayer.BottomX,
-            "top" => isY ? SlabLayer.TopY : SlabLayer.TopX,
+            "bottom" => SlabLayer.AddBottom,
+            "top" => SlabLayer.AddTop,
             "dowel" => SlabLayer.Dowel,
             _ => SlabLayer.Support,
         };

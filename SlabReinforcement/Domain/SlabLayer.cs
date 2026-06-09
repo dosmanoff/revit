@@ -15,4 +15,8 @@ public enum SlabLayer
     OpeningTrim,
     Support,
     Dowel,
+    /// <summary>Additional (non-field) bottom-face reinforcement from a brief group — own view.</summary>
+    AddBottom,
+    /// <summary>Additional (non-field) top-face reinforcement from a brief group — own view.</summary>
+    AddTop,
 }

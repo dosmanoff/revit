@@ -63,31 +63,49 @@ public sealed class SlabViewsEngine
         if (level is null) { result.Error($"Slab {floor.Id.Value} has no level — skipped."); return; }
 
         string mark = MarkOf(floor);
+        if (string.IsNullOrWhiteSpace(mark)) mark = $"Slab-{floor.Id.Value}";   // schedule/sheet need a non-blank id
 
         using var tx = new Transaction(_doc, $"Slab Views — {mark}");
         tx.Start();
 
+        int scale = PickScale(bbox);
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, _cfg.PlanViewTypeName);
-        var created = new List<(View View, SlabLayer Layer)>();
+        var created = new List<(View View, SlabLayer[] Layers)>();
 
+        // 4 main views — the field mat, one per layer.
         foreach ((SlabLayer layer, int num, string label) in LayerSet)
         {
             ViewPlan plan = ViewPlan.Create(_doc, vft.Id, level.Id);
             CropAndRange(plan, bbox, level);
             NameView(plan, mark, num, label);
             ApplyAppearance(plan);
+            TrySet(() => plan.Scale = scale);
             ApplyTemplate(plan);
-            created.Add((plan, layer));
+            created.Add((plan, new[] { layer }));
         }
 
+        // Additional reinforcement — one view per face that actually has any (groups + edge / trim /
+        // opening / support / dowel go with the top face). Created only when present.
+        HashSet<SlabLayer> present = LayersPresent(floor.Id);
+        SlabLayer[] addBottom = { SlabLayer.AddBottom };
+        SlabLayer[] addTop = { SlabLayer.AddTop, SlabLayer.Support, SlabLayer.EdgeU, SlabLayer.OpeningTrim, SlabLayer.Dowel };
+        if (addBottom.Any(present.Contains))
+            created.Add((MakeAdditionalPlan(level, bbox, mark, "Bottom", scale), addBottom));
+        if (addTop.Any(present.Contains))
+            created.Add((MakeAdditionalPlan(level, bbox, mark, "Top", scale), addTop));
+
         _doc.Regenerate();
-        foreach ((View view, SlabLayer layer) in created)
+        foreach ((View view, SlabLayer[] layers) in created)
         {
-            IsolateLayer(view, floor.Id, layer);
+            IsolateLayers(view, floor.Id, layers);
             result.ViewsCreated++;
         }
 
         var sheetViews = created.Select(c => c.View).ToList();
+        var ownSections = new HashSet<string>(StringComparer.Ordinal);
+
+        if (_cfg.CreateSections)
+            foreach (View s in CreateSections(floor, bbox, mark, result)) { sheetViews.Add(s); ownSections.Add(s.Name); }
 
         if (_cfg.Create3DView && Create3D(floor, bbox, mark, result) is { } v3d)
         {
@@ -99,24 +117,72 @@ public sealed class SlabViewsEngine
             sheetViews.Add(bd);
             result.ViewsCreated++;
         }
-        if (_cfg.CreateSections)
-            sheetViews.AddRange(CreateSections(floor, bbox, mark, result));
 
-        List<ViewSchedule> schedules = BuildSchedule(mark, result);
+        // Hide section/elevation markers that aren't this slab's own sections, in the plan views.
+        _doc.Regenerate();
+        foreach ((View view, SlabLayer[] _) in created)
+            if (view is ViewPlan) HideForeignSectionMarkers(view, ownSections);
+
+        List<ViewSchedule> schedules = BuildSchedule(mark, floor.Id, result);
         if (_cfg.PlaceOnSheet)
             BuildSheet(mark, sheetViews, schedules, result);
 
         tx.Commit();
     }
 
-    private List<ViewSchedule> BuildSchedule(string mark, ViewRunResult result)
+    private ViewPlan MakeAdditionalPlan(Level level, BoundingBoxXYZ bbox, string mark, string face, int scale)
+    {
+        ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, _cfg.PlanViewTypeName);
+        ViewPlan plan = ViewPlan.Create(_doc, vft.Id, level.Id);
+        CropAndRange(plan, bbox, level);
+        plan.Name = UniqueName(_cfg.AdditionalViewNameTemplate.Replace("{Mark}", mark).Replace("{Face}", face));
+        ApplyAppearance(plan);
+        TrySet(() => plan.Scale = scale);
+        ApplyTemplate(plan);
+        return plan;
+    }
+
+    /// <summary>The set of SR layers that actually have rebar on this slab.</summary>
+    private HashSet<SlabLayer> LayersPresent(ElementId floorId)
+    {
+        var present = new HashSet<SlabLayer>();
+        string marker = $":{floorId.Value}:";
+        foreach (Rebar r in HostSrRebar(floorId))
+        {
+            string tag = r.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() ?? "";
+            int i = tag.IndexOf(marker, StringComparison.Ordinal);
+            if (i >= 0 && Enum.TryParse(tag[(i + marker.Length)..], out SlabLayer layer)) present.Add(layer);
+        }
+        return present;
+    }
+
+    /// <summary>Smallest standard scale so the slab's larger plan dimension fits the target paper width.</summary>
+    private int PickScale(BoundingBoxXYZ bbox)
+    {
+        double maxFt = Math.Max(bbox.Max.X - bbox.Min.X, bbox.Max.Y - bbox.Min.Y);
+        double needed = maxFt * 12.0 / Math.Max(1.0, _cfg.TargetViewWidthIn);
+        foreach (int s in new[] { 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384 })
+            if (s >= needed) return s;
+        return 384;
+    }
+
+    private void HideForeignSectionMarkers(View view, HashSet<string> keepNames)
+    {
+        List<ElementId> toHide = new FilteredElementCollector(_doc, view.Id)
+            .OfCategory(BuiltInCategory.OST_Viewers).WhereElementIsNotElementType()
+            .Where(e => !keepNames.Contains(e.Name) && e.CanBeHidden(view))
+            .Select(e => e.Id).ToList();
+        if (toHide.Count > 0) try { view.HideElements(toHide); } catch { /* best-effort */ }
+    }
+
+    private List<ViewSchedule> BuildSchedule(string mark, ElementId slabId, ViewRunResult result)
     {
         var list = new List<ViewSchedule>();
-        if (!_cfg.CreateSchedule || string.IsNullOrWhiteSpace(mark)) return list;
+        if (!_cfg.CreateSchedule) return list;
         try
         {
             string name = UniqueName(Token(_cfg.ScheduleNameTemplate, mark));
-            list.Add(new SlabScheduleBuilder(_doc).BuildRebarSchedule(mark, name));
+            list.Add(new SlabScheduleBuilder(_doc).BuildRebarSchedule(slabId, name));
             result.SchedulesCreated++;
         }
         catch (Exception ex) { result.Error($"Schedule for {mark}: {ex.Message}"); }
@@ -241,11 +307,17 @@ public sealed class SlabViewsEngine
                 view.CropBoxVisible = false;
                 view.Name = UniqueName(_cfg.SectionNameTemplate.Replace("{Mark}", mark).Replace("{Dir}", dir));
                 ApplyAppearance(view);
+                TrySet(() => view.Scale = PickScale(bbox));
                 ApplyTemplate(view);
 
                 _doc.Regenerate();
                 foreach (Rebar r in HostSrRebar(floor.Id))
+                {
                     try { r.SetUnobscuredInView(view, true); } catch { /* best-effort */ }
+                    if (_cfg.ShowMiddleBarOnly)
+                        try { if (r.CanApplyPresentationMode(view)) r.SetPresentationMode(view, RebarPresentationMode.Middle); }
+                        catch { /* best-effort */ }
+                }
 
                 views.Add(view);
                 result.ViewsCreated++;
@@ -320,23 +392,28 @@ public sealed class SlabViewsEngine
         plan.SetViewRange(vr);
     }
 
-    private void IsolateLayer(View view, ElementId slabId, SlabLayer layer)
+    private void IsolateLayers(View view, ElementId slabId, IReadOnlyCollection<SlabLayer> layers)
     {
-        string suffix = $":{slabId.Value}:{layer}";
+        string marker = $":{slabId.Value}:";
+        var keep = new HashSet<string>(layers.Select(l => l.ToString()), StringComparer.Ordinal);
 
-        // This layer's bars: show as unobscured solid lines. Without this, horizontal slab bars
-        // (seen in projection, not cut) are not drawn in a plan view at all — verified in-Revit.
-        foreach (Element e in new FilteredElementCollector(_doc, view.Id)
-                     .OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType().ToList())
-            if (TagMatches(e, suffix) && e is Autodesk.Revit.DB.Structure.Rebar bar)
+        List<Element> rebar = new FilteredElementCollector(_doc, view.Id)
+            .OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType().ToList();
+
+        // This view's bars: unobscured solid lines (else horizontal bars seen in projection don't
+        // draw in a plan), and — for sets — the "Show middle rebar" presentation.
+        foreach (Element e in rebar)
+            if (TagLayerIn(e, marker, keep) && e is Rebar bar)
+            {
                 try { bar.SetUnobscuredInView(view, true); } catch { /* best-effort */ }
+                if (_cfg.ShowMiddleBarOnly)
+                    try { if (bar.CanApplyPresentationMode(view)) bar.SetPresentationMode(view, RebarPresentationMode.Middle); }
+                    catch { /* best-effort */ }
+            }
 
         if (_cfg.Isolation == LayerIsolation.Show) return;
 
-        List<Element> others = new FilteredElementCollector(_doc, view.Id)
-            .OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType()
-            .Where(e => !TagMatches(e, suffix))
-            .ToList();
+        List<Element> others = rebar.Where(e => !TagLayerIn(e, marker, keep)).ToList();
         if (others.Count == 0) return;
 
         if (_cfg.Isolation == LayerIsolation.Halftone)
@@ -354,12 +431,13 @@ public sealed class SlabViewsEngine
         }
     }
 
-    private static bool TagMatches(Element e, string suffix)
+    /// <summary>True if the element's SR tag layer (after <c>:{slabId}:</c>) is in <paramref name="layerNames"/>.</summary>
+    private static bool TagLayerIn(Element e, string marker, HashSet<string> layerNames)
     {
         string? tag = e.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString();
-        return tag is not null
-            && tag.StartsWith("SR:", StringComparison.Ordinal)
-            && tag.EndsWith(suffix, StringComparison.Ordinal);
+        if (tag is null || !tag.StartsWith("SR:", StringComparison.Ordinal)) return false;
+        int i = tag.IndexOf(marker, StringComparison.Ordinal);
+        return i >= 0 && layerNames.Contains(tag[(i + marker.Length)..]);
     }
 
     private void NameView(View view, string mark, int num, string label)

@@ -20,8 +20,14 @@ public sealed class SlabViewsConfig
     public LayerIsolation Isolation { get; set; } = LayerIsolation.Hide;
 
     public string LayerViewNameTemplate { get; set; } = "{Mark} - Layer {N} {Layer}";
+    public string AdditionalViewNameTemplate { get; set; } = "{Mark} - Additional {Face}";
     public string? PlanViewTypeName { get; set; }
     public string? ViewTemplateName { get; set; }
+
+    /// <summary>Set the rebar sets to "Show middle rebar" presentation in the generated views.</summary>
+    public bool ShowMiddleBarOnly { get; set; } = true;
+    /// <summary>Auto-pick a plan/section scale so the slab fits this paper width (inches) per view.</summary>
+    public double TargetViewWidthIn { get; set; } = 9.0;
 
     // Cross-sections through the slab (like ColumnViews' elevations) — two cuts (each way),
     // through the slab centroid, with the SR rebar shown unobscured.
@@ -30,8 +36,8 @@ public sealed class SlabViewsConfig
     public double SectionDepthFt { get; set; } = 2.0;        // view depth past the slab footprint
     public string SectionNameTemplate { get; set; } = "{Mark} - Section {Dir}";
 
-    // 3D isolated cage + bending-detail "details" (like ColumnViews)
-    public bool Create3DView { get; set; } = true;
+    // 3D isolated cage + bending-detail "details" (like ColumnViews). 3D off by default (optional).
+    public bool Create3DView { get; set; } = false;
     public int View3DScale { get; set; } = 24;
     public string View3DNameTemplate { get; set; } = "{Mark} - 3D Cage";
     public bool CreateBendingDetails { get; set; } = true;
