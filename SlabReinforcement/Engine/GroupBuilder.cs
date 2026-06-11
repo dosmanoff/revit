@@ -123,11 +123,14 @@ public sealed class GroupBuilder
         SlabGeometry geom, Pt2 a, Pt2 b, double z, BriefGroup g, UnitSystem u, bool topFace, double cover)
     {
         double edge = g.EdgeBend?.ToFeet(u) ?? 0;
-        double tol = cover + 0.06;
+        // A hook belongs only where the bar TERMINATES into the slab edge: probing a little past
+        // the end along the bar axis must leave the concrete. A mere distance test also fired on
+        // bars running PARALLEL to (and hugging) an edge — hooks scattered mid-edge.
+        Pt2 axis = (b - a).Normalized;
         double bendA = g.BendStart?.ToFeet(u)
-                       ?? (edge > 1e-6 && FieldLayout.OnBoundary(a, geom.Outer, [], tol) ? edge : 0);
+                       ?? (edge > 1e-6 && ExitsSlab(geom, a, axis * -1, cover) ? edge : 0);
         double bendB = g.BendEnd?.ToFeet(u)
-                       ?? (edge > 1e-6 && FieldLayout.OnBoundary(b, geom.Outer, [], tol) ? edge : 0);
+                       ?? (edge > 1e-6 && ExitsSlab(geom, b, axis, cover) ? edge : 0);
 
         var pa = new XYZ(a.X, a.Y, z);
         var pb = new XYZ(b.X, b.Y, z);
@@ -136,6 +139,15 @@ public sealed class GroupBuilder
         curves.Add(Line.CreateBound(pa, pb));
         if (bendB > 1e-6) curves.Add(Line.CreateBound(pb, new XYZ(b.X, b.Y, topFace ? z - bendB : z + bendB)));
         return curves;
+    }
+
+    /// <summary>True when extending the bar a little past <paramref name="end"/> along
+    /// <paramref name="outward"/> leaves the building footprint — i.e. the bar dead-ends into the
+    /// slab's outer edge (openings don't count: the probe lands inside the outer loop there).</summary>
+    private static bool ExitsSlab(SlabGeometry geom, Pt2 end, Pt2 outward, double cover)
+    {
+        Pt2 probe = end + outward * (cover + 0.15);
+        return !Geometry2D.PointInLoop(geom.Outer.Points, probe);
     }
 
     // ── Area bands (BBox / Polygon): parallel bars clipped to the region ──
