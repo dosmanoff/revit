@@ -194,6 +194,60 @@ public static class FieldLayout
         return result;
     }
 
+    /// <summary>
+    /// The interval of concrete along direction <paramref name="dir"/> (unit) through
+    /// <paramref name="origin"/>: signed distances (lo, hi) of the contiguous piece of slab
+    /// (outer minus holes) that contains the origin. Returns null when the origin is not on
+    /// concrete. Used to fit support strips inside the slab instead of clipping them away.
+    /// </summary>
+    public static (double Lo, double Hi)? ConcreteInterval(
+        Pt2 origin, Pt2 dir, Loop2 outer, IReadOnlyList<Loop2> holes, double reach = 500.0)
+    {
+        Pt2 u = dir.Normalized;
+        var seg = new Seg2(origin - u * reach, origin + u * reach);
+        foreach (Seg2 piece in ClipToFootprint(seg, outer, holes))
+        {
+            double a = (piece.A - origin).Dot(u);
+            double b = (piece.B - origin).Dot(u);
+            double lo = Math.Min(a, b), hi = Math.Max(a, b);
+            if (lo <= 1e-6 && hi >= -1e-6) return (lo, hi);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Pull back the ends of a clipped bar that lie on the slab boundary (outer or a hole) by
+    /// <paramref name="inset"/>, restoring the side cover that <see cref="ClipToFootprint"/>
+    /// removes. Ends that were not produced by clipping (away from any boundary) are untouched.
+    /// Returns null when the remaining length would vanish.
+    /// </summary>
+    public static Seg2? InsetClippedEnds(Seg2 bar, Loop2 outer, IReadOnlyList<Loop2> holes, double inset, double tol = 1e-3)
+    {
+        Pt2 a = bar.A, b = bar.B;
+        Pt2 u = (b - a).Normalized;
+        if (OnBoundary(a, outer, holes, tol)) a += u * inset;
+        if (OnBoundary(b, outer, holes, tol)) b -= u * inset;
+        return (b - a).Dot(u) > 1e-6 ? new Seg2(a, b) : null;
+    }
+
+    /// <summary>True when the point lies within <paramref name="tol"/> of the outer loop or any hole.</summary>
+    public static bool OnBoundary(Pt2 p, Loop2 outer, IReadOnlyList<Loop2> holes, double tol)
+    {
+        if (MinDistToLoop(p, outer.Points) <= tol) return true;
+        foreach (Loop2 h in holes)
+            if (MinDistToLoop(p, h.Points) <= tol) return true;
+        return false;
+    }
+
+    private static double MinDistToLoop(Pt2 p, IReadOnlyList<Pt2> loop)
+    {
+        double best = double.MaxValue;
+        int n = loop.Count;
+        for (int i = 0; i < n; i++)
+            best = Math.Min(best, Geometry2D.DistancePointToSegment(p, new Seg2(loop[i], loop[(i + 1) % n])));
+        return best;
+    }
+
     // ── internals ────────────────────────────────────────────────────────────────
 
     /// <summary>Add to <paramref name="ts"/> the parameters t∈(0,1) at which the ray
