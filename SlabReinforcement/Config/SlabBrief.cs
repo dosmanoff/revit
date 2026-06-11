@@ -166,6 +166,13 @@ public sealed class BriefGroup
     /// <summary>Bar ends that land at the slab edge get a 90° leg of this length bent into the
     /// slab (down for Top, up for Bottom) — the plan's "отгиб у торца" hook. Null = no bend.</summary>
     public Length? EdgeBend { get; set; }
+
+    /// <summary>Explicit hook at the bar START (the line end for Line groups; the −direction end
+    /// for strips), regardless of boundaries — e.g. the hook into a shaft wall. Null = none.</summary>
+    public Length? BendStart { get; set; }
+
+    /// <summary>Explicit hook at the bar END (+direction end). Null = none.</summary>
+    public Length? BendEnd { get; set; }
 }
 
 public sealed class BriefDirection
