@@ -68,7 +68,7 @@ public sealed class SlabViewsEngine
         using var tx = new Transaction(_doc, $"Slab Views — {mark}");
         tx.Start();
 
-        int scale = PickScale(bbox);
+        int scale = _cfg.AutoScale ? PickScale(bbox) : _cfg.PlanScale;
         ViewFamilyType vft = FindViewFamilyType(ViewFamily.FloorPlan, _cfg.PlanViewTypeName);
         var created = new List<(View View, SlabLayer[] Layers)>();
 
@@ -352,7 +352,7 @@ public sealed class SlabViewsEngine
                 view.CropBoxVisible = false;
                 view.Name = UniqueName(_cfg.SectionNameTemplate.Replace("{Mark}", mark).Replace("{Dir}", dir));
                 ApplyAppearance(view);
-                TrySet(() => view.Scale = PickScale(bbox));
+                TrySet(() => view.Scale = _cfg.AutoScale ? PickScale(bbox) : _cfg.PlanScale);
                 ApplyTemplate(view);
 
                 _doc.Regenerate();
