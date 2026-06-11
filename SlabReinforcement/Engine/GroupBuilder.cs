@@ -97,7 +97,6 @@ public sealed class GroupBuilder
             }
         }
 
-        double bendLen = g.EdgeBend?.ToFeet(u) ?? 0;
         bool topFace = !string.Equals(g.Face, "Bottom", StringComparison.OrdinalIgnoreCase);
         var norm = new XYZ(perp.X, perp.Y, 0);
 
@@ -106,7 +105,7 @@ public sealed class GroupBuilder
         {
             Pt2 a = dir * run.Start + perp * run.Perp0;
             Pt2 b = dir * run.End + perp * run.Perp0;
-            List<Curve> curves = BarWithEdgeBends(geom, a, b, z, bendLen, topFace, cover);
+            List<Curve> curves = BarWithBends(geom, a, b, z, g, u, topFace, cover);
             Rebar set = RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, norm, curves, tag);
             if (run.Count > 1)
                 try { set.GetShapeDrivenAccessor().SetLayoutAsNumberWithSpacing(run.Count, spacing, true, true, true); }
@@ -116,27 +115,26 @@ public sealed class GroupBuilder
         return created;
     }
 
-    /// <summary>A bar from <paramref name="a"/> to <paramref name="b"/> at <paramref name="z"/>;
-    /// an end sitting at the slab edge (within side cover + tolerance of the outer boundary) gets
-    /// a 90° leg of <paramref name="bendLen"/> bent into the slab (down for top, up for bottom).</summary>
-    private static List<Curve> BarWithEdgeBends(
-        SlabGeometry geom, Pt2 a, Pt2 b, double z, double bendLen, bool topFace, double cover)
+    /// <summary>A bar from <paramref name="a"/> to <paramref name="b"/> at <paramref name="z"/>
+    /// with 90° hooks into the slab (down for top, up for bottom). Hook lengths per end come from
+    /// the group's explicit <c>bendStart</c>/<c>bendEnd</c>, or — when <c>edgeBend</c> is set —
+    /// from the end sitting at the slab's OUTER edge (within side cover + tolerance).</summary>
+    private static List<Curve> BarWithBends(
+        SlabGeometry geom, Pt2 a, Pt2 b, double z, BriefGroup g, UnitSystem u, bool topFace, double cover)
     {
+        double edge = g.EdgeBend?.ToFeet(u) ?? 0;
+        double tol = cover + 0.06;
+        double bendA = g.BendStart?.ToFeet(u)
+                       ?? (edge > 1e-6 && FieldLayout.OnBoundary(a, geom.Outer, [], tol) ? edge : 0);
+        double bendB = g.BendEnd?.ToFeet(u)
+                       ?? (edge > 1e-6 && FieldLayout.OnBoundary(b, geom.Outer, [], tol) ? edge : 0);
+
         var pa = new XYZ(a.X, a.Y, z);
         var pb = new XYZ(b.X, b.Y, z);
-        if (bendLen <= 1e-6) return new List<Curve> { Line.CreateBound(pa, pb) };
-
-        double zLeg = topFace ? z - bendLen : z + bendLen;
-        double tol = cover + 0.06;
-        // Bend only at the slab's OUTER edge (торец) — never at openings: shaft edges carry the
-        // wall verticals, and a hook there is not on the plan.
-        bool bendA = FieldLayout.OnBoundary(a, geom.Outer, [], tol);
-        bool bendB = FieldLayout.OnBoundary(b, geom.Outer, [], tol);
-
         var curves = new List<Curve>();
-        if (bendA) curves.Add(Line.CreateBound(new XYZ(a.X, a.Y, zLeg), pa));
+        if (bendA > 1e-6) curves.Add(Line.CreateBound(new XYZ(a.X, a.Y, topFace ? z - bendA : z + bendA), pa));
         curves.Add(Line.CreateBound(pa, pb));
-        if (bendB) curves.Add(Line.CreateBound(pb, new XYZ(b.X, b.Y, zLeg)));
+        if (bendB > 1e-6) curves.Add(Line.CreateBound(pb, new XYZ(b.X, b.Y, topFace ? z - bendB : z + bendB)));
         return curves;
     }
 
@@ -224,7 +222,6 @@ public sealed class GroupBuilder
             }
         }
 
-        double bendLen = g.EdgeBend?.ToFeet(u) ?? 0;
         bool topFace = !string.Equals(g.Face, "Bottom", StringComparison.OrdinalIgnoreCase);
         var norm = new XYZ(t.X, t.Y, 0);
         int created = 0;
@@ -232,7 +229,7 @@ public sealed class GroupBuilder
         {
             Pt2 p0 = dir * run.Start + t * run.Perp0;
             Pt2 p1 = dir * run.End + t * run.Perp0;
-            List<Curve> curves = BarWithEdgeBends(geom, p0, p1, z, bendLen, topFace, cover);
+            List<Curve> curves = BarWithBends(geom, p0, p1, z, g, u, topFace, cover);
             Rebar set = RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, norm, curves, tag);
             if (run.Count > 1)
                 try { set.GetShapeDrivenAccessor().SetLayoutAsNumberWithSpacing(run.Count, step, true, true, true); }
