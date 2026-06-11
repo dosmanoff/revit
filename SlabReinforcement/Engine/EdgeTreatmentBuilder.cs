@@ -39,12 +39,15 @@ public sealed class EdgeTreatmentBuilder
             double spacing = tr.Spacing.ToFeet(units);
             double leg = tr.Leg.ToFeet(units);
             double anchor = tr.AnchorLen.ToFeet(units);
+            // curves define the bar CENTERLINE — keep the bar surface out of the cover
+            double halfDb = barType.BarNominalDiameter / 2;
 
             foreach (int idx in ResolveSegments(edge.Segments, ctx))
             {
                 if (idx < 0 || idx >= ctx.Edges.Count) continue;
                 BoundaryEdge be = ctx.Edges[idx];
-                created += Apply(geom, be, tr, barType.Id, spacing, leg, anchor, coverSide, zTop, zBottom, tag);
+                created += Apply(geom, be, tr, barType.Id, spacing, leg, anchor,
+                    coverSide + halfDb, zTop - halfDb, zBottom + halfDb, tag);
             }
         }
         return created;
