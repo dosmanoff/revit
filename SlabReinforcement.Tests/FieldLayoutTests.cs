@@ -170,4 +170,50 @@ public class FieldLayoutTests
         Assert.Equal(6.0, total, 6);                          // (5→8) + (12→15) = 3 + 3
         Assert.All(pieces, p => Assert.Equal(3.0, p.Length, 6));
     }
+
+    // ── ConcreteInterval / InsetClippedEnds (support-strip fitting) ─────────────────
+
+    [Fact]
+    public void Interval_InteriorPoint_SpansTheSlab()
+    {
+        var iv = FieldLayout.ConcreteInterval(new Pt2(5, 10), new Pt2(1, 0), Square(20), []);
+        Assert.NotNull(iv);
+        Assert.Equal(-5.0, iv!.Value.Lo, 6);                  // to x=0
+        Assert.Equal(15.0, iv.Value.Hi, 6);                   // to x=20
+    }
+
+    [Fact]
+    public void Interval_StopsAtHole()
+    {
+        var hole = new Loop2([new(8, 8), new(12, 8), new(12, 12), new(8, 12)]);
+        var iv = FieldLayout.ConcreteInterval(new Pt2(5, 10), new Pt2(1, 0), Square(20), [hole]);
+        Assert.NotNull(iv);
+        Assert.Equal(-5.0, iv!.Value.Lo, 6);
+        Assert.Equal(3.0, iv.Value.Hi, 6);                    // stops at the hole face x=8
+    }
+
+    [Fact]
+    public void Interval_OffConcrete_ReturnsNull()
+    {
+        Assert.Null(FieldLayout.ConcreteInterval(new Pt2(30, 10), new Pt2(1, 0), Square(20), []));
+    }
+
+    [Fact]
+    public void Inset_PullsBack_OnlyClippedEnds()
+    {
+        // end B was clipped at the boundary x=20; end A is interior
+        var bar = new Seg2(new Pt2(10, 10), new Pt2(20, 10));
+        Seg2? r = FieldLayout.InsetClippedEnds(bar, Square(20), [], 1.0);
+        Assert.NotNull(r);
+        Assert.Equal(10.0, r!.Value.A.X, 6);                  // untouched
+        Assert.Equal(19.0, r.Value.B.X, 6);                   // pulled back by the cover
+    }
+
+    [Fact]
+    public void Inset_VanishingBar_ReturnsNull()
+    {
+        var bar = new Seg2(new Pt2(0, 10), new Pt2(1.5, 10)); // both ends near x=0 boundary? only A on it
+        Seg2? r = FieldLayout.InsetClippedEnds(bar, Square(20), [], 2.0);
+        Assert.Null(r);                                        // 1.5' bar minus 2' inset → gone
+    }
 }

@@ -162,6 +162,10 @@ public sealed class BriefGroup
     public Length? Length { get; set; }               // null = derived from region
     public BriefAnchorPair Anchor { get; set; } = new();
     public BriefDowel? Dowel { get; set; }            // out-of-plane starters (wall/stair/…)
+
+    /// <summary>Bar ends that land at the slab edge get a 90° leg of this length bent into the
+    /// slab (down for Top, up for Bottom) — the plan's "отгиб у торца" hook. Null = no bend.</summary>
+    public Length? EdgeBend { get; set; }
 }
 
 public sealed class BriefDirection

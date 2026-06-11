@@ -38,40 +38,129 @@ public sealed class GroupBuilder
         RebarBarType barType = RebarFactory.GetBarType(_doc, g.BarType);
         double db = barType.BarNominalDiameter;
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, slabId, ResolveLayer(g));
-        double z = FaceZ(geom, cfg, g.Face, db);
         Pt2 dir = ResolveDir(g.Direction, geom, ctx);
+        // X-direction bars share the field X plane, Y-direction the field Y plane — otherwise an
+        // additional Y band would lie in (and clash with) the crossing field X layer.
+        bool isY = Math.Abs(dir.Dot(geom.Basis.Y)) > Math.Abs(dir.Dot(geom.Basis.X));
+        double z = FaceZ(geom, cfg, g.Face, db, isY);
         double spacing = g.Spacing is { } sp ? sp.ToFeet(u) : 1.0;
 
         return g.Region.Kind switch
         {
             RegionKind.Line or RegionKind.EdgeRange => BuildLine(geom, ctx, g, barType.Id, dir, spacing, z, tag, u),
-            _ => BuildArea(geom, g, barType.Id, dir, spacing, z, tag, u),
+            RegionKind.SupportStrip => BuildSupportStrip(geom, cfg, g, barType.Id, dir, spacing, z, tag, u),
+            _ => BuildArea(geom, cfg, g, barType.Id, dir, spacing, z, tag, u),
         };
     }
 
-    // ── Area bands (SupportStrip / BBox / Polygon): parallel bars clipped to the region ──
+    // ── SupportStrip: N bars × length L FITTED INSIDE the slab around the support ────
+    //
+    // The strip prefers to centre on the support but is clamped inside the concrete (one-sided
+    // at an edge/corner column), so the full bar count and length from the plan tag survive —
+    // previously the centred strip was clipped at the slab edge and lost bars and length.
 
-    private int BuildArea(SlabGeometry geom, BriefGroup g, ElementId barTypeId, Pt2 dir,
+    private int BuildSupportStrip(SlabGeometry geom, SlabReinforcementConfig cfg, BriefGroup g,
+        ElementId barTypeId, Pt2 dir, double spacing, double z, string tag, UnitSystem u)
+    {
+        if (g.Region.Support is not { } mark || FindSupport(geom, mark) is not { } center) return 0;
+        Pt2 perp = dir.Perp;
+        double cover = cfg.Ft(cfg.Cover.Side);
+        IReadOnlyList<Loop2> holes = geom.Openings;
+
+        double L = g.Length?.ToFeet(u) ?? 2 * (g.Region.Extent?.ToFeet(u) ?? 4.0);
+        int n = g.Count ?? Math.Max(1, (int)Math.Round((g.Region.Width?.ToFeet(u) ?? 4.0) / spacing) + 1);
+
+        if (FieldLayout.ConcreteInterval(center, dir, geom.Outer, holes) is not { } dInt) return 0;
+        if (FieldLayout.ConcreteInterval(center, perp, geom.Outer, holes) is not { } pInt) return 0;
+        double dLo = dInt.Lo + cover, dHi = dInt.Hi - cover;
+        double pLo = pInt.Lo + cover, pHi = pInt.Hi - cover;
+        if (dHi <= dLo || pHi <= pLo) return 0;
+
+        double span = Math.Min(L, dHi - dLo);
+        double s0 = Math.Clamp(-L / 2, dLo, dHi - span);          // centred, pushed inside
+        double band = (n - 1) * spacing;
+        if (band > pHi - pLo) { n = Math.Max(1, (int)((pHi - pLo) / spacing) + 1); band = (n - 1) * spacing; }
+        double p0 = Math.Clamp(-band / 2, pLo, pHi - band);
+
+        // clip each bar against holes (edge fit is already guaranteed), then band into sets
+        var rails = new List<LocalRail>();
+        for (int k = 0; k < n; k++)
+        {
+            Pt2 a = center + dir * s0 + perp * (p0 + k * spacing);
+            Pt2 b = center + dir * (s0 + span) + perp * (p0 + k * spacing);
+            foreach (Seg2 piece in FieldLayout.ClipToFootprint(new Seg2(a, b), geom.Outer, holes))
+            {
+                if (FieldLayout.InsetClippedEnds(piece, geom.Outer, holes, cover) is not { } bar) continue;
+                double sa = bar.A.Dot(dir), sb = bar.B.Dot(dir);
+                rails.Add(new LocalRail(bar.A.Dot(perp), Math.Min(sa, sb), Math.Max(sa, sb)));
+            }
+        }
+
+        double bendLen = g.EdgeBend?.ToFeet(u) ?? 0;
+        bool topFace = !string.Equals(g.Face, "Bottom", StringComparison.OrdinalIgnoreCase);
+        var norm = new XYZ(perp.X, perp.Y, 0);
+
+        int created = 0;
+        foreach (Band run in FieldLayout.Bands(rails, spacing))
+        {
+            Pt2 a = dir * run.Start + perp * run.Perp0;
+            Pt2 b = dir * run.End + perp * run.Perp0;
+            List<Curve> curves = BarWithEdgeBends(geom, a, b, z, bendLen, topFace, cover);
+            Rebar set = RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, norm, curves, tag);
+            if (run.Count > 1)
+                try { set.GetShapeDrivenAccessor().SetLayoutAsNumberWithSpacing(run.Count, spacing, true, true, true); }
+                catch { /* keep the representative bar */ }
+            created += run.Count;
+        }
+        return created;
+    }
+
+    /// <summary>A bar from <paramref name="a"/> to <paramref name="b"/> at <paramref name="z"/>;
+    /// an end sitting at the slab edge (within side cover + tolerance of the outer boundary) gets
+    /// a 90° leg of <paramref name="bendLen"/> bent into the slab (down for top, up for bottom).</summary>
+    private static List<Curve> BarWithEdgeBends(
+        SlabGeometry geom, Pt2 a, Pt2 b, double z, double bendLen, bool topFace, double cover)
+    {
+        var pa = new XYZ(a.X, a.Y, z);
+        var pb = new XYZ(b.X, b.Y, z);
+        if (bendLen <= 1e-6) return new List<Curve> { Line.CreateBound(pa, pb) };
+
+        double zLeg = topFace ? z - bendLen : z + bendLen;
+        double tol = cover + 0.06;
+        bool bendA = FieldLayout.OnBoundary(a, geom.Outer, geom.Openings, tol);
+        bool bendB = FieldLayout.OnBoundary(b, geom.Outer, geom.Openings, tol);
+
+        var curves = new List<Curve>();
+        if (bendA) curves.Add(Line.CreateBound(new XYZ(a.X, a.Y, zLeg), pa));
+        curves.Add(Line.CreateBound(pa, pb));
+        if (bendB) curves.Add(Line.CreateBound(pb, new XYZ(b.X, b.Y, zLeg)));
+        return curves;
+    }
+
+    // ── Area bands (BBox / Polygon): parallel bars clipped to the region ──
+
+    private int BuildArea(SlabGeometry geom, SlabReinforcementConfig cfg, BriefGroup g, ElementId barTypeId, Pt2 dir,
         double spacing, double z, string tag, UnitSystem u)
     {
         Loop2? region = RegionLoop(g.Region, geom, dir, u);
         if (region is null) return 0;
 
         double len = g.Length is { } l ? l.ToFeet(u) : 0;
+        double cover = cfg.Ft(cfg.Cover.Side);
         Pt2 perp = dir.Perp;
 
         // Parallel bars across the region (recentred to an explicit length if given), each clipped
-        // to the slab footprint, then regrouped into uniform bands. Each band is placed as one rebar
-        // SET (distributed in-plane via SetLayoutAsNumberWithSpacing) — matching the field mats, not
-        // loose single bars. Clipping happens before grouping, so every set copy stays on concrete.
+        // to the slab footprint with the side cover restored at clipped ends, then regrouped into
+        // uniform bands. Each band is placed as one rebar SET (SetLayoutAsNumberWithSpacing).
         var clipped = new List<LocalRail>();
         foreach (Seg2 rail in FieldLayout.Rails(region, [], dir, spacing, 0, 0))
         {
             Seg2 bar = len > 0 ? Recenter(rail, len) : rail;
             foreach (Seg2 piece in FieldLayout.ClipToFootprint(bar, geom.Outer, geom.Openings))
             {
-                double ly = piece.A.Dot(perp);
-                double s = piece.A.Dot(dir), e = piece.B.Dot(dir);
+                if (FieldLayout.InsetClippedEnds(piece, geom.Outer, geom.Openings, cover) is not { } inset) continue;
+                double ly = inset.A.Dot(perp);
+                double s = inset.A.Dot(dir), e = inset.B.Dot(dir);
                 if (s > e) (s, e) = (e, s);
                 clipped.Add(new LocalRail(ly, s, e));
             }
@@ -230,12 +319,26 @@ public sealed class GroupBuilder
         }
     }
 
-    private static double FaceZ(SlabGeometry geom, SlabReinforcementConfig cfg, string face, double db) => face switch
+    /// <summary>Bar-axis plane: X-direction bars share the field X layer (at the face), Y-direction
+    /// the field Y layer (one field-bar diameter further in), so additional bands nest with the mat
+    /// instead of lying inside the cover / on top of the crossing layer.</summary>
+    private double FaceZ(SlabGeometry geom, SlabReinforcementConfig cfg, string face, double db, bool isY)
     {
-        "Bottom" => geom.BottomElevationFt + cfg.Ft(cfg.Cover.Bottom) + db / 2,
-        "Mid" => (geom.TopElevationFt + geom.BottomElevationFt) / 2,
-        _ => geom.TopElevationFt - cfg.Ft(cfg.Cover.Top) - db / 2,
-    };
+        return face switch
+        {
+            "Bottom" => geom.BottomElevationFt + cfg.Ft(cfg.Cover.Bottom)
+                        + (isY ? Dia(cfg.Field.BottomX.BarType) + db / 2 : db / 2),
+            "Mid" => (geom.TopElevationFt + geom.BottomElevationFt) / 2,
+            _ => geom.TopElevationFt - cfg.Ft(cfg.Cover.Top)
+                 - (isY ? Dia(cfg.Field.TopX.BarType) + db / 2 : db / 2),
+        };
+    }
+
+    private double Dia(string barTypeName)
+    {
+        try { return RebarFactory.GetBarType(_doc, barTypeName).BarNominalDiameter; }
+        catch { return 0; }
+    }
 
     private static Loop2 Rect(double x1, double y1, double x2, double y2)
     {
