@@ -14,6 +14,9 @@ public sealed class SlabViewsConfig
     public int SchemaVersion { get; set; } = 1;
 
     public double CropPadding { get; set; } = 1.0;            // ft
+    /// <summary>Auto-pick the plan/section scale so the slab fits <see cref="TargetViewWidthIn"/>;
+    /// when false, <see cref="PlanScale"/> is used as-is.</summary>
+    public bool AutoScale { get; set; } = true;
     public int PlanScale { get; set; } = 48;                  // 1/4" = 1'-0"
     public ViewDetailLevel DetailLevel { get; set; } = ViewDetailLevel.Fine;
     public DisplayStyle VisualStyle { get; set; } = DisplayStyle.HLR;

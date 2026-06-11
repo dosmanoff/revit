@@ -23,26 +23,26 @@ public class SlabViewsCommand : IExternalCommand
         Document doc = uidoc.Document;
 
         List<Floor> floors = GetSelectedFloors(uidoc);
-        if (floors.Count == 0)
+        if (floors.Count == 0 && PickFloors(uidoc) is { } first)
+            floors = first;
+
+        SlabViewsConfig cfg = SlabViewsConfigStore.Load(doc);
+        List<string> titleBlocks = TitleBlockNames(doc);
+        List<string> viewTemplates = ViewTemplateNames(doc);
+
+        // Dialog ↔ re-pick loop, like Column Views.
+        while (true)
         {
-            try
-            {
-                IList<Reference> refs = uidoc.Selection.PickObjects(
-                    ObjectType.Element, new SlabSelectionFilter(),
-                    "Select reinforced floor slabs, then click Finish");
-                floors = refs.Select(r => doc.GetElement(r.ElementId)).OfType<Floor>().ToList();
-            }
-            catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return Result.Cancelled; }
+            var dlg = new SlabViewsDialog(cfg, titleBlocks, viewTemplates, floors.Count);
+            if (dlg.ShowDialog() != true) return Result.Cancelled;
+            if (!dlg.ReselectRequested) break;
+            if (PickFloors(uidoc) is { } picked) floors = picked;
         }
         if (floors.Count == 0)
         {
             TaskDialog.Show("Slab Views", "No floor slabs selected.");
             return Result.Cancelled;
         }
-
-        SlabViewsConfig cfg = SlabViewsConfigStore.Load(doc);
-        var dlg = new SlabViewsDialog(cfg);
-        if (dlg.ShowDialog() != true) return Result.Cancelled;
 
         try { SlabViewsConfigStore.Save(doc, cfg); } catch { /* best-effort */ }
 
@@ -78,4 +78,30 @@ public class SlabViewsCommand : IExternalCommand
         Document doc = uidoc.Document;
         return uidoc.Selection.GetElementIds().Select(id => doc.GetElement(id)).OfType<Floor>().ToList();
     }
+
+    /// <summary>Interactive slab pick; null when the user cancels (caller keeps the old set).</summary>
+    private static List<Floor>? PickFloors(UIDocument uidoc)
+    {
+        try
+        {
+            IList<Reference> refs = uidoc.Selection.PickObjects(
+                ObjectType.Element, new SlabSelectionFilter(),
+                "Select reinforced floor slabs, then click Finish");
+            return refs.Select(r => uidoc.Document.GetElement(r.ElementId)).OfType<Floor>().ToList();
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
+    }
+
+    private static List<string> TitleBlockNames(Document doc) =>
+        new FilteredElementCollector(doc)
+            .OfCategory(BuiltInCategory.OST_TitleBlocks).OfClass(typeof(FamilySymbol))
+            .Cast<FamilySymbol>().Select(t => t.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+
+    private static List<string> ViewTemplateNames(Document doc) =>
+        new FilteredElementCollector(doc)
+            .OfClass(typeof(View)).Cast<View>()
+            .Where(v => v.IsTemplate)
+            .Select(v => v.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
 }
