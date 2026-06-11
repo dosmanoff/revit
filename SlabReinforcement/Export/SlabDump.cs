@@ -184,6 +184,9 @@ public sealed class SupportInfo
     public double[] CenterFt { get; set; } = [];
     public double WidthIn { get; set; }
     public double DepthIn { get; set; }
+    /// <summary>Plan centerline [ax, ay, bx, by] (ft) for walls / beams; null for columns.
+    /// Anchor wall strips (e.g. shaft-core faces) to this, not just the center point.</summary>
+    public double[]? LineFt { get; set; }
 }
 
 public sealed class NeighborGroupInfo

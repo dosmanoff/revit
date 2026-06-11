@@ -30,6 +30,9 @@ public sealed class SupportBelow
     public required Pt2 CenterXY { get; init; }              // feet
     public double WidthIn { get; init; }
     public double DepthIn { get; init; }
+    /// <summary>Plan centerline for line supports (walls / beams) — lets the agent anchor
+    /// strips to the actual wall, e.g. shaft-core faces. Null for columns.</summary>
+    public Seg2? LineSeg { get; init; }
 }
 
 /// <summary>
@@ -244,6 +247,8 @@ public sealed class SlabContext
                 ElementId = e.Id.Value,
                 Mark = MarkOf(e),
                 CenterXY = cl.Mid,
+                WidthIn = e is Wall wall ? UnitConv.FtToIn(wall.Width) : 0,
+                LineSeg = cl,
             });
         }
     }
