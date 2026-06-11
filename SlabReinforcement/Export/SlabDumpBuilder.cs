@@ -137,6 +137,7 @@ public sealed class SlabDumpBuilder
                 CenterFt = [s.CenterXY.X, s.CenterXY.Y],
                 WidthIn = s.WidthIn,
                 DepthIn = s.DepthIn,
+                LineFt = s.LineSeg is { } seg ? [seg.A.X, seg.A.Y, seg.B.X, seg.B.Y] : null,
             }).ToList(),
             WallsBounding = GroupEdges(ctx, EdgeKind.Wall),
             Beams = GroupEdges(ctx, EdgeKind.Beam),
