@@ -23,6 +23,7 @@ public sealed class GroupBuilder
         SlabReinforcementConfig cfg, IReadOnlyList<BriefGroup> groups)
     {
         UnitSystem u = cfg.Units;
+        cfgSideCoverFt = cfg.Ft(cfg.Cover.Side);
         int created = 0;
         foreach (BriefGroup g in groups)
         {
@@ -127,8 +128,10 @@ public sealed class GroupBuilder
 
         double zLeg = topFace ? z - bendLen : z + bendLen;
         double tol = cover + 0.06;
-        bool bendA = FieldLayout.OnBoundary(a, geom.Outer, geom.Openings, tol);
-        bool bendB = FieldLayout.OnBoundary(b, geom.Outer, geom.Openings, tol);
+        // Bend only at the slab's OUTER edge (торец) — never at openings: shaft edges carry the
+        // wall verticals, and a hook there is not on the plan.
+        bool bendA = FieldLayout.OnBoundary(a, geom.Outer, [], tol);
+        bool bendB = FieldLayout.OnBoundary(b, geom.Outer, [], tol);
 
         var curves = new List<Curve>();
         if (bendA) curves.Add(Line.CreateBound(new XYZ(a.X, a.Y, zLeg), pa));
@@ -193,29 +196,54 @@ public sealed class GroupBuilder
         if (lineLen < 1e-6) return 0;
         Pt2 t = (b - a).Normalized;
 
-        IEnumerable<double> positions = g.Count is { } c && c > 0
+        List<double> positions = (g.Count is { } c && c > 0
             ? Enumerable.Range(0, c).Select(i => c == 1 ? lineLen / 2 : i * (lineLen / (c - 1)))
-            : RebarFactory.EvenlySpaced(0, lineLen, spacing);
+            : RebarFactory.EvenlySpaced(0, lineLen, spacing)).ToList();
 
-        int created = 0;
+        if (g.Dowel is { } dw)
+        {
+            int made = 0;
+            foreach (double d in positions) made += Dowel(geom, barTypeId, tag, a + t * d, dw, u);
+            return made;
+        }
+
+        // Row of parallel bars: clip to the footprint, restore the side cover at clipped ends,
+        // then band into rebar SETS distributed along the line (like the area groups).
+        double cover = cfgSideCoverFt;
+        double len = g.Length is { } l ? l.ToFeet(u) : 3.0;
+        double step = positions.Count > 1 ? positions[1] - positions[0] : spacing;
+        var rails = new List<LocalRail>();
         foreach (double d in positions)
         {
             Pt2 p = a + t * d;
-            if (g.Dowel is { } dw) created += Dowel(geom, barTypeId, tag, p, dw, u);
-            else
+            foreach (Seg2 piece in FieldLayout.ClipToFootprint(new Seg2(p, p + dir * len), geom.Outer, geom.Openings))
             {
-                double len = g.Length is { } l ? l.ToFeet(u) : 3.0;
-                Pt2 q = p + dir * len;
-                foreach (Seg2 piece in FieldLayout.ClipToFootprint(new Seg2(p, q), geom.Outer, geom.Openings))
-                {
-                    RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, XYZ.BasisZ,
-                        new List<Curve> { Line.CreateBound(new XYZ(piece.A.X, piece.A.Y, z), new XYZ(piece.B.X, piece.B.Y, z)) }, tag);
-                    created++;
-                }
+                if (FieldLayout.InsetClippedEnds(piece, geom.Outer, geom.Openings, cover) is not { } bar) continue;
+                double sa = bar.A.Dot(dir), sb = bar.B.Dot(dir);
+                rails.Add(new LocalRail(bar.A.Dot(t), Math.Min(sa, sb), Math.Max(sa, sb)));
             }
+        }
+
+        double bendLen = g.EdgeBend?.ToFeet(u) ?? 0;
+        bool topFace = !string.Equals(g.Face, "Bottom", StringComparison.OrdinalIgnoreCase);
+        var norm = new XYZ(t.X, t.Y, 0);
+        int created = 0;
+        foreach (Band run in FieldLayout.Bands(rails, step))
+        {
+            Pt2 p0 = dir * run.Start + t * run.Perp0;
+            Pt2 p1 = dir * run.End + t * run.Perp0;
+            List<Curve> curves = BarWithEdgeBends(geom, p0, p1, z, bendLen, topFace, cover);
+            Rebar set = RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, geom.Floor, norm, curves, tag);
+            if (run.Count > 1)
+                try { set.GetShapeDrivenAccessor().SetLayoutAsNumberWithSpacing(run.Count, step, true, true, true); }
+                catch { /* keep the representative bar */ }
+            created += run.Count;
         }
         return created;
     }
+
+    // Side cover of the active config — set by Build() before the group loop.
+    private double cfgSideCoverFt;
 
     private int Dowel(SlabGeometry geom, ElementId barTypeId, string tag, Pt2 p, BriefDowel dw, UnitSystem u)
     {
