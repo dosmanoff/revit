@@ -2,7 +2,7 @@
 
 *Operational guide: how to start a session, test the link, rebuild after changes, and recover from common problems. Last verified 2026-06-13.*
 
-Companion doc: [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md) (architecture + how to add a command).
+Companion docs: [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md) (architecture + how to add a command) · [`revit-mcp-api-cookbook.md`](revit-mcp-api-cookbook.md) (verified C# recipes + pitfalls).
 
 ---
 
@@ -15,6 +15,28 @@ Companion doc: [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md) (architect
 5. Confirm the link with a **non-interactive** call: `get_current_view_info`. (Don't use `say_hello` as a health check — it pops a modal that must be clicked within 15 s.)
 
 If `get_current_view_info` returns the active view, you're live.
+
+---
+
+## Orient yourself first (new session)
+
+Before doing work, ground the session in the actual model — don't assume.
+
+**First moves (read-only):**
+- `get_current_view_info` — confirms the link + the active view/model.
+- List levels: `new FilteredElementCollector(document).OfClass(typeof(Level)).Cast<Level>().OrderBy(l => l.Elevation)` — get the elevation datums you'll work against.
+- `analyze_model_statistics` — element counts / model scope.
+- For a target element, probe geometry before editing (bbox, location curve, solid faces — see the cookbook §2).
+
+**Project conventions (assume unless told otherwise):**
+- **Imperial units**; API returns lengths/diameters in **decimal feet** (#8 = 0.0833 ft = 1").
+- **ACI 318 / US norms**, **non-seismic** default.
+- **Strict `RebarBarType` lookup** — never silently fall back to a default bar size; report if the requested size isn't found.
+- Verify against a **reference/etalon view** when replicating reinforcement across floors, rather than trusting coordinates blindly.
+
+**Two separate repos — don't conflate:**
+- **MCP server/plugin/commandset code:** `C:\dev\mcp-servers-for-revit` (local disk only).
+- **Structural plugins + these docs:** `L:\My Drive\claude\revit\claude_revit_mcp\` (this repo: AutoNumbering, ColumnReinforcement, SlabRebar, SmartViews, WallReinforcement).
 
 ---
 
@@ -105,5 +127,6 @@ Data store: `store_project_data`, `store_room_data`.
 All Revit-MCP docs live in **`L:\My Drive\claude\revit\claude_revit_mcp\`** (`.md` on Drive is fine):
 - `revit-mcp-runbook.md` — this file (startup / rebuild / gotchas).
 - `revit-mcp-agent-guide.md` — architecture, repo layout, adding a command.
+- `revit-mcp-api-cookbook.md` — verified C# recipes (rebar, MRA, views, export) + pitfalls.
 
 The **code** lives at `C:\dev\mcp-servers-for-revit` (local disk only). This repo (`claude_revit_mcp`) is the *structural-plugins* repo (AutoNumbering, ColumnReinforcement, SlabRebar, SmartViews, WallReinforcement) — separate from the MCP server.
