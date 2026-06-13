@@ -2,7 +2,7 @@
 
 *Operational guide: how to start a session, test the link, rebuild after changes, and recover from common problems. Last verified 2026-06-13.*
 
-Companion docs: [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md) (architecture + how to add a command) · [`revit-mcp-api-cookbook.md`](revit-mcp-api-cookbook.md) (verified C# recipes + pitfalls).
+Companion docs: [`revit-mcp-best-practices.md`](revit-mcp-best-practices.md) (START HERE — top rules) · [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md) (architecture + how to add a command) · [`revit-mcp-api-cookbook.md`](revit-mcp-api-cookbook.md) (verified C# recipes + pitfalls).
 
 ---
 
@@ -125,6 +125,7 @@ Data store: `store_project_data`, `store_room_data`.
 ## Documentation locations
 
 All Revit-MCP docs live in **`L:\My Drive\claude\revit\claude_revit_mcp\`** (`.md` on Drive is fine):
+- `revit-mcp-best-practices.md` — **START HERE**: read order + top rules (rebar/views/annotations).
 - `revit-mcp-runbook.md` — this file (startup / rebuild / gotchas).
 - `revit-mcp-agent-guide.md` — architecture, repo layout, adding a command.
 - `revit-mcp-api-cookbook.md` — verified C# recipes (rebar, MRA, views, export) + pitfalls.

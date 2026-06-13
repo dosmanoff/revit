@@ -2,7 +2,7 @@
 
 *Verified, copy-paste-ready C# for `send_code_to_revit`. These are patterns proven in real sessions — paired with the pitfalls that cost hours. Last verified 2026-06-13.*
 
-Companion docs: [`revit-mcp-runbook.md`](revit-mcp-runbook.md) · [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md)
+Companion docs: [`revit-mcp-best-practices.md`](revit-mcp-best-practices.md) (START HERE) · [`revit-mcp-runbook.md`](revit-mcp-runbook.md) · [`revit-mcp-agent-guide.md`](revit-mcp-agent-guide.md)
 External reference (don't reproduce — link): [revitapidocs 2025](https://www.revitapidocs.com/2025/) · [Autodesk RVT 2025 help](https://help.autodesk.com/view/RVT/2025/ENU/)
 
 ---

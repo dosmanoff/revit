@@ -2,7 +2,7 @@
 
 *Orientation for an AI agent (or developer) working on the Revit MCP system: architecture, repo layout, conventions, and how to add a new command end-to-end. Last verified 2026-06-13.*
 
-Companion docs: [`revit-mcp-runbook.md`](revit-mcp-runbook.md) (start a session, rebuild, gotchas) · [`revit-mcp-api-cookbook.md`](revit-mcp-api-cookbook.md) (verified C# recipes + pitfalls).
+Companion docs: [`revit-mcp-best-practices.md`](revit-mcp-best-practices.md) (START HERE) · [`revit-mcp-runbook.md`](revit-mcp-runbook.md) (start a session, rebuild, gotchas) · [`revit-mcp-api-cookbook.md`](revit-mcp-api-cookbook.md) (verified C# recipes + pitfalls).
 
 ---
 
