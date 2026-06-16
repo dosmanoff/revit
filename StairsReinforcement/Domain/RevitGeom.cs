@@ -1,0 +1,113 @@
+using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Structure;
+using StairsReinforcement.Geometry;
+
+namespace StairsReinforcement.Domain;
+
+/// <summary>Revit-API ⇆ Revit-free geometry adapters and small solid/face helpers.</summary>
+internal static class RevitGeom
+{
+    public static Pt3 P3(XYZ p) => new(p.X, p.Y, p.Z);
+    public static Pt2 P2(XYZ p) => new(p.X, p.Y);
+    public static XYZ ToXYZ(Pt3 p) => new(p.X, p.Y, p.Z);
+
+    public static IEnumerable<Solid> Solids(Element e)
+    {
+        var opt = new Options
+        {
+            ComputeReferences = false,
+            IncludeNonVisibleObjects = false,
+            DetailLevel = ViewDetailLevel.Fine,
+        };
+        GeometryElement? ge = e.get_Geometry(opt);
+        if (ge is null) yield break;
+
+        foreach (GeometryObject go in ge)
+        {
+            if (go is Solid s && s.Volume > 1e-9) yield return s;
+            else if (go is GeometryInstance gi)
+                foreach (GeometryObject g2 in gi.GetInstanceGeometry())
+                    if (g2 is Solid s2 && s2.Volume > 1e-9) yield return s2;
+        }
+    }
+
+    public static Solid? LargestSolid(Element e) =>
+        Solids(e).OrderByDescending(s => s.Volume).FirstOrDefault();
+
+    /// <summary>Largest planar face whose outward normal points up (top) or down (bottom).</summary>
+    public static PlanarFace? ExtremeFace(Solid solid, bool top)
+    {
+        PlanarFace? best = null;
+        double bestArea = -1;
+        foreach (Face f in solid.Faces)
+        {
+            if (f is not PlanarFace pf) continue;
+            double nz = pf.FaceNormal.Z;
+            bool match = top ? nz > 0.2 : nz < -0.2;
+            if (!match) continue;
+            if (pf.Area > bestArea) { bestArea = pf.Area; best = pf; }
+        }
+        return best;
+    }
+
+    public static Bounds3 ElemBounds(Element e)
+    {
+        var b = new Bounds3();
+        BoundingBoxXYZ? bb = e.get_BoundingBox(null);
+        if (bb is not null) { b.Add(P3(bb.Min)); b.Add(P3(bb.Max)); }
+        return b;
+    }
+
+    public static bool IsValidRebarHost(Element e)
+    {
+        try
+        {
+            RebarHostData? hd = RebarHostData.GetRebarHostData(e);
+            return hd is not null && hd.IsValidHost();
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Tessellate a closed curve loop to a plan polygon (XY, feet), dropping duplicate vertices.</summary>
+    public static List<Pt2> ToPlanLoop(IEnumerable<Curve> curves)
+    {
+        var pts = new List<Pt2>();
+        foreach (Curve c in curves)
+            foreach (XYZ p in c.Tessellate())
+            {
+                Pt2 q = P2(p);
+                if (pts.Count == 0 || (pts[^1] - q).Length > 1e-7) pts.Add(q);
+            }
+        if (pts.Count > 1 && (pts[0] - pts[^1]).Length < 1e-7) pts.RemoveAt(pts.Count - 1);
+        return pts;
+    }
+
+    /// <summary>String param by exact name on the element, or null.</summary>
+    public static double? LookupLengthFt(Element e, params string[] names)
+    {
+        foreach (string n in names)
+        {
+            Parameter? p = e.LookupParameter(n);
+            if (p is { StorageType: StorageType.Double }) return p.AsDouble();
+        }
+        return null;
+    }
+
+    public static string? Mark(Element e) =>
+        e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
+
+    public static string? Comments(Element e) =>
+        e.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString();
+
+    /// <summary>Floor structural thickness from the compound structure, fallback to bbox height.</summary>
+    public static double FloorThicknessFt(Floor floor)
+    {
+        if (floor.Document.GetElement(floor.GetTypeId()) is FloorType ft)
+        {
+            CompoundStructure? cs = ft.GetCompoundStructure();
+            if (cs is not null) { double w = cs.GetWidth(); if (w > 1e-6) return w; }
+        }
+        Bounds3 b = ElemBounds(floor);
+        return b.IsEmpty ? 0 : b.Size.Z;
+    }
+}
