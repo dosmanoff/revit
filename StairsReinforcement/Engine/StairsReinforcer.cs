@@ -72,7 +72,18 @@ public sealed class StairsReinforcer
             created += distribution.Build(f, cfg, asm.Id);
         }
 
-        // Landings, knee, starters, steps are wired in PR-09…PR-12.
+        var landingMat = new LandingMatBuilder(_doc);
+        foreach (LandingComponent l in asm.Landings)
+        {
+            if (!l.RebarHostOk)
+            {
+                outcome.Reason = Append(outcome.Reason, $"landing {l.Index}: host cannot hold rebar");
+                continue;
+            }
+            created += landingMat.Build(l, cfg, asm.Id);
+        }
+
+        // Knee, starters, steps are wired in PR-10…PR-12.
         return created;
     }
 
