@@ -83,7 +83,9 @@ public sealed class StairsReinforcer
             created += landingMat.Build(l, cfg, asm.Id);
         }
 
-        // Knee, starters, steps are wired in PR-10…PR-12.
+        created += new KneeBarBuilder(_doc).Build(asm, cfg, asm.Id);
+
+        // Starters, steps are wired in PR-11…PR-12.
         return created;
     }
 
