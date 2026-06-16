@@ -1,0 +1,6 @@
+# Basic stair assignments — one row per stair Mark. Sparse: only non-default columns.
+# ST-1: monolithic U-stair. Bottom main #5@8 anchored into both supports, dist #4@12,
+#        top over supports #5@8, landing #5@8 EW, starters from the slab below.
+Mark,FlightBotMainBarType,FlightBotMainSpacing,FlightBotMainStartAnchor,FlightBotMainEndAnchor,FlightBotDistBarType,FlightBotDistSpacing,FlightTopMode,FlightTopMainBarType,FlightTopMainSpacing,FlightTopSupportExtent,LandBotXBarType,LandBotXSpacing,LandBotYBarType,LandBotYSpacing,KneeMode,StartersEnabled,StarterHost,MaxBarLength
+ST-1,#5,8,IntoSupport,IntoSupport,#4,12,OverSupports,#5,8,3'-0",#5,8,#5,8,LappedHairpin,true,SlabBelow,40'-0"
+ST-2,#6,7,Hook90,IntoSupport,#4,12,Continuous,#5,10,,#5,8,#5,8,LappedHairpin,true,Auto,
