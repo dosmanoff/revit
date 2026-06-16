@@ -18,6 +18,12 @@ public sealed class LandingMatBuilder
 
     public int Build(LandingComponent l, StairsReinforcementConfig cfg, ElementId stairId)
     {
+        if (cfg.Landing.Mode == FieldMode.AreaSystem)
+        {
+            int areaN = TryAreaSystem(l, cfg, stairId);
+            if (areaN > 0) return areaN;   // else fall through to discrete bars
+        }
+
         double coverBot = cfg.Ft(cfg.Cover.Bottom);
         double coverTop = cfg.Ft(cfg.Cover.Top);
         double zBot = l.ElevationFt - l.ThicknessFt;
@@ -103,4 +109,64 @@ public sealed class LandingMatBuilder
         try { return RebarFactory.GetBarType(_doc, spec.BarType).BarNominalDiameter; }
         catch { return 0; }
     }
+
+    // ── native AreaReinforcement mode ─────────────────────────────────────────
+
+    /// <summary>Place a native AreaReinforcement mat; returns 0 (caller falls back to bars) on any issue.</summary>
+    private int TryAreaSystem(LandingComponent l, StairsReinforcementConfig cfg, ElementId stairId)
+    {
+        try
+        {
+            if (l.Boundary.Count < 3) return 0;
+            ElementId areaTypeId = new FilteredElementCollector(_doc).OfClass(typeof(AreaReinforcementType)).FirstElementId();
+            ElementId majorBar = RebarFactory.LookupBarType(_doc, cfg.Landing.BottomX.BarType);
+            if (areaTypeId == ElementId.InvalidElementId || majorBar == ElementId.InvalidElementId) return 0;
+
+            var boundary = new List<Curve>();
+            for (int i = 0; i < l.Boundary.Count; i++)
+            {
+                Pt2 a = l.Boundary[i], b = l.Boundary[(i + 1) % l.Boundary.Count];
+                if ((b - a).Length < 1e-6) continue;
+                boundary.Add(Line.CreateBound(new XYZ(a.X, a.Y, l.ElevationFt), new XYZ(b.X, b.Y, l.ElevationFt)));
+            }
+            if (boundary.Count < 3) return 0;
+
+            var majorDir = new XYZ(l.Basis.X.X, l.Basis.X.Y, 0);
+            AreaReinforcement area = AreaReinforcement.Create(
+                _doc, l.Host, boundary, majorDir, areaTypeId, majorBar, ElementId.InvalidElementId);
+
+            ConfigureArea(area, cfg);
+            ExistingRebarCleaner.Tag(area, ExistingRebarCleaner.MakeTag(cfg.Name, stairId, StairLayer.LandingBottomX));
+            return 1;
+        }
+        catch { return 0; }
+    }
+
+    private void ConfigureArea(AreaReinforcement area, StairsReinforcementConfig cfg)
+    {
+        bool top = cfg.Landing.TopMode != TopMode.None;
+        SetInt(area, BuiltInParameter.REBAR_SYSTEM_LAYOUT_RULE, (int)RebarLayoutRule.MaximumSpacing);
+
+        SetInt(area, BuiltInParameter.REBAR_SYSTEM_ACTIVE_BOTTOM_DIR_1, cfg.Landing.BottomX.Enabled ? 1 : 0);
+        SetInt(area, BuiltInParameter.REBAR_SYSTEM_ACTIVE_BOTTOM_DIR_2, cfg.Landing.BottomY.Enabled ? 1 : 0);
+        SetInt(area, BuiltInParameter.REBAR_SYSTEM_ACTIVE_TOP_DIR_1, top && cfg.Landing.TopX.Enabled ? 1 : 0);
+        SetInt(area, BuiltInParameter.REBAR_SYSTEM_ACTIVE_TOP_DIR_2, top && cfg.Landing.TopY.Enabled ? 1 : 0);
+
+        SetDouble(area, BuiltInParameter.REBAR_SYSTEM_SPACING_BOTTOM_DIR_1, cfg.Ft(cfg.Landing.BottomX.Spacing));
+        SetDouble(area, BuiltInParameter.REBAR_SYSTEM_SPACING_BOTTOM_DIR_2, cfg.Ft(cfg.Landing.BottomY.Spacing));
+        SetDouble(area, BuiltInParameter.REBAR_SYSTEM_SPACING_TOP_DIR_1, cfg.Ft(cfg.Landing.TopX.Spacing));
+        SetDouble(area, BuiltInParameter.REBAR_SYSTEM_SPACING_TOP_DIR_2, cfg.Ft(cfg.Landing.TopY.Spacing));
+
+        SetElem(area, BuiltInParameter.REBAR_SYSTEM_BAR_TYPE_BOTTOM_DIR_1, RebarFactory.LookupBarType(_doc, cfg.Landing.BottomX.BarType));
+        SetElem(area, BuiltInParameter.REBAR_SYSTEM_BAR_TYPE_BOTTOM_DIR_2, RebarFactory.LookupBarType(_doc, cfg.Landing.BottomY.BarType));
+        SetElem(area, BuiltInParameter.REBAR_SYSTEM_BAR_TYPE_TOP_DIR_1, RebarFactory.LookupBarType(_doc, cfg.Landing.TopX.BarType));
+        SetElem(area, BuiltInParameter.REBAR_SYSTEM_BAR_TYPE_TOP_DIR_2, RebarFactory.LookupBarType(_doc, cfg.Landing.TopY.BarType));
+    }
+
+    private static void SetInt(Element e, BuiltInParameter bip, int v)
+    { try { e.get_Parameter(bip)?.Set(v); } catch { } }
+    private static void SetDouble(Element e, BuiltInParameter bip, double v)
+    { try { e.get_Parameter(bip)?.Set(v); } catch { } }
+    private static void SetElem(Element e, BuiltInParameter bip, ElementId v)
+    { try { if (v != ElementId.InvalidElementId) e.get_Parameter(bip)?.Set(v); } catch { } }
 }
