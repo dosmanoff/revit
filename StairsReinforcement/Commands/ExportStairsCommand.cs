@@ -1,17 +1,18 @@
+using System.IO;
 using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
 using StairsReinforcement.Domain;
-using StairsReinforcement.Engine;
+using StairsReinforcement.Export;
 
 namespace StairsReinforcement.Commands;
 
 /// <summary>
-/// Exports a JSON geometry description of the selected stairs for the reinforcement agent.
-/// (Phase 1 in progress — PR-02 resolves the stair model and reports the extracted geometry;
-/// the JSON writer and save dialog land in PR-04.)
+/// Exports a JSON geometry description of the selected stairs (native Stairs and/or
+/// floor-modelled) for the reinforcement agent: per-flight + per-landing geometry, supports,
+/// available bar/hook types and document resources.
 /// </summary>
 [Transaction(TransactionMode.Manual)]
 public class ExportStairsCommand : IExternalCommand
@@ -41,44 +42,58 @@ public class ExportStairsCommand : IExternalCommand
         }
 
         List<StairAssembly> assemblies = StairSourceResolver.Resolve(doc, picked);
-        TaskDialog.Show("Export Stairs — geometry", Summarize(assemblies));
+        StairsDump dump = new StairsDumpBuilder(doc).Build(assemblies, DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"));
+
+        string? path = AskSavePath(doc);
+        if (path is null) return Result.Cancelled;
+
+        try { File.WriteAllText(path, dump.ToJson(), new UTF8Encoding(false)); }
+        catch (Exception ex) { message = $"Could not write '{path}': {ex.Message}"; return Result.Failed; }
+
+        TaskDialog.Show("Export Stairs", Summarize(dump, path));
         return Result.Succeeded;
     }
 
-    private static string Summarize(IReadOnlyList<StairAssembly> assemblies)
+    private static string? AskSavePath(Document doc)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"Resolved {assemblies.Count} stair assembly(ies).");
-        sb.AppendLine("(JSON export lands in PR-04; this confirms geometry extraction.)");
+        string title = string.IsNullOrWhiteSpace(doc.Title) ? "stairs" : Path.GetFileNameWithoutExtension(doc.Title);
+        string initialDir = !string.IsNullOrWhiteSpace(doc.PathName)
+            ? Path.GetDirectoryName(doc.PathName)!
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
-        foreach (StairAssembly a in assemblies)
+        var dlg = new Microsoft.Win32.SaveFileDialog
         {
-            sb.AppendLine();
-            sb.AppendLine($"■ {a.Source} · Mark '{a.Mark ?? "—"}' · " +
-                          $"{a.Flights.Count} flight(s), {a.Landings.Count} landing(s)");
-
-            foreach (FlightComponent f in a.Flights)
-                sb.AppendLine(
-                    $"   Flight {f.Index} [{f.SourceKind}] hostOk={f.RebarHostOk}: " +
-                    $"waist {UnitConv.FtToIn(f.WaistFt):0.#}\", width {f.WidthFt:0.##}', " +
-                    $"run {f.HorizRunFt:0.##}', rise {f.TotalRiseFt:0.##}', " +
-                    $"slope {UnitConv.Deg(f.SlopeRad):0.#}°, {f.RiserCount}R/{f.TreadCount}T; " +
-                    $"supports {Supp(f.LowerSupport)}→{Supp(f.UpperSupport)}");
-
-            foreach (LandingComponent l in a.Landings)
-                sb.AppendLine(
-                    $"   Landing {l.Index} [{l.SourceKind}]: thick {UnitConv.FtToIn(l.ThicknessFt):0.#}\", " +
-                    $"elev {l.ElevationFt:0.##}', area {l.AreaSf:0.#} sf, " +
-                    $"connects [{string.Join(",", l.ConnectsFlights)}], " +
-                    $"supports {string.Join("/", l.Supports.Select(s => s.Kind).DefaultIfEmpty("—"))}");
-
-            foreach (string w in a.Warnings) sb.AppendLine($"   ! {w}");
-        }
-
-        return sb.ToString();
+            Title = "Export stairs JSON",
+            Filter = "JSON (*.json)|*.json",
+            FileName = $"{title}_stairs.json",
+            InitialDirectory = initialDir,
+            OverwritePrompt = true,
+        };
+        return dlg.ShowDialog() == true ? dlg.FileName : null;
     }
 
-    private static string Supp(SupportInfo? s) => s is null ? "none" : s.Kind;
+    private static string Summarize(StairsDump dump, string path)
+    {
+        int flights = dump.Stairs.Sum(s => s.Flights.Count);
+        int landings = dump.Stairs.Sum(s => s.Landings.Count);
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Wrote {dump.Stairs.Count} stair(s): {flights} flight(s), {landings} landing(s).");
+        sb.AppendLine($"{dump.AvailableRebarBarTypes.Count} bar types, {dump.AvailableRebarHookTypes.Count} hook types.");
+        sb.AppendLine(path);
+
+        var allWarnings = dump.Warnings
+            .Concat(dump.Stairs.SelectMany(s => s.Warnings ?? new List<string>()))
+            .ToList();
+        if (allWarnings.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Warnings:");
+            foreach (string w in allWarnings.Take(5)) sb.AppendLine($"  • {w}");
+            if (allWarnings.Count > 5) sb.AppendLine($"  … and {allWarnings.Count - 5} more");
+        }
+        return sb.ToString();
+    }
 
     private static List<Element> GetSelected(UIDocument uidoc)
     {
