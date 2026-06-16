@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure plan/section geometry for stair reinforcement. NO Revit API dependency on purpose:
+    the Revit-facing StairGeometry (in the plugin) converts CurveLoop/XYZ into these types and
+    delegates the math here (flight slope frame, scan-line rails, split-at-max-length + lap),
+    so the algorithms are unit-testable without Revit.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+</Project>
