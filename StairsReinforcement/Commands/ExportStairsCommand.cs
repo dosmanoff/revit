@@ -62,18 +62,23 @@ public class ExportStairsCommand : IExternalCommand
                     $"   Flight {f.Index} [{f.SourceKind}] hostOk={f.RebarHostOk}: " +
                     $"waist {UnitConv.FtToIn(f.WaistFt):0.#}\", width {f.WidthFt:0.##}', " +
                     $"run {f.HorizRunFt:0.##}', rise {f.TotalRiseFt:0.##}', " +
-                    $"slope {UnitConv.Deg(f.SlopeRad):0.#}°, {f.RiserCount}R/{f.TreadCount}T");
+                    $"slope {UnitConv.Deg(f.SlopeRad):0.#}°, {f.RiserCount}R/{f.TreadCount}T; " +
+                    $"supports {Supp(f.LowerSupport)}→{Supp(f.UpperSupport)}");
 
             foreach (LandingComponent l in a.Landings)
                 sb.AppendLine(
                     $"   Landing {l.Index} [{l.SourceKind}]: thick {UnitConv.FtToIn(l.ThicknessFt):0.#}\", " +
-                    $"elev {l.ElevationFt:0.##}', area {l.AreaSf:0.#} sf");
+                    $"elev {l.ElevationFt:0.##}', area {l.AreaSf:0.#} sf, " +
+                    $"connects [{string.Join(",", l.ConnectsFlights)}], " +
+                    $"supports {string.Join("/", l.Supports.Select(s => s.Kind).DefaultIfEmpty("—"))}");
 
             foreach (string w in a.Warnings) sb.AppendLine($"   ! {w}");
         }
 
         return sb.ToString();
     }
+
+    private static string Supp(SupportInfo? s) => s is null ? "none" : s.Kind;
 
     private static List<Element> GetSelected(UIDocument uidoc)
     {

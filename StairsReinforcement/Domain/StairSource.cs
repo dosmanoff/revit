@@ -28,6 +28,11 @@ public static class StairSourceResolver
         }
 
         if (floors.Count > 0) result.Add(BuildFromFloors(doc, floors));
+
+        foreach (StairAssembly asm in result)
+            try { StairContext.Populate(doc, asm); }
+            catch (Exception ex) { asm.Warnings.Add($"Context: {ex.Message}"); }
+
         return result;
     }
 
