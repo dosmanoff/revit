@@ -84,8 +84,9 @@ public sealed class StairsReinforcer
         }
 
         created += new KneeBarBuilder(_doc).Build(asm, cfg, asm.Id);
+        created += new StarterBarBuilder(_doc).Build(asm, cfg, asm.Id);
 
-        // Starters, steps are wired in PR-11…PR-12.
+        // Step bars are wired in PR-12.
         return created;
     }
 
