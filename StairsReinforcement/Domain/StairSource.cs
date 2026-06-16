@@ -7,9 +7,10 @@ namespace StairsReinforcement.Domain;
 /// <summary>
 /// Resolves the two supported representations into one <see cref="StairAssembly"/> model:
 /// native Revit <see cref="Stairs"/> (one assembly each, from its runs + landings), and
-/// floor-modelled stairs (all picked floors form one assembly; sloped floors = flights,
-/// flat floors = landings). The rebar engine resolves geometry through the same path so the
-/// dump and the generated bars always agree.
+/// floor-modelled stairs — the picked floors are split into distinct stairs by bbox connectivity
+/// (<see cref="BoxCluster"/>), one assembly per connected group; within each, sloped floors = flights,
+/// flat floors = landings. The rebar engine resolves geometry through the same path so the dump and
+/// the generated bars always agree.
 /// </summary>
 public static class StairSourceResolver
 {
@@ -27,7 +28,7 @@ public static class StairSourceResolver
             else if (e is Floor fl) floors.Add(fl);
         }
 
-        if (floors.Count > 0) result.Add(BuildFromFloors(doc, floors));
+        if (floors.Count > 0) result.AddRange(BuildFromFloors(doc, floors));
 
         foreach (StairAssembly asm in result)
             try { StairContext.Populate(doc, asm); }
@@ -150,7 +151,29 @@ public static class StairSourceResolver
 
     // ── Floor-modelled ───────────────────────────────────────────────────────
 
-    private static StairAssembly BuildFromFloors(Document doc, List<Floor> floors)
+    private const double GroupGapFt = 0.5;   // floors within ~6" are treated as one stair
+
+    /// <summary>Split the selected floors into distinct stairs by bbox connectivity, one assembly each.</summary>
+    private static List<StairAssembly> BuildFromFloors(Document doc, List<Floor> floors)
+    {
+        var withBox = new List<(Floor F, BoxCluster.Box Box)>();
+        var noBox = new List<Floor>();
+        foreach (Floor f in floors)
+        {
+            Bounds3 b = RevitGeom.ElemBounds(f);
+            if (b.IsEmpty) noBox.Add(f);
+            else withBox.Add((f, new BoxCluster.Box(b.Min, b.Max)));
+        }
+
+        var result = new List<StairAssembly>();
+        foreach (List<int> group in BoxCluster.Group(withBox.Select(x => x.Box).ToList(), GroupGapFt))
+            result.Add(BuildFloorAssembly(doc, group.Select(i => withBox[i].F).ToList()));
+        foreach (Floor f in noBox)
+            result.Add(BuildFloorAssembly(doc, new List<Floor> { f }));
+        return result;
+    }
+
+    private static StairAssembly BuildFloorAssembly(Document doc, List<Floor> floors)
     {
         Floor first = floors[0];
         var asm = new StairAssembly
