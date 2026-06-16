@@ -58,7 +58,8 @@ public sealed class StairsReinforcer
     private int BuildAssembly(StairAssembly asm, StairsReinforcementConfig cfg, StairOutcome outcome)
     {
         int created = 0;
-        var flight = new FlightLongitudinalBuilder(_doc);
+        var longitudinal = new FlightLongitudinalBuilder(_doc);
+        var distribution = new FlightDistributionBuilder(_doc);
 
         foreach (FlightComponent f in asm.Flights)
         {
@@ -67,10 +68,11 @@ public sealed class StairsReinforcer
                 outcome.Reason = Append(outcome.Reason, $"flight {f.Index}: host cannot hold rebar");
                 continue;
             }
-            created += flight.Build(f, cfg, asm.Id);
+            created += longitudinal.Build(f, cfg, asm.Id);
+            created += distribution.Build(f, cfg, asm.Id);
         }
 
-        // Landings, knee, starters, steps are wired in PR-08…PR-12.
+        // Landings, knee, starters, steps are wired in PR-09…PR-12.
         return created;
     }
 
