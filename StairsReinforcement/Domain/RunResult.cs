@@ -17,6 +17,9 @@ public sealed class RunResult
     public bool DryRun { get; set; }
     public List<StairOutcome> Outcomes { get; } = new();
 
+    /// <summary>Non-fatal notes (e.g. Expected* geometry mismatches) surfaced to the user.</summary>
+    public List<string> Warnings { get; } = new();
+
     public int Succeeded => Outcomes.Count(o => o.Status == StairStatus.Success);
     public int Skipped => Outcomes.Count(o => o.Status == StairStatus.Skipped);
     public int Failed => Outcomes.Count(o => o.Status == StairStatus.Failed);

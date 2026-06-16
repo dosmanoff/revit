@@ -15,7 +15,9 @@ public sealed class StairsReinforcer
     private readonly Document _doc;
     public StairsReinforcer(Document doc) => _doc = doc;
 
-    public RunResult Run(IReadOnlyList<(StairAssembly Asm, StairsReinforcementConfig Cfg)> work, bool dryRun)
+    public RunResult Run(
+        IReadOnlyList<(StairAssembly Asm, StairsReinforcementConfig Cfg)> work, bool dryRun,
+        IReadOnlyDictionary<long, ExpectedGeom>? expected = null)
     {
         var result = new RunResult { DryRun = dryRun };
 
@@ -32,6 +34,9 @@ public sealed class StairsReinforcer
             {
                 int replaced = cfg.CleanExisting ? ExistingRebarCleaner.Clean(_doc, asm.Id, cfg.Name) : 0;
                 int created = BuildAssembly(asm, cfg, outcome);
+
+                if (expected is not null && expected.TryGetValue(asm.Id.Value, out ExpectedGeom? exp) && exp is not null)
+                    Validate(asm, cfg, exp, result);
 
                 outcome.Created = created;
                 outcome.Replaced = replaced;
@@ -94,4 +99,26 @@ public sealed class StairsReinforcer
 
     private static string Append(string? reason, string add) =>
         string.IsNullOrEmpty(reason) ? add : $"{reason}; {add}";
+
+    /// <summary>Warn (non-fatal) when the live geometry differs from the CSV Expected* values.</summary>
+    private static void Validate(StairAssembly asm, StairsReinforcementConfig cfg, ExpectedGeom exp, RunResult result)
+    {
+        FlightComponent? f = asm.Flights.FirstOrDefault();
+        if (f is null) return;
+        const double tolFt = 0.5 / 12.0;   // ~1/2 inch
+
+        Check(result, asm, cfg, "waist", exp.Waist, f.WaistFt, tolFt);
+        Check(result, asm, cfg, "width", exp.Width, f.WidthFt, tolFt);
+        Check(result, asm, cfg, "rise", exp.Rise, f.TotalRiseFt, tolFt);
+    }
+
+    private static void Check(RunResult result, StairAssembly asm, StairsReinforcementConfig cfg,
+        string what, Config.Length? expected, double liveFt, double tolFt)
+    {
+        if (expected is not { } e) return;
+        double expFt = cfg.Ft(e);
+        if (Math.Abs(expFt - liveFt) > tolFt)
+            result.Warnings.Add(
+                $"{cfg.Name} (stair {asm.Id.Value}): expected {what} {expFt * 12:0.#}\" but model is {liveFt * 12:0.#}\".");
+    }
 }

@@ -50,7 +50,8 @@ public class GenerateStairsRebarCommand : IExternalCommand
         List<StairAssembly> assemblies = StairSourceResolver.Resolve(doc, picked);
         var skipped = new List<string>();
         List<(StairAssembly, StairsReinforcementConfig)> work;
-        try { work = BuildWork(assemblies, dlg, skipped); }
+        Dictionary<long, ExpectedGeom> expected;
+        try { work = BuildWork(assemblies, dlg, skipped, out expected); }
         catch (Exception ex) { message = ex.Message; return Result.Failed; }
 
         if (work.Count == 0)
@@ -60,15 +61,17 @@ public class GenerateStairsRebarCommand : IExternalCommand
             return Result.Cancelled;
         }
 
-        RunResult result = new StairsReinforcer(doc).Run(work, dlg.DryRun);
+        RunResult result = new StairsReinforcer(doc).Run(work, dlg.DryRun, expected);
         TaskDialog.Show("Generate Stair Rebar", Summarize(result, skipped));
         return Result.Succeeded;
     }
 
     private static List<(StairAssembly, StairsReinforcementConfig)> BuildWork(
-        IReadOnlyList<StairAssembly> assemblies, StairsRebarGenDialog dlg, List<string> skipped)
+        IReadOnlyList<StairAssembly> assemblies, StairsRebarGenDialog dlg, List<string> skipped,
+        out Dictionary<long, ExpectedGeom> expected)
     {
         var work = new List<(StairAssembly, StairsReinforcementConfig)>();
+        expected = new Dictionary<long, ExpectedGeom>();
 
         if (dlg.FromCsv)
         {
@@ -82,8 +85,9 @@ public class GenerateStairsRebarCommand : IExternalCommand
             foreach (StairAssembly asm in assemblies)
             {
                 StairsReinforcementConfig? cfg = table.TryGetConfig(asm.Mark);
-                if (cfg is null) skipped.Add($"Mark '{asm.Mark ?? "—"}' (stair {asm.Id.Value}): no CSV row");
-                else work.Add((asm, cfg));
+                if (cfg is null) { skipped.Add($"Mark '{asm.Mark ?? "—"}' (stair {asm.Id.Value}): no CSV row"); continue; }
+                work.Add((asm, cfg));
+                if (table.TryGetExpected(asm.Mark) is { } exp) expected[asm.Id.Value] = exp;
             }
         }
         else
@@ -121,6 +125,9 @@ public class GenerateStairsRebarCommand : IExternalCommand
 
         foreach (StairOutcome o in result.Outcomes.Where(o => o.Status != StairStatus.Success).Take(12))
             sb.AppendLine($"  • {o.Mark} (stair {o.StairId}): {o.Status} — {o.Reason}");
+
+        foreach (string w in result.Warnings.Take(8))
+            sb.AppendLine($"  ⚠ {w}");
 
         if (skipped.Count > 0)
         {
