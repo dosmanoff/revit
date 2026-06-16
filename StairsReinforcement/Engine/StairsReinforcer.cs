@@ -60,6 +60,7 @@ public sealed class StairsReinforcer
         int created = 0;
         var longitudinal = new FlightLongitudinalBuilder(_doc);
         var distribution = new FlightDistributionBuilder(_doc);
+        var steps = new StepBarBuilder(_doc);
 
         foreach (FlightComponent f in asm.Flights)
         {
@@ -70,6 +71,7 @@ public sealed class StairsReinforcer
             }
             created += longitudinal.Build(f, cfg, asm.Id);
             created += distribution.Build(f, cfg, asm.Id);
+            created += steps.Build(f, cfg, asm.Id);
         }
 
         var landingMat = new LandingMatBuilder(_doc);
