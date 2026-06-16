@@ -52,5 +52,17 @@ public class App : IExternalApplication
                 "dowels. Each bar set is independently configurable. Re-running a config replaces " +
                 "its prior result.",
         });
+
+        panel.AddItem(new PushButtonData(
+            name: "StairViews",
+            text: "Stair\nViews",
+            assemblyName: assemblyPath,
+            className: typeof(StairViewsCommand).FullName!)
+        {
+            ToolTip = "Create a section view, rebar schedule and sheet for the selected reinforced stairs.",
+            LongDescription =
+                "Generates a longitudinal section per stair (oriented along the run), a rebar " +
+                "schedule filtered to the stair, and lays them out on a sheet.",
+        });
     }
 }

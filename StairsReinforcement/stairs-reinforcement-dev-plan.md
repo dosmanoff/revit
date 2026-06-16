@@ -104,14 +104,12 @@ embed + projection, нахлёст с рабочей.
 
 ---
 
-## Phase 4 — Stair Views (документация)
-### PR-13 — Разрезы и планы лестниц
-`Config/StairViewsConfig.cs` (+ store, **новый GUID**), `Engine/StairViewsEngine.cs`,
-`Commands/StairViewsCommand.cs`: продольный разрез + план на лестницу, спецификация арматуры
-(фильтр по тегу слоя).
-
-### PR-14 — Спецификации и листы
-`Engine/StairScheduleBuilder.cs`, `Engine/StairSheetBuilder.cs`. Замыкает конвейер:
+## Phase 4 — Stair Views (документация) ✅ ГОТОВО
+`Config/StairViewsConfig.cs` + `StairViewsConfigStore.cs` (**новый GUID**), `Engine/StairViewsEngine.cs`
+(продольный разрез на лестницу — ViewSection вдоль уклона, ориентация right=run/up=Z/view=поперёк
+ширины, кроп по объединённому bbox), `Engine/StairScheduleBuilder.cs` (спецификация арматуры,
+фильтр Host Mark), `Engine/StairSheetBuilder.cs` (раскладка на лист), `Commands/StairViewsCommand.cs`,
+`UI/StairViewsDialog.cs`, кнопка «Stair Views». Замыкает конвейер:
 Export → агент → CSV → Generate → Stair Views.
 
 ---

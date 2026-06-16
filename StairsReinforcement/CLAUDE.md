@@ -11,7 +11,8 @@ panel **Stairs Reinforcement**:
 3. **Generate Stair Rebar** — places every bar set from the config; re-running replaces its prior
    result (idempotent by `Comments` tag).
 
-A future **Stair Views** button (Phase 4) adds section/plan views, schedules and sheets.
+4. **Stair Views** — a longitudinal section per stair (oriented along the run), a rebar schedule
+   filtered to the stair, and a sheet laying them out.
 
 ## Key decisions
 - **Self-contained plugin**, sibling of SlabReinforcement/ColumnReinforcement. Logic and skeleton
