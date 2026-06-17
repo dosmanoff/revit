@@ -1,6 +1,7 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using StairsReinforcement.Config;
+using StairsReinforcement.Domain;
 using StairsReinforcement.Geometry;
 
 namespace StairsReinforcement.Engine;
@@ -9,6 +10,20 @@ namespace StairsReinforcement.Engine;
 internal static class BuildUtil
 {
     public static XYZ XYZof(Pt3 p) => new(p.X, p.Y, p.Z);
+
+    /// <summary>
+    /// The u along the slope at which a bar offset <paramref name="n"/> from the soffit reaches the
+    /// TOP of the run's solid. The frame's slope length (derived from run.Height) overshoots the real
+    /// run solid on monolithic stairs — the top riser belongs to the landing — so bars clamped to the
+    /// slope length stick out above the run ("rebar outside host" + the floating bars). Clamp to this.
+    /// </summary>
+    public static double RunTopU(FlightComponent f, double n)
+    {
+        double uz = f.Frame.U.Z;
+        if (uz < 1e-6 || f.Bounds.IsEmpty) return f.SlopeLengthFt;
+        double u = (f.Bounds.Max.Z - (f.Frame.Origin.Z + f.Frame.N.Z * n)) / uz;
+        return Math.Clamp(u, 0, f.SlopeLengthFt);
+    }
 
     /// <summary>Resolve a set to (count, centre-to-centre spacing in feet) over a span.</summary>
     public static (int Count, double SpacingFt) ResolveSet(SpacingMode mode, int count, double spacingFt, double spanFt)

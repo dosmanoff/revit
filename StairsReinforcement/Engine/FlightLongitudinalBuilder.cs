@@ -40,8 +40,8 @@ public sealed class FlightLongitudinalBuilder
         double db = bt.BarNominalDiameter;
         double n = cfg.FtOr(spec.Cover, cfg.Cover.Bottom) + db / 2;
         double inset = EndInsetFt(cfg);
-        double L = f.SlopeLengthFt;
-        double dev = LandingDevFt(cfg, spec, db);
+        double lap = BuildUtil.LapFt(cfg, db);
+        double uTop = BuildUtil.RunTopU(f, n);            // clamp to the real run solid, not the frame
 
         double coverSide = cfg.Ft(cfg.Cover.Side);
         double w0 = -f.WidthFt / 2 + coverSide + db / 2;
@@ -55,12 +55,18 @@ public sealed class FlightLongitudinalBuilder
         var runH = new XYZ(f.Frame.U.X, f.Frame.U.Y, 0);
         runH = runH.IsZeroLength() ? XYZ.BasisY : runH.Normalize();
 
-        // Representative polyline at w0 (all points share the same W coordinate ⇒ planar ⟂ W).
+        double uLo = lowerLanding is not null ? 0 : inset;
+        double uHi = upperLanding is not null ? uTop : uTop - inset;
+        if (uHi <= uLo + 1e-6) return 0;
+
+        // Up the soffit, bending into a landing end for a lap with the landing bottom mesh.
         var pts = new List<XYZ>();
-        if (lowerLanding is not null) pts.Add(LandingPt(f, w0, n, db, cfg, runH, atUpper: false, lowerLanding, dev));
-        pts.Add(BuildUtil.XYZof(f.Frame.At(lowerLanding is not null ? 0 : inset, w0, n)));
-        pts.Add(BuildUtil.XYZof(f.Frame.At(upperLanding is not null ? L : L - inset, w0, n)));
-        if (upperLanding is not null) pts.Add(LandingPt(f, w0, n, db, cfg, runH, atUpper: true, upperLanding, dev));
+        XYZ pLo = BuildUtil.XYZof(f.Frame.At(uLo, w0, n));
+        XYZ pHi = BuildUtil.XYZof(f.Frame.At(uHi, w0, n));
+        if (lowerLanding is not null) pts.Add(LandingLeg(pLo, runH * -1.0, lowerLanding, db, cfg, lap));
+        pts.Add(pLo);
+        pts.Add(pHi);
+        if (upperLanding is not null) pts.Add(LandingLeg(pHi, runH, upperLanding, db, cfg, lap));
 
         var curves = new List<Curve>();
         for (int i = 1; i < pts.Count; i++)
@@ -71,24 +77,14 @@ public sealed class FlightLongitudinalBuilder
         return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing);
     }
 
-    /// <summary>End point of the landing leg: the fold, extended horizontally into the landing at the landing's bottom-bar level.</summary>
-    private static XYZ LandingPt(FlightComponent f, double w0, double n, double db,
-        StairsReinforcementConfig cfg, XYZ runH, bool atUpper, LandingComponent landing, double dev)
+    /// <summary>Horizontal leg from the run end into the landing (run-horizontal, dropped to the landing bottom-mesh level) for a lap.</summary>
+    private static XYZ LandingLeg(XYZ runEnd, XYZ awayDir, LandingComponent landing, double db, StairsReinforcementConfig cfg, double lap)
     {
-        double uEnd = atUpper ? f.SlopeLengthFt : 0;
-        XYZ fold = BuildUtil.XYZof(f.Frame.At(uEnd, w0, n));
-        XYZ away = runH * (atUpper ? 1.0 : -1.0);               // out of the flight, into the landing
-        double landBotZ = landing.ElevationFt - landing.ThicknessFt + cfg.Ft(cfg.Cover.Bottom) + db / 2;
-        return new XYZ(fold.X + away.X * dev, fold.Y + away.Y * dev, landBotZ);
+        double meshZ = landing.ElevationFt - landing.ThicknessFt + cfg.Ft(cfg.Cover.Bottom) + db / 2;
+        return new XYZ(runEnd.X + awayDir.X * lap, runEnd.Y + awayDir.Y * lap, meshZ);
     }
 
-    private static double LandingDevFt(StairsReinforcementConfig cfg, BarSetSpec spec, double db)
-    {
-        double a = cfg.Ft(spec.EndAnchorLen);
-        return a > 1e-6 ? a : BuildUtil.LapFt(cfg, db);
-    }
-
-    /// <summary>Small inset from the run ends so a clamped (non-landing) end stays inside the host solid.</summary>
+    /// <summary>Small inset from the run ends so a clamped end stays inside the host solid.</summary>
     private static double EndInsetFt(StairsReinforcementConfig cfg) => cfg.Ft(cfg.Cover.Bottom);
 
     private int BuildTop(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId)
@@ -100,7 +96,7 @@ public sealed class FlightLongitudinalBuilder
         if (n <= db) n = f.WaistFt * 0.5;   // guard a thin/unknown waist
 
         double inset = EndInsetFt(cfg);
-        double L = f.SlopeLengthFt;
+        double L = BuildUtil.RunTopU(f, n);                 // real run solid top, not the frame slope length
         double lo = inset, hi = L - inset;                 // clamped within the host run
         double ext = cfg.Ft(cfg.Flight.TopSupportExtent);
         bool hookA = BuildUtil.IsHook(spec.StartAnchor), hookB = BuildUtil.IsHook(spec.EndAnchor);
@@ -112,8 +108,10 @@ public sealed class FlightLongitudinalBuilder
                 return PlaceSet(f, cfg, spec, bt, db, n, lo, hi, tag, hookA, hookB);
 
             case TopMode.OverSupports:
-                int c = PlaceSet(f, cfg, spec, bt, db, n, lo, Math.Min(lo + ext, hi), tag, hookA, false);
-                c += PlaceSet(f, cfg, spec, bt, db, n, Math.Max(lo, hi - ext), hi, tag, false, hookB);
+                if (lo + ext >= hi - ext)   // the two end bands meet on a short flight → one continuous top bar
+                    return PlaceSet(f, cfg, spec, bt, db, n, lo, hi, tag, hookA, hookB);
+                int c = PlaceSet(f, cfg, spec, bt, db, n, lo, lo + ext, tag, hookA, false);
+                c += PlaceSet(f, cfg, spec, bt, db, n, hi - ext, hi, tag, false, hookB);
                 return c;
 
             case TopMode.EndsOnly:
