@@ -89,6 +89,7 @@ public sealed class StairsReinforcer
         }
 
         var landingMat = new LandingMatBuilder(_doc);
+        var landingEdge = new LandingEdgeBuilder(_doc);
         foreach (LandingComponent l in asm.Landings)
         {
             if (!l.RebarHostOk)
@@ -97,6 +98,7 @@ public sealed class StairsReinforcer
                 continue;
             }
             created += Safe(() => landingMat.Build(l, cfg, asm.Id), $"landing {l.Index} mat", outcome);
+            created += Safe(() => landingEdge.Build(l, cfg, asm.Id), $"landing {l.Index} пэшки", outcome);
         }
 
         // Bottom continuity into landings is carried by the flight main bars themselves (above), so the
