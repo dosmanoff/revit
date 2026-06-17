@@ -34,6 +34,27 @@ internal static class RevitGeom
     public static Solid? LargestSolid(Element e) =>
         Solids(e).OrderByDescending(s => s.Volume).FirstOrDefault();
 
+    /// <summary>
+    /// The run's inclined soffit: the largest planar face whose normal points down-and-out (a
+    /// horizontal component, so it is the sloped underside, not a flat landing soffit). Its normal is
+    /// the ground truth for the slope frame — see <see cref="FlightFrame.FromSoffit"/>.
+    /// </summary>
+    public static PlanarFace? SoffitFace(Element e)
+    {
+        PlanarFace? best = null;
+        double bestArea = -1;
+        foreach (Solid s in Solids(e))
+            foreach (Face f in s.Faces)
+            {
+                if (f is not PlanarFace pf) continue;
+                XYZ n = pf.FaceNormal;
+                if (n.Z > -0.3 || n.Z < -0.97) continue;                       // inclined and downward
+                if (Math.Sqrt(n.X * n.X + n.Y * n.Y) < 0.15) continue;          // not a flat soffit
+                if (pf.Area > bestArea) { bestArea = pf.Area; best = pf; }
+            }
+        return best;
+    }
+
     /// <summary>Largest planar face whose outward normal points up (top) or down (bottom).</summary>
     public static PlanarFace? ExtremeFace(Solid solid, bool top)
     {

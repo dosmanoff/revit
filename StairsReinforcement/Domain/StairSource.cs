@@ -94,7 +94,21 @@ public static class StairSourceResolver
         Bounds3 bounds = RevitGeom.SolidBounds(run);
         if (bounds.IsEmpty) bounds = RevitGeom.ElemBounds(run);
         double soffitZ = bounds.IsEmpty ? start.Z : bounds.Min.Z;
-        var frame = FlightFrame.Create(new Pt3(start.X, start.Y, soffitZ), runDir, slope);
+
+        // Frame from the REAL soffit face (parallel-to-soffit bars); path+height is a few degrees off.
+        FlightFrame frame;
+        PlanarFace? soffit = RevitGeom.SoffitFace(run);
+        if (soffit is not null)
+        {
+            XYZ sn = soffit.FaceNormal, sp = soffit.Origin;
+            XYZ o = new(start.X, start.Y, soffitZ);
+            XYZ op = o - sn.Multiply((o - sp).DotProduct(sn));   // project the origin onto the soffit plane
+            frame = FlightFrame.FromSoffit(new Pt3(op.X, op.Y, op.Z), new Pt3(sn.X, sn.Y, sn.Z), runDir);
+        }
+        else
+        {
+            frame = FlightFrame.Create(new Pt3(start.X, start.Y, soffitZ), runDir, slope);
+        }
 
         int risers = SafeInt(() => run.ActualRisersNumber);
         int treads = SafeInt(() => run.ActualTreadsNumber);
@@ -113,7 +127,7 @@ public static class StairSourceResolver
             HorizRunFt = horizRun,
             SlopeLengthFt = Math.Sqrt(horizRun * horizRun + rise * rise),
             TotalRiseFt = rise,
-            SlopeRad = slope,
+            SlopeRad = frame.SlopeRad,
             RiserCount = risers,
             TreadCount = treads,
             TreadFt = treads > 0 ? horizRun / treads : 0,

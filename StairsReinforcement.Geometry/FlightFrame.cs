@@ -42,6 +42,26 @@ public sealed class FlightFrame
     public static FlightFrame FromRiseRun(Pt3 origin, Pt2 runDirHoriz, double horizRun, double rise)
         => Create(origin, runDirHoriz, Math.Atan2(rise, Math.Max(1e-9, horizRun)));
 
+    /// <summary>
+    /// Build the frame from the run's real soffit face normal (the outward normal of the inclined
+    /// bottom face, pointing down-and-out). This is the ground truth for a monolithic run: deriving
+    /// the slope from the stairs path + <c>run.Height</c> is a few degrees off the actual waist, which
+    /// makes longitudinal bars visibly non-parallel to the soffit. <paramref name="climbDirHoriz"/>
+    /// only disambiguates which way U points (toward the top of the flight, in plan).
+    /// </summary>
+    public static FlightFrame FromSoffit(Pt3 origin, Pt3 soffitNormalOut, Pt2 climbDirHoriz)
+    {
+        Pt3 n = (soffitNormalOut * -1).Normalized();    // waist normal = -outward soffit normal
+        if (n.Z < 0) n = n * -1;
+        Pt2 rd = climbDirHoriz.Normalized();
+        if (rd.Length < 1e-9) rd = new Pt2(1, 0);
+        Pt3 w = new Pt3(-rd.Y, rd.X, 0).Normalized();   // horizontal, ⟂ the climb direction
+        Pt3 u = w.Cross(n).Normalized();                // up-slope, in the soffit plane
+        if (u.X * rd.X + u.Y * rd.Y < 0) { u = u * -1; w = w * -1; }   // make U climb toward rd
+        double slope = Math.Atan2(u.Z, Math.Sqrt(u.X * u.X + u.Y * u.Y));
+        return new FlightFrame(origin, u, w, n, slope);
+    }
+
     /// <summary>World point at local coordinates (u along slope, w across width, n along normal).</summary>
     public Pt3 At(double u, double w, double n) => Origin + U * u + W * w + N * n;
 }
