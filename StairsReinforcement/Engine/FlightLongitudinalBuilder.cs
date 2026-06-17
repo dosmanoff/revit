@@ -58,7 +58,9 @@ public sealed class FlightLongitudinalBuilder
         double uLo = inset;
         double uHi = uTop - inset;
         _ = lowerLanding; _ = upperLanding;
-        if (f.UpperSupport is { } us)
+        // Extend into the upper support only when it is a SLAB the flight arrives at (a floor) — a
+        // landing junction is carried by the dowels, so the main must not run on into the landing.
+        if (f.UpperSupport is { Kind: "slab" } us)
         {
             Bounds3 sb = RevitGeom.SolidBounds(_doc.GetElement(new ElementId(us.ElementId)));
             if (!sb.IsEmpty && Math.Abs(f.Frame.U.Z) > 1e-6)
