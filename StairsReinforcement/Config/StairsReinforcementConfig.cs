@@ -226,6 +226,45 @@ public class ConnectionsConfig
 {
     public KneeConfig Knee { get; set; } = new();
     public StarterConfig Starters { get; set; } = new();
+
+    /// <summary>Green/red connection dowels at every flight↔support junction (slab/landing/foundation).</summary>
+    public DowelConfig Dowels { get; set; } = new();
+
+    /// <summary>U-bars (shape 17) wrapping the supported edges of each landing into the walls.</summary>
+    public PashkaConfig Pashki { get; set; } = new();
+}
+
+/// <summary>
+/// Per junction, two bent bars lap the flight to the support meshes: GREEN runs ¼-span (min 4'-0")
+/// into the flight from the support TOP mesh / top-plane; RED runs a short leg from the support
+/// BOTTOM (or top) mesh into the flight bottom/mid plane. Each lies on / under its mesh (±1 mesh-dia).
+/// At a foundation the support leg turns DOWN into the slab by <see cref="FoundationEmbed"/>.
+/// </summary>
+public class DowelConfig
+{
+    public bool Enabled { get; set; } = true;
+    public string BarType { get; set; } = "#4";
+    public SpacingMode SpacingMode { get; set; } = SpacingMode.Spacing;
+    public Length Spacing { get; set; } = new(10);
+    public int Count { get; set; } = 0;
+    /// <summary>Green flight leg = max(¼ span, this).</summary>
+    public Length GreenFlightMin { get; set; } = new("4'-0\"");
+    /// <summary>Red flight leg, and the support leg of both into a slab/landing.</summary>
+    public Length ShortLeg { get; set; } = new("1'-6\"");
+    /// <summary>Vertical leg turned down into a foundation slab.</summary>
+    public Length FoundationEmbed { get; set; } = new("0'-10\"");
+}
+
+/// <summary>U-bar (shape 17) sets along the wall-supported sides of a landing.</summary>
+public class PashkaConfig
+{
+    public bool Enabled { get; set; } = true;
+    public string BarType { get; set; } = "#4";
+    public SpacingMode SpacingMode { get; set; } = SpacingMode.Spacing;
+    public Length Spacing { get; set; } = new(10);
+    public int Count { get; set; } = 0;
+    /// <summary>Length of each horizontal leg reaching into the landing (laps the mesh).</summary>
+    public Length Leg { get; set; } = new("1'-0\"");
 }
 
 /// <summary>Reinforcement carried around a flight↔landing (or flight↔flight) fold.</summary>

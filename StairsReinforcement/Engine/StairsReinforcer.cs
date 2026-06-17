@@ -71,6 +71,7 @@ public sealed class StairsReinforcer
         var longitudinal = new FlightLongitudinalBuilder(_doc);
         var distribution = new FlightDistributionBuilder(_doc);
         var steps = new StepBarBuilder(_doc);
+        var dowels = new ConnectionDowelBuilder(_doc);
 
         foreach (FlightComponent f in asm.Flights)
         {
@@ -84,6 +85,7 @@ public sealed class StairsReinforcer
             created += Safe(() => longitudinal.Build(f, cfg, asm.Id, lowerLanding, upperLanding), $"flight {f.Index} long", outcome);
             created += Safe(() => distribution.Build(f, cfg, asm.Id), $"flight {f.Index} dist", outcome);
             created += Safe(() => steps.Build(f, cfg, asm.Id), $"flight {f.Index} steps", outcome);
+            created += Safe(() => dowels.Build(f, cfg, asm.Id), $"flight {f.Index} dowels", outcome);
         }
 
         var landingMat = new LandingMatBuilder(_doc);
