@@ -131,6 +131,26 @@ internal static class RevitGeom
         return b;
     }
 
+    /// <summary>
+    /// A support's structural TOP and BOTTOM levels from its largest horizontal faces. Robust where the
+    /// raw solid bbox misleads: a native <c>StairsLanding</c>'s solid dips into the run-junction wedge,
+    /// so <see cref="SolidBounds"/>.Min.Z sits ~0.4 ft below the real landing soffit — which would push a
+    /// connection-dowel leg out the bottom of the landing (no cover). Falls back to the solid bbox.
+    /// </summary>
+    public static (double Top, double Bottom) SlabExtents(Element e)
+    {
+        Solid? s = LargestSolid(e);
+        if (s is not null)
+        {
+            PlanarFace? top = ExtremeFace(s, true);
+            PlanarFace? bot = ExtremeFace(s, false);
+            if (top is not null && bot is not null && top.Origin.Z > bot.Origin.Z + 1e-6)
+                return (top.Origin.Z, bot.Origin.Z);
+        }
+        Bounds3 b = SolidBounds(e);
+        return b.IsEmpty ? (0, 0) : (b.Max.Z, b.Min.Z);
+    }
+
     private static IEnumerable<XYZ> BoxCorners(XYZ min, XYZ max)
     {
         foreach (double x in new[] { min.X, max.X })

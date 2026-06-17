@@ -26,8 +26,12 @@ public static class StairContext
             XYZ lower = RevitGeom.ToXYZ(f.Frame.Origin);
             XYZ upper = RevitGeom.ToXYZ(f.Frame.At(f.SlopeLengthFt, 0, 0));
 
+            // Lower end bears on something below; the upper end ARRIVES at a floor above (else a
+            // sibling landing, else — rarely — something below).
             f.LowerSupport = SiblingLanding(asm, lower) ?? FindSupportBelow(doc, lower, exclude);
-            f.UpperSupport = SiblingLanding(asm, upper) ?? FindSupportBelow(doc, upper, exclude);
+            f.UpperSupport = SiblingLanding(asm, upper)
+                ?? FindSupportAbove(doc, upper, exclude)
+                ?? FindSupportBelow(doc, upper, exclude);
         }
 
         foreach (LandingComponent l in asm.Landings)
@@ -73,6 +77,37 @@ public static class StairContext
             if (bb is null || bb.Max.Z > pt.Z + SearchUpFt) continue;   // must sit below the end
 
             double gap = pt.Z - bb.Max.Z;
+            if (gap < bestGap) { bestGap = gap; best = new SupportInfo { Kind = kind, ElementId = e.Id.Value, ElevationFt = bb.Max.Z }; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// The upper end of a flight ARRIVES at a floor above it (the flight tops out flush with the
+    /// floor walking surface, so the slab/beam sits at — or just above — the soffit-top point). Search
+    /// upward for the support whose underside is closest above the end. <see cref="FindSupportBelow"/>
+    /// can never see it, because that element's box is above, not below, the flight top.
+    /// </summary>
+    private static SupportInfo? FindSupportAbove(Document doc, XYZ pt, HashSet<long> exclude)
+    {
+        var min = new XYZ(pt.X - PadFt, pt.Y - PadFt, pt.Z - SearchUpFt);
+        var max = new XYZ(pt.X + PadFt, pt.Y + PadFt, pt.Z + SearchDownFt);
+
+        SupportInfo? best = null;
+        double bestGap = double.MaxValue;
+
+        foreach (Element e in new FilteredElementCollector(doc)
+                     .WherePasses(new BoundingBoxIntersectsFilter(new Outline(min, max)))
+                     .WhereElementIsNotElementType())
+        {
+            if (exclude.Contains(e.Id.Value)) continue;
+            string? kind = ClassifyKind(e);
+            if (kind is null or "stairs") continue;
+
+            BoundingBoxXYZ? bb = e.get_BoundingBox(null);
+            if (bb is null || bb.Min.Z < pt.Z - SearchUpFt) continue;   // must sit at/above the end
+
+            double gap = bb.Min.Z - pt.Z;                               // closest underside above the end
             if (gap < bestGap) { bestGap = gap; best = new SupportInfo { Kind = kind, ElementId = e.Id.Value, ElevationFt = bb.Max.Z }; }
         }
         return best;
