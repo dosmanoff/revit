@@ -55,6 +55,34 @@ internal static class RevitGeom
         return best;
     }
 
+    /// <summary>
+    /// Per-step nosing corners of a native run: for each riser (a vertical planar face roughly facing
+    /// along the run direction <paramref name="uHoriz"/>), the width-centre of its TOP edge plus the
+    /// (horizontal) face normal. Empty for floor-modelled flights (no risers) — the caller then falls
+    /// back to a waist-top approximation.
+    /// </summary>
+    public static List<(XYZ Corner, XYZ Normal)> RiserNosings(Element e, XYZ uHoriz)
+    {
+        var res = new List<(XYZ, XYZ)>();
+        XYZ uh = uHoriz.IsZeroLength() ? XYZ.BasisY : uHoriz.Normalize();
+        foreach (Solid s in Solids(e))
+            foreach (Face f in s.Faces)
+            {
+                if (f is not PlanarFace pf) continue;
+                XYZ n = pf.FaceNormal;
+                if (Math.Abs(n.Z) > 0.25) continue;                              // vertical face
+                if (Math.Abs(n.X * uh.X + n.Y * uh.Y) < 0.6) continue;           // faces along the run = a riser
+                if (pf.Area < 0.3) continue;
+                double zmax = double.MinValue;
+                foreach (CurveLoop loop in pf.GetEdgesAsCurveLoops())
+                    foreach (Curve c in loop)
+                        foreach (XYZ p in c.Tessellate())
+                            if (p.Z > zmax) zmax = p.Z;
+                res.Add((new XYZ(pf.Origin.X, pf.Origin.Y, zmax), n));
+            }
+        return res;
+    }
+
     /// <summary>Largest planar face whose outward normal points up (top) or down (bottom).</summary>
     public static PlanarFace? ExtremeFace(Solid solid, bool top)
     {
