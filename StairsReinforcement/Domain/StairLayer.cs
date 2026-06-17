@@ -18,4 +18,6 @@ public enum StairLayer
     LandingTopY,
     Knee,
     Starter,
+    Dowel,
+    Pashka,
 }

@@ -36,8 +36,38 @@ public sealed class StepBarBuilder
             : BuildNosing(f, cfg, steps, bt, db, tag);
     }
 
-    /// <summary>One transverse bar across the width per tread; the set marches up the slope.</summary>
+    /// <summary>
+    /// One #3 across the width at each step's nosing — the TOP edge of each riser (offset into the
+    /// concrete by its cover from the riser face and the tread top). Falls back to a waist-top
+    /// approximation for floor-modelled flights, which have no risers.
+    /// </summary>
     private int BuildNosing(FlightComponent f, StairsReinforcementConfig cfg, StepConfig steps, RebarBarType bt, double db, string tag)
+    {
+        var uH = new XYZ(f.Frame.U.X, f.Frame.U.Y, 0);
+        var nosings = RevitGeom.RiserNosings(_doc.GetElement(f.ComponentId), uH);
+        if (nosings.Count == 0) return BuildNosingWaist(f, cfg, steps, bt, db, tag);
+
+        double off = cfg.Ft(steps.Cover) + db / 2;
+        var W = new XYZ(f.Frame.W.X, f.Frame.W.Y, f.Frame.W.Z);
+        W = W.IsZeroLength() ? XYZ.BasisX : W.Normalize();
+        double halfW = f.WidthFt / 2 - cfg.Ft(cfg.Cover.Side) - db / 2;
+        if (halfW <= 0) return 0;
+        XYZ normalU = uH.IsZeroLength() ? XYZ.BasisY : uH.Normalize();
+
+        int created = 0;
+        foreach ((XYZ corner, XYZ normal) in nosings)
+        {
+            var nh = new XYZ(normal.X, normal.Y, 0);
+            nh = nh.IsZeroLength() ? XYZ.BasisY : nh.Normalize();
+            XYZ c = corner - nh * off + new XYZ(0, 0, -off);     // cover from the riser face and the tread top
+            var curves = new List<Curve> { Line.CreateBound(c - W * halfW, c + W * halfW) };
+            created += RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalU, curves, tag, 1, 0);
+        }
+        return created;
+    }
+
+    /// <summary>Fallback for floor flights: one transverse bar per tread near the waist top, marching up-slope.</summary>
+    private int BuildNosingWaist(FlightComponent f, StairsReinforcementConfig cfg, StepConfig steps, RebarBarType bt, double db, string tag)
     {
         double n = TopN(f, cfg, steps, db);
         (double wL, double wR) = WidthRange(f, cfg, db);
