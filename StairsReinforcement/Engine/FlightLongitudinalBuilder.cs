@@ -94,10 +94,11 @@ public sealed class FlightLongitudinalBuilder
         double db = bt.BarNominalDiameter;
         double n = f.WaistFt - cfg.FtOr(spec.Cover, cfg.Cover.Top) - db / 2;
         if (n <= db) n = f.WaistFt * 0.5;   // guard a thin/unknown waist
+        n = BuildUtil.CapTopLayerN(f, n);   // hold clear of the irregular native-run top
 
-        double inset = EndInsetFt(cfg);
-        double L = BuildUtil.RunTopU(f, n);                 // real run solid top, not the frame slope length
-        double lo = inset, hi = L - inset;                 // clamped within the host run
+        double inset = BuildUtil.BodyEndInsetFt(f, EndInsetFt(cfg));
+        double L = BuildUtil.RunTopU(f, n, BuildUtil.BodyTopMarginFt(f));  // clamp clear of the irregular top
+        double lo = inset, hi = L;                          // bottom inset clears the first riser; the margin insets the top
         double ext = cfg.Ft(cfg.Flight.TopSupportExtent);
         bool hookA = BuildUtil.IsHook(spec.StartAnchor), hookB = BuildUtil.IsHook(spec.EndAnchor);
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, stairId, StairLayer.FlightTopMain);

@@ -44,7 +44,7 @@ public sealed class StepBarBuilder
         if (wR - wL <= 1e-6) return 0;
 
         int count = f.TreadCount;
-        double spacing = BuildUtil.RunTopU(f, n) / Math.Max(1, f.TreadCount);
+        double spacing = BuildUtil.RunTopU(f, n, BuildUtil.BodyTopMarginFt(f)) / Math.Max(1, f.TreadCount);
 
         XYZ p0 = BuildUtil.XYZof(f.Frame.At(spacing * 0.5, wL, n));
         XYZ p1 = BuildUtil.XYZof(f.Frame.At(spacing * 0.5, wR, n));
@@ -69,7 +69,7 @@ public sealed class StepBarBuilder
         var Wv = new XYZ(f.Frame.W.X, f.Frame.W.Y, 0);
         XYZ normalW = Wv.IsZeroLength() ? XYZ.BasisX : Wv.Normalize();
 
-        double stepSlope = BuildUtil.RunTopU(f, n) / Math.Max(1, f.TreadCount);
+        double stepSlope = BuildUtil.RunTopU(f, n, BuildUtil.BodyTopMarginFt(f)) / Math.Max(1, f.TreadCount);
         int created = 0;
         for (int i = 0; i < f.TreadCount; i++)
         {
@@ -86,7 +86,8 @@ public sealed class StepBarBuilder
     private static double TopN(FlightComponent f, StairsReinforcementConfig cfg, StepConfig steps, double db)
     {
         double n = f.WaistFt - cfg.Ft(steps.Cover) - db / 2;
-        return n <= 0 ? f.WaistFt * 0.7 : n;
+        if (n <= 0) n = f.WaistFt * 0.7;
+        return BuildUtil.CapTopLayerN(f, n);   // hold clear of the irregular native-run top
     }
 
     private static (double wL, double wR) WidthRange(FlightComponent f, StairsReinforcementConfig cfg, double db)

@@ -44,15 +44,17 @@ public sealed class FlightDistributionBuilder
         double db = bt.BarNominalDiameter;
         if (fromTop) n -= db / 2; else n += db / 2;
         if (n <= 0 || n >= f.WaistFt) n = f.WaistFt * 0.5;   // guard
+        if (fromTop) n = BuildUtil.CapTopLayerN(f, n);       // hold the top layer clear of the irregular run top
 
         double coverSide = cfg.Ft(cfg.Cover.Side);
         double wL = -f.WidthFt / 2 + coverSide + db / 2;
         double wR = f.WidthFt / 2 - coverSide - db / 2;
         if (wR - wL <= 1e-6) return 0;
 
-        // Inset from the run ends, clamped to the real run solid (not the overshooting frame).
-        double inset = cfg.Ft(cfg.Cover.Bottom);
-        double span = Math.Max(0, BuildUtil.RunTopU(f, n) - 2 * inset);
+        // Inset from both run ends, clamped to the real run solid (clear of the angled first riser at the
+        // bottom and the irregular top), so the transverse set stays inside the host.
+        double inset = BuildUtil.BodyEndInsetFt(f, cfg.Ft(cfg.Cover.Bottom));
+        double span = Math.Max(0, BuildUtil.RunTopU(f, n, BuildUtil.BodyTopMarginFt(f)) - 2 * inset);
         (int count, double spacing) = BuildUtil.ResolveSet(spec.SpacingMode, spec.Count, cfg.Ft(spec.Spacing), span);
 
         // Representative bar runs across the width at the lower end; the set marches up-slope along U.

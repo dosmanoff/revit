@@ -17,13 +17,36 @@ internal static class BuildUtil
     /// run solid on monolithic stairs — the top riser belongs to the landing — so bars clamped to the
     /// slope length stick out above the run ("rebar outside host" + the floating bars). Clamp to this.
     /// </summary>
-    public static double RunTopU(FlightComponent f, double n)
+    public static double RunTopU(FlightComponent f, double n, double zMargin = 0)
     {
         double uz = f.Frame.U.Z;
         if (uz < 1e-6 || f.Bounds.IsEmpty) return f.SlopeLengthFt;
-        double u = (f.Bounds.Max.Z - (f.Frame.Origin.Z + f.Frame.N.Z * n)) / uz;
+        double u = (f.Bounds.Max.Z - zMargin - (f.Frame.Origin.Z + f.Frame.N.Z * n)) / uz;
         return Math.Clamp(u, 0, f.SlopeLengthFt);
     }
+
+    /// <summary>
+    /// Vertical clearance to hold top-side body bars (top main / distribution / nosing) below the
+    /// run-solid top when clamping with <see cref="RunTopU"/>. A native run top is irregular — steps
+    /// ride on the waist and the top riser belongs to the landing — so a bar clamped to the exact top
+    /// surface is flagged "outside host"; ~1.5 risers of up-slope clearance keeps the end inside.
+    /// Zero for floor-modelled flights (no risers → a clean sloped box).
+    /// </summary>
+    public static double BodyTopMarginFt(FlightComponent f) => 1.5 * f.RiserFt;
+
+    /// <summary>
+    /// Up-slope inset from the run bottom for transverse / top body bars, clearing the angled
+    /// first-riser face: one riser on a native run, else the given cover.
+    /// </summary>
+    public static double BodyEndInsetFt(FlightComponent f, double coverFt) =>
+        f.RiserFt > 1e-6 ? Math.Max(coverFt, f.RiserFt) : coverFt;
+
+    /// <summary>
+    /// Cap a top-layer normal offset so a native run keeps it at least ~a third of a riser below the
+    /// waist top, absorbing frame-vs-solid mismatch near the steps. No change for floor flights.
+    /// </summary>
+    public static double CapTopLayerN(FlightComponent f, double n) =>
+        f.RiserFt > 1e-6 ? Math.Min(n, f.WaistFt - 0.35 * f.RiserFt) : n;
 
     /// <summary>Resolve a set to (count, centre-to-centre spacing in feet) over a span.</summary>
     public static (int Count, double SpacingFt) ResolveSet(SpacingMode mode, int count, double spacingFt, double spanFt)
