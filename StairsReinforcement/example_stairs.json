@@ -1,0 +1,107 @@
+{
+  "document": { "title": "tower-core.rvt", "path": "C:\\proj\\tower-core.rvt" },
+  "generated_at": "2026-06-16T12:00:00",
+  "schema_version": 1,
+  "units_note": "Sections & cover in inches (*_in); positions/elevations/areas in feet; angles in degrees from world +X. Bar sizes & spacing come from you (with the engineer) — the plugin sizes nothing from loads.",
+  "levels": [
+    { "name": "L1", "elevation_ft": 0.0, "id": 311 },
+    { "name": "L2", "elevation_ft": 11.0, "id": 312 }
+  ],
+  "stair_types_in_use": {
+    "9921": { "family": "Cast-In-Place Stair", "type": "Monolithic 7\" max riser", "id": 9921 }
+  },
+  "available_rebar_bar_types": [
+    { "name": "#3", "nominal_diameter_in": 0.375 },
+    { "name": "#4", "nominal_diameter_in": 0.5 },
+    { "name": "#5", "nominal_diameter_in": 0.625 },
+    { "name": "#6", "nominal_diameter_in": 0.75 }
+  ],
+  "available_rebar_hook_types": [
+    { "name": "Standard - 90 deg" },
+    { "name": "Standard - 180 deg" }
+  ],
+  "warnings": [],
+  "stairs": [
+    {
+      "element_id": 50231,
+      "mark": "ST-1",
+      "comments": "Monolithic U-stair. B: #5@8 main + #4@12 dist; T over supports #5@8. Landing #5@8 EW, T&B. Starters from L1 slab.",
+      "source": "stairs",
+      "rebar_host_ok": true,
+      "flights": [
+        {
+          "index": 0,
+          "component_id": 50232,
+          "source": "run",
+          "rebar_host_ok": true,
+          "waist_in": 6.0,
+          "width_ft": 3.5,
+          "run_length_ft": 7.5,
+          "slope_length_ft": 9.3,
+          "total_rise_ft": 5.5,
+          "slope_deg": 36.25,
+          "riser_count": 10,
+          "tread_count": 9,
+          "tread_in": 10.0,
+          "riser_in": 6.6,
+          "local_basis": {
+            "origin_ft": [0.0, 0.0, 0.0],
+            "u_dir": [0.806, 0.0, 0.592],
+            "w_dir": [0.0, 1.0],
+            "n_dir": [-0.592, 0.0, 0.806],
+            "run_world_deg": 0.0
+          },
+          "bbox": { "min_ft": [0.0, 0.0, 0.0], "max_ft": [7.5, 3.5, 5.5] },
+          "lower_support": { "kind": "slab", "element_id": 41002, "elevation_ft": 0.0 },
+          "upper_support": { "kind": "landing", "element_id": 50234, "elevation_ft": 5.5 }
+        },
+        {
+          "index": 1,
+          "component_id": 50233,
+          "source": "run",
+          "rebar_host_ok": true,
+          "waist_in": 6.0,
+          "width_ft": 3.5,
+          "run_length_ft": 7.5,
+          "slope_length_ft": 9.3,
+          "total_rise_ft": 5.5,
+          "slope_deg": 36.25,
+          "riser_count": 10,
+          "tread_count": 9,
+          "tread_in": 10.0,
+          "riser_in": 6.6,
+          "local_basis": {
+            "origin_ft": [7.5, 4.0, 5.5],
+            "u_dir": [-0.806, 0.0, 0.592],
+            "w_dir": [0.0, -1.0],
+            "n_dir": [0.592, 0.0, 0.806],
+            "run_world_deg": 180.0
+          },
+          "bbox": { "min_ft": [0.0, 4.0, 5.5], "max_ft": [7.5, 7.5, 11.0] },
+          "lower_support": { "kind": "landing", "element_id": 50234, "elevation_ft": 5.5 },
+          "upper_support": { "kind": "slab", "element_id": 41050, "elevation_ft": 11.0 }
+        }
+      ],
+      "landings": [
+        {
+          "index": 0,
+          "component_id": 50234,
+          "source": "landing",
+          "thickness_in": 6.0,
+          "elevation_ft": 5.5,
+          "area_sf": 26.25,
+          "local_basis": {
+            "origin_ft": [7.5, 0.0],
+            "x_dir": [0.0, 1.0],
+            "y_dir": [-1.0, 0.0],
+            "angle_world_deg": 90.0
+          },
+          "bbox": { "min_ft": [7.5, 0.0, 5.5], "max_ft": [11.0, 7.5, 6.0] },
+          "boundary": [[7.5, 0.0], [11.0, 0.0], [11.0, 7.5], [7.5, 7.5]],
+          "supports": [{ "kind": "wall", "element_id": 22110, "elevation_ft": 5.5 }],
+          "connects_flights": [0, 1]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "name": "default",
+  "units": "Imperial",
+  "cleanExisting": true,
+  "cover": { "top": 1.5, "bottom": 1.5, "side": 1.5 },
+  "flight": {
+    "bottomMain": { "enabled": true, "barType": "#5", "spacingMode": "Spacing", "spacing": 8, "startAnchor": "IntoSupport", "endAnchor": "IntoSupport" },
+    "bottomDist": { "enabled": true, "barType": "#4", "spacingMode": "Spacing", "spacing": 12 },
+    "topMode": "OverSupports",
+    "topMain": { "enabled": true, "barType": "#5", "spacingMode": "Spacing", "spacing": 8 },
+    "topDist": { "enabled": true, "barType": "#4", "spacingMode": "Spacing", "spacing": 12 },
+    "topSupportExtent": "3'-0\"",
+    "steps": { "mode": "None", "barType": "#3", "leg": 6, "cover": 1 }
+  },
+  "landing": {
+    "mode": "Bars",
+    "bottomX": { "enabled": true, "barType": "#5", "spacingMode": "Spacing", "spacing": 8 },
+    "bottomY": { "enabled": true, "barType": "#5", "spacingMode": "Spacing", "spacing": 8 },
+    "topMode": "OverSupports",
+    "topX": { "enabled": true, "barType": "#5", "spacingMode": "Spacing", "spacing": 8 },
+    "topY": { "enabled": true, "barType": "#5", "spacingMode": "Spacing", "spacing": 8 },
+    "topSupportExtent": "3'-0\""
+  },
+  "connections": {
+    "knee": { "enabled": true, "mode": "LappedHairpin", "barType": "#5", "spacingMode": "Spacing", "spacing": 8, "leg": "2'-0\"" },
+    "starters": { "enabled": true, "host": "Auto", "form": "L", "barType": "#5", "spacingMode": "Spacing", "spacing": 8, "embed": "1'-6\"", "projection": "2'-0\"" }
+  },
+  "lengths": { "maxBarLength": "40'-0\"", "lapMode": "Factor", "lapLength": "2'-0\"", "lapFactor": 40, "lapStagger": true }
+}

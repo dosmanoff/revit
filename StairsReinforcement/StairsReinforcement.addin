@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>StairsReinforcement</Name>
+    <Assembly>StairsReinforcement.dll</Assembly>
+    <FullClassName>StairsReinforcement.App</FullClassName>
+    <ClientId>2D868DF3-77A0-40B4-B4D2-04084219FF95</ClientId>
+    <VendorId>StairsReinforcement</VendorId>
+    <VendorDescription>Stairs Reinforcement plugin for monolithic RC stairs in Revit 2025 (ACI 318)</VendorDescription>
+  </AddIn>
+</RevitAddIns>

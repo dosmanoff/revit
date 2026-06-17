@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>StairsReinforcement</AssemblyName>
+    <RootNamespace>StairsReinforcement</RootNamespace>
+    <Platforms>x64</Platforms>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference-only packages: Revit ships the real DLLs at runtime -->
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI"   Version="2025.4.0" ExcludeAssets="runtime"/>
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="2025.4.0" ExcludeAssets="runtime"/>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StairsReinforcement.Geometry\StairsReinforcement.Geometry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="StairsReinforcement.addin" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Ship sample configs alongside the DLL so the in-dialog config picker finds them. -->
+    <None Include="samples\*.json" CopyToOutputDirectory="PreserveNewest">
+      <Link>samples\%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+</Project>
