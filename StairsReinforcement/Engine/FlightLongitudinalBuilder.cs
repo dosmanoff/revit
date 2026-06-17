@@ -40,7 +40,6 @@ public sealed class FlightLongitudinalBuilder
         double db = bt.BarNominalDiameter;
         double n = cfg.FtOr(spec.Cover, cfg.Cover.Bottom) + db / 2;
         double inset = EndInsetFt(cfg);
-        double lap = BuildUtil.LapFt(cfg, db);
         double uTop = BuildUtil.RunTopU(f, n);            // clamp to the real run solid, not the frame
 
         double coverSide = cfg.Ft(cfg.Cover.Side);
@@ -52,26 +51,27 @@ public sealed class FlightLongitudinalBuilder
 
         var W = new XYZ(f.Frame.W.X, f.Frame.W.Y, 0);
         XYZ normalW = W.IsZeroLength() ? XYZ.BasisX : W.Normalize();
-        var runH = new XYZ(f.Frame.U.X, f.Frame.U.Y, 0);
-        runH = runH.IsZeroLength() ? XYZ.BasisY : runH.Normalize();
 
-        double uLo = lowerLanding is not null ? 0 : inset;
-        double uHi = upperLanding is not null ? uTop : uTop - inset;
+        // A single STRAIGHT bar parallel to the soffit — the connection dowels carry the lap into the
+        // supports. At the upper end, extend into the support to (support top − cover) when that sits
+        // above the run solid (a flight arriving at a slab/floor); otherwise just inset from the run top.
+        double uLo = inset;
+        double uHi = uTop - inset;
+        _ = lowerLanding; _ = upperLanding;
+        if (f.UpperSupport is { } us)
+        {
+            Bounds3 sb = RevitGeom.SolidBounds(_doc.GetElement(new ElementId(us.ElementId)));
+            if (!sb.IsEmpty && Math.Abs(f.Frame.U.Z) > 1e-6)
+            {
+                double uInto = (sb.Max.Z - cfg.Ft(cfg.Cover.Top) - db / 2 - f.Frame.Origin.Z - f.Frame.N.Z * n) / f.Frame.U.Z;
+                if (uInto > uHi) uHi = uInto;
+            }
+        }
         if (uHi <= uLo + 1e-6) return 0;
 
-        // Up the soffit, bending into a landing end for a lap with the landing bottom mesh.
-        var pts = new List<XYZ>();
-        XYZ pLo = BuildUtil.XYZof(f.Frame.At(uLo, w0, n));
-        XYZ pHi = BuildUtil.XYZof(f.Frame.At(uHi, w0, n));
-        if (lowerLanding is not null) pts.Add(LandingLeg(pLo, runH * -1.0, lowerLanding, db, cfg, lap));
-        pts.Add(pLo);
-        pts.Add(pHi);
-        if (upperLanding is not null) pts.Add(LandingLeg(pHi, runH, upperLanding, db, cfg, lap));
-
-        var curves = new List<Curve>();
-        for (int i = 1; i < pts.Count; i++)
-            if (pts[i].DistanceTo(pts[i - 1]) > 1e-6) curves.Add(Line.CreateBound(pts[i - 1], pts[i]));
-        if (curves.Count == 0) return 0;
+        XYZ p0 = BuildUtil.XYZof(f.Frame.At(uLo, w0, n));
+        XYZ p1 = BuildUtil.XYZof(f.Frame.At(uHi, w0, n));
+        var curves = new List<Curve> { Line.CreateBound(p0, p1) };
 
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, stairId, StairLayer.FlightBottomMain);
         return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing);

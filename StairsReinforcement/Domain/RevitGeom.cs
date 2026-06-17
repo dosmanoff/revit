@@ -73,12 +73,17 @@ internal static class RevitGeom
                 if (Math.Abs(n.Z) > 0.25) continue;                              // vertical face
                 if (Math.Abs(n.X * uh.X + n.Y * uh.Y) < 0.6) continue;           // faces along the run = a riser
                 if (pf.Area < 0.3) continue;
-                double zmax = double.MinValue;
+                var pts = new List<XYZ>();
                 foreach (CurveLoop loop in pf.GetEdgesAsCurveLoops())
                     foreach (Curve c in loop)
                         foreach (XYZ p in c.Tessellate())
-                            if (p.Z > zmax) zmax = p.Z;
-                res.Add((new XYZ(pf.Origin.X, pf.Origin.Y, zmax), n));
+                            pts.Add(p);
+                if (pts.Count == 0) continue;
+                double zmax = double.MinValue;
+                foreach (XYZ p in pts) if (p.Z > zmax) zmax = p.Z;
+                double sx = 0, sy = 0; int cnt = 0;                      // centre of the TOP edge (the nosing)
+                foreach (XYZ p in pts) if (p.Z > zmax - 0.05) { sx += p.X; sy += p.Y; cnt++; }
+                res.Add((new XYZ(sx / cnt, sy / cnt, zmax), n));
             }
         return res;
     }

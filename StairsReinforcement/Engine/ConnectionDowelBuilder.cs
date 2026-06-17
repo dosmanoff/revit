@@ -74,30 +74,31 @@ public sealed class ConnectionDowelBuilder
             return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing);
         }
 
-        switch (support.Kind)
+        // A slab/foundation at the LOW end is borne on: green top plane + red bottom plane, the support
+        // leg turning straight DOWN into it (the foundation detail).
+        if (atLowEnd && (support.Kind is "foundation" or "slab"))
         {
-            case "foundation":
-            {
-                double embed = cfg.Ft(d.FoundationEmbed);
-                return Dowel(nTop, fr.At(0, w0, nTop).Z, greenLen, embed)        // green, top plane
-                     + Dowel(nBot, fr.At(0, w0, nBot).Z, shortLeg, embed);       // red, bottom plane
-            }
-            case "slab":
-            {
-                Bounds3 b = RevitGeom.SolidBounds(_doc.GetElement(new ElementId(support.ElementId)));
-                if (b.IsEmpty) return 0;
-                double meshTop = b.Max.Z - cover - db / 2, meshBot = b.Min.Z + cover + db / 2;
-                return Dowel(nTop, meshTop, greenLen, 0)                          // green: slab top mesh → flight top
-                     + Dowel(nMid, meshBot, shortLeg, 0);                         // red:   slab bottom mesh → flight mid
-            }
-            default:   // landing (and any other lap support)
-            {
-                Bounds3 b = RevitGeom.SolidBounds(_doc.GetElement(new ElementId(support.ElementId)));
-                if (b.IsEmpty) return 0;
-                double meshTop = b.Max.Z - cover - db / 2 - mdb, meshBot = b.Min.Z + cover + db / 2 + mdb;
-                return Dowel(nBot, meshBot, greenLen, 0)                          // green: bottom mesh → flight bottom
-                     + Dowel(nBot, meshTop, shortLeg, 0);                         // red:   top mesh → flight bottom
-            }
+            double embed = cfg.Ft(d.FoundationEmbed);
+            return Dowel(nTop, fr.At(0, w0, nTop).Z, greenLen, embed)
+                 + Dowel(nBot, fr.At(0, w0, nBot).Z, shortLeg, embed);
         }
+
+        Bounds3 b = RevitGeom.SolidBounds(_doc.GetElement(new ElementId(support.ElementId)));
+        if (b.IsEmpty) return 0;
+
+        // An upper slab the flight arrives at: green from its TOP mesh into the flight TOP plane,
+        // red from its BOTTOM mesh into the flight MID plane.
+        if (support.Kind == "slab")
+        {
+            double meshTop = b.Max.Z - cover - db / 2, meshBot = b.Min.Z + cover + db / 2;
+            return Dowel(nTop, meshTop, greenLen, 0)
+                 + Dowel(nMid, meshBot, shortLeg, 0);
+        }
+
+        // A landing (above or below): both lap the flight BOTTOM plane — green from the landing bottom
+        // mesh, red from its top mesh; the support legs rest on / under those meshes (±1 mesh dia).
+        double mTop = b.Max.Z - cover - db / 2 - mdb, mBot = b.Min.Z + cover + db / 2 + mdb;
+        return Dowel(nBot, mBot, greenLen, 0)
+             + Dowel(nBot, mTop, shortLeg, 0);
     }
 }
