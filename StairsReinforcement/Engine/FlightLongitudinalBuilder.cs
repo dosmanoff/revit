@@ -17,33 +17,78 @@ public sealed class FlightLongitudinalBuilder
     private readonly Document _doc;
     public FlightLongitudinalBuilder(Document doc) => _doc = doc;
 
-    public int Build(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId)
+    public int Build(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId,
+        LandingComponent? lowerLanding, LandingComponent? upperLanding)
     {
         int created = 0;
-        if (cfg.Flight.BottomMain.Enabled) created += BuildBottom(f, cfg, stairId);
+        if (cfg.Flight.BottomMain.Enabled) created += BuildBottom(f, cfg, stairId, lowerLanding, upperLanding);
         if (cfg.Flight.TopMode != TopMode.None && cfg.Flight.TopMain.Enabled) created += BuildTop(f, cfg, stairId);
         return created;
     }
 
-    private int BuildBottom(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId)
+    /// <summary>
+    /// Bottom (soffit) main bar: runs up the run and, at a landing end, bends into the landing for a
+    /// development length (the soffit is convex, so this is the safe place to carry continuity). At a
+    /// slab/other end it is clamped just inside the run (a straight bar into a separate support element
+    /// throws "internal error" on a native-stair host). One planar polyline, distributed across the width.
+    /// </summary>
+    private int BuildBottom(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId,
+        LandingComponent? lowerLanding, LandingComponent? upperLanding)
     {
         BarSetSpec spec = cfg.Flight.BottomMain;
         RebarBarType bt = RebarFactory.GetBarType(_doc, spec.BarType);
         double db = bt.BarNominalDiameter;
         double n = cfg.FtOr(spec.Cover, cfg.Cover.Bottom) + db / 2;
-
-        // Clamp within the host run extent — a bar running out past the run into the support throws
-        // "internal error" on a native-stair host. Development is provided by a hook (see BuildUtil.IsHook).
         double inset = EndInsetFt(cfg);
-        double uA = inset;
-        double uB = f.SlopeLengthFt - inset;
+        double L = f.SlopeLengthFt;
+        double dev = LandingDevFt(cfg, spec, db);
+
+        double coverSide = cfg.Ft(cfg.Cover.Side);
+        double w0 = -f.WidthFt / 2 + coverSide + db / 2;
+        double w1 = f.WidthFt / 2 - coverSide - db / 2;
+        double widthSpan = w1 - w0;
+        if (widthSpan <= 1e-6) { w0 = 0; widthSpan = 0; }
+        (int count, double spacing) = BuildUtil.ResolveSet(spec.SpacingMode, spec.Count, cfg.Ft(spec.Spacing), widthSpan);
+
+        var W = new XYZ(f.Frame.W.X, f.Frame.W.Y, 0);
+        XYZ normalW = W.IsZeroLength() ? XYZ.BasisX : W.Normalize();
+        var runH = new XYZ(f.Frame.U.X, f.Frame.U.Y, 0);
+        runH = runH.IsZeroLength() ? XYZ.BasisY : runH.Normalize();
+
+        // Representative polyline at w0 (all points share the same W coordinate ⇒ planar ⟂ W).
+        var pts = new List<XYZ>();
+        if (lowerLanding is not null) pts.Add(LandingPt(f, w0, n, db, cfg, runH, atUpper: false, lowerLanding, dev));
+        pts.Add(BuildUtil.XYZof(f.Frame.At(lowerLanding is not null ? 0 : inset, w0, n)));
+        pts.Add(BuildUtil.XYZof(f.Frame.At(upperLanding is not null ? L : L - inset, w0, n)));
+        if (upperLanding is not null) pts.Add(LandingPt(f, w0, n, db, cfg, runH, atUpper: true, upperLanding, dev));
+
+        var curves = new List<Curve>();
+        for (int i = 1; i < pts.Count; i++)
+            if (pts[i].DistanceTo(pts[i - 1]) > 1e-6) curves.Add(Line.CreateBound(pts[i - 1], pts[i]));
+        if (curves.Count == 0) return 0;
 
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, stairId, StairLayer.FlightBottomMain);
-        return PlaceSet(f, cfg, spec, bt, db, n, uA, uB, tag,
-            hookA: BuildUtil.IsHook(spec.StartAnchor), hookB: BuildUtil.IsHook(spec.EndAnchor));
+        return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing);
     }
 
-    /// <summary>Small inset from the run ends so the bar (and any hook) stays inside the host solid.</summary>
+    /// <summary>End point of the landing leg: the fold, extended horizontally into the landing at the landing's bottom-bar level.</summary>
+    private static XYZ LandingPt(FlightComponent f, double w0, double n, double db,
+        StairsReinforcementConfig cfg, XYZ runH, bool atUpper, LandingComponent landing, double dev)
+    {
+        double uEnd = atUpper ? f.SlopeLengthFt : 0;
+        XYZ fold = BuildUtil.XYZof(f.Frame.At(uEnd, w0, n));
+        XYZ away = runH * (atUpper ? 1.0 : -1.0);               // out of the flight, into the landing
+        double landBotZ = landing.ElevationFt - landing.ThicknessFt + cfg.Ft(cfg.Cover.Bottom) + db / 2;
+        return new XYZ(fold.X + away.X * dev, fold.Y + away.Y * dev, landBotZ);
+    }
+
+    private static double LandingDevFt(StairsReinforcementConfig cfg, BarSetSpec spec, double db)
+    {
+        double a = cfg.Ft(spec.EndAnchorLen);
+        return a > 1e-6 ? a : BuildUtil.LapFt(cfg, db);
+    }
+
+    /// <summary>Small inset from the run ends so a clamped (non-landing) end stays inside the host solid.</summary>
     private static double EndInsetFt(StairsReinforcementConfig cfg) => cfg.Ft(cfg.Cover.Bottom);
 
     private int BuildTop(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId)

@@ -79,7 +79,9 @@ public sealed class StairsReinforcer
                 outcome.Reason = Append(outcome.Reason, $"flight {f.Index}: host cannot hold rebar");
                 continue;
             }
-            created += Safe(() => longitudinal.Build(f, cfg, asm.Id), $"flight {f.Index} long", outcome);
+            LandingComponent? lowerLanding = FindLanding(asm, f.LowerSupport);
+            LandingComponent? upperLanding = FindLanding(asm, f.UpperSupport);
+            created += Safe(() => longitudinal.Build(f, cfg, asm.Id, lowerLanding, upperLanding), $"flight {f.Index} long", outcome);
             created += Safe(() => distribution.Build(f, cfg, asm.Id), $"flight {f.Index} dist", outcome);
             created += Safe(() => steps.Build(f, cfg, asm.Id), $"flight {f.Index} steps", outcome);
         }
@@ -95,11 +97,17 @@ public sealed class StairsReinforcer
             created += Safe(() => landingMat.Build(l, cfg, asm.Id), $"landing {l.Index} mat", outcome);
         }
 
-        created += Safe(() => new KneeBarBuilder(_doc).Build(asm, cfg, asm.Id), "knee", outcome);
+        // Bottom continuity into landings is carried by the flight main bars themselves (above), so the
+        // separate knee bar is not placed — it duplicated those bars and tangled the junction.
         created += Safe(() => new StarterBarBuilder(_doc).Build(asm, cfg, asm.Id), "starters", outcome);
 
         return created;
     }
+
+    private static LandingComponent? FindLanding(StairAssembly asm, SupportInfo? support) =>
+        support?.Kind == "landing"
+            ? asm.Landings.FirstOrDefault(l => l.ComponentId.Value == support.ElementId)
+            : null;
 
     /// <summary>Run one bar-set builder; isolate a failure to that set (record it) instead of failing the whole stair.</summary>
     private static int Safe(Func<int> build, string label, StairOutcome outcome)
