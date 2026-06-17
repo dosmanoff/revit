@@ -30,6 +30,11 @@ public sealed class StairsReinforcer
 
             using var tx = new Transaction(_doc, $"Stair {asm.Id.Value}");
             tx.Start();
+            // Non-modal failure handling: a rebar warning must never pop a blocking dialog mid-run.
+            FailureHandlingOptions fo = tx.GetFailureHandlingOptions();
+            fo.SetForcedModalHandling(false);
+            fo.SetClearAfterRollback(true);
+            tx.SetFailureHandlingOptions(fo);
             try
             {
                 int replaced = cfg.CleanExisting ? ExistingRebarCleaner.Clean(_doc, asm.Id, cfg.Name) : 0;
@@ -74,9 +79,9 @@ public sealed class StairsReinforcer
                 outcome.Reason = Append(outcome.Reason, $"flight {f.Index}: host cannot hold rebar");
                 continue;
             }
-            created += longitudinal.Build(f, cfg, asm.Id);
-            created += distribution.Build(f, cfg, asm.Id);
-            created += steps.Build(f, cfg, asm.Id);
+            created += Safe(() => longitudinal.Build(f, cfg, asm.Id), $"flight {f.Index} long", outcome);
+            created += Safe(() => distribution.Build(f, cfg, asm.Id), $"flight {f.Index} dist", outcome);
+            created += Safe(() => steps.Build(f, cfg, asm.Id), $"flight {f.Index} steps", outcome);
         }
 
         var landingMat = new LandingMatBuilder(_doc);
@@ -87,14 +92,20 @@ public sealed class StairsReinforcer
                 outcome.Reason = Append(outcome.Reason, $"landing {l.Index}: host cannot hold rebar");
                 continue;
             }
-            created += landingMat.Build(l, cfg, asm.Id);
+            created += Safe(() => landingMat.Build(l, cfg, asm.Id), $"landing {l.Index} mat", outcome);
         }
 
-        created += new KneeBarBuilder(_doc).Build(asm, cfg, asm.Id);
-        created += new StarterBarBuilder(_doc).Build(asm, cfg, asm.Id);
+        created += Safe(() => new KneeBarBuilder(_doc).Build(asm, cfg, asm.Id), "knee", outcome);
+        created += Safe(() => new StarterBarBuilder(_doc).Build(asm, cfg, asm.Id), "starters", outcome);
 
-        // Step bars are wired in PR-12.
         return created;
+    }
+
+    /// <summary>Run one bar-set builder; isolate a failure to that set (record it) instead of failing the whole stair.</summary>
+    private static int Safe(Func<int> build, string label, StairOutcome outcome)
+    {
+        try { return build(); }
+        catch (Exception ex) { outcome.Reason = Append(outcome.Reason, $"{label}: {ex.Message}"); return 0; }
     }
 
     private static string Append(string? reason, string add) =>

@@ -40,7 +40,13 @@ internal static class BuildUtil
             _ => Math.Max(0, lenFt),   // Straight / BendUp / BendDown (bends approximated as straight for now)
         };
 
-    public static bool IsHook(AnchorMode mode) => mode is AnchorMode.Hook90 or AnchorMode.Hook180;
+    /// <summary>
+    /// Whether an end is anchored with a hook. <see cref="AnchorMode.IntoSupport"/> counts as a hook
+    /// because a native-stair host cannot accept a straight bar running out into the supporting slab
+    /// (it throws "internal error") — the development is provided by a hook inside the waist instead.
+    /// </summary>
+    public static bool IsHook(AnchorMode mode) =>
+        mode is AnchorMode.Hook90 or AnchorMode.Hook180 or AnchorMode.IntoSupport;
 
     /// <summary>Hook type for a hooked end: a named hook (strict), else a 90/180 hook by name match.</summary>
     public static RebarHookType? HookFor(Document doc, AnchorMode mode, string? name)
@@ -48,7 +54,7 @@ internal static class BuildUtil
         if (!string.IsNullOrWhiteSpace(name)) return RebarFactory.GetHookType(doc, name);
         return mode switch
         {
-            AnchorMode.Hook90 => FindHookContaining(doc, "90"),
+            AnchorMode.Hook90 or AnchorMode.IntoSupport => FindHookContaining(doc, "90"),
             AnchorMode.Hook180 => FindHookContaining(doc, "180"),
             _ => null,
         };

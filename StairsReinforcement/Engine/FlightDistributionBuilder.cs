@@ -50,12 +50,14 @@ public sealed class FlightDistributionBuilder
         double wR = f.WidthFt / 2 - coverSide - db / 2;
         if (wR - wL <= 1e-6) return 0;
 
-        double L = f.SlopeLengthFt;
-        (int count, double spacing) = BuildUtil.ResolveSet(spec.SpacingMode, spec.Count, cfg.Ft(spec.Spacing), L);
+        // Inset from the run ends so the first/last distribution bars stay inside the host solid.
+        double inset = cfg.Ft(cfg.Cover.Bottom);
+        double span = Math.Max(0, f.SlopeLengthFt - 2 * inset);
+        (int count, double spacing) = BuildUtil.ResolveSet(spec.SpacingMode, spec.Count, cfg.Ft(spec.Spacing), span);
 
         // Representative bar runs across the width at the lower end; the set marches up-slope along U.
-        XYZ p0 = BuildUtil.XYZof(f.Frame.At(0, wL, n));
-        XYZ p1 = BuildUtil.XYZof(f.Frame.At(0, wR, n));
+        XYZ p0 = BuildUtil.XYZof(f.Frame.At(inset, wL, n));
+        XYZ p1 = BuildUtil.XYZof(f.Frame.At(inset, wR, n));
         var curves = new List<Curve> { Line.CreateBound(p0, p1) };
 
         var U = new XYZ(f.Frame.U.X, f.Frame.U.Y, f.Frame.U.Z);

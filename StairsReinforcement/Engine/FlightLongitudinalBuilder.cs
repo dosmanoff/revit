@@ -32,13 +32,19 @@ public sealed class FlightLongitudinalBuilder
         double db = bt.BarNominalDiameter;
         double n = cfg.FtOr(spec.Cover, cfg.Cover.Bottom) + db / 2;
 
-        double uA = -BuildUtil.AnchorExtFt(spec.StartAnchor, cfg.Ft(spec.StartAnchorLen), cfg, db);
-        double uB = f.SlopeLengthFt + BuildUtil.AnchorExtFt(spec.EndAnchor, cfg.Ft(spec.EndAnchorLen), cfg, db);
+        // Clamp within the host run extent — a bar running out past the run into the support throws
+        // "internal error" on a native-stair host. Development is provided by a hook (see BuildUtil.IsHook).
+        double inset = EndInsetFt(cfg);
+        double uA = inset;
+        double uB = f.SlopeLengthFt - inset;
 
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, stairId, StairLayer.FlightBottomMain);
         return PlaceSet(f, cfg, spec, bt, db, n, uA, uB, tag,
             hookA: BuildUtil.IsHook(spec.StartAnchor), hookB: BuildUtil.IsHook(spec.EndAnchor));
     }
+
+    /// <summary>Small inset from the run ends so the bar (and any hook) stays inside the host solid.</summary>
+    private static double EndInsetFt(StairsReinforcementConfig cfg) => cfg.Ft(cfg.Cover.Bottom);
 
     private int BuildTop(FlightComponent f, StairsReinforcementConfig cfg, ElementId stairId)
     {
@@ -48,25 +54,25 @@ public sealed class FlightLongitudinalBuilder
         double n = f.WaistFt - cfg.FtOr(spec.Cover, cfg.Cover.Top) - db / 2;
         if (n <= db) n = f.WaistFt * 0.5;   // guard a thin/unknown waist
 
+        double inset = EndInsetFt(cfg);
         double L = f.SlopeLengthFt;
+        double lo = inset, hi = L - inset;                 // clamped within the host run
         double ext = cfg.Ft(cfg.Flight.TopSupportExtent);
-        double startExt = BuildUtil.AnchorExtFt(spec.StartAnchor, cfg.Ft(spec.StartAnchorLen), cfg, db);
-        double endExt = BuildUtil.AnchorExtFt(spec.EndAnchor, cfg.Ft(spec.EndAnchorLen), cfg, db);
         bool hookA = BuildUtil.IsHook(spec.StartAnchor), hookB = BuildUtil.IsHook(spec.EndAnchor);
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, stairId, StairLayer.FlightTopMain);
 
         switch (cfg.Flight.TopMode)
         {
             case TopMode.Continuous:
-                return PlaceSet(f, cfg, spec, bt, db, n, -startExt, L + endExt, tag, hookA, hookB);
+                return PlaceSet(f, cfg, spec, bt, db, n, lo, hi, tag, hookA, hookB);
 
             case TopMode.OverSupports:
-                int c = PlaceSet(f, cfg, spec, bt, db, n, -startExt, Math.Min(ext, L), tag, hookA, false);
-                c += PlaceSet(f, cfg, spec, bt, db, n, Math.Max(0, L - ext), L + endExt, tag, false, hookB);
+                int c = PlaceSet(f, cfg, spec, bt, db, n, lo, Math.Min(lo + ext, hi), tag, hookA, false);
+                c += PlaceSet(f, cfg, spec, bt, db, n, Math.Max(lo, hi - ext), hi, tag, false, hookB);
                 return c;
 
             case TopMode.EndsOnly:
-                return PlaceSet(f, cfg, spec, bt, db, n, Math.Max(0, L - ext), L + endExt, tag, false, hookB);
+                return PlaceSet(f, cfg, spec, bt, db, n, Math.Max(lo, hi - ext), hi, tag, false, hookB);
 
             default:
                 return 0;
