@@ -58,6 +58,33 @@ internal static class RevitGeom
         return b;
     }
 
+    /// <summary>
+    /// World AABB from the element's OWN solid geometry. For native stair components
+    /// (StairsRun/StairsLanding of a Monolithic Stair) <c>get_BoundingBox(null)</c> returns the
+    /// whole-stair box, so per-component Z is wrong; the solids give the true per-component extent.
+    /// </summary>
+    public static Bounds3 SolidBounds(Element e)
+    {
+        var b = new Bounds3();
+        foreach (Solid s in Solids(e))
+        {
+            BoundingBoxXYZ? bb = s.GetBoundingBox();
+            if (bb is null) continue;
+            Transform t = bb.Transform;
+            foreach (XYZ corner in BoxCorners(bb.Min, bb.Max))
+                b.Add(P3(t.OfPoint(corner)));
+        }
+        return b;
+    }
+
+    private static IEnumerable<XYZ> BoxCorners(XYZ min, XYZ max)
+    {
+        foreach (double x in new[] { min.X, max.X })
+            foreach (double y in new[] { min.Y, max.Y })
+                foreach (double z in new[] { min.Z, max.Z })
+                    yield return new XYZ(x, y, z);
+    }
+
     public static bool IsValidRebarHost(Element e)
     {
         try

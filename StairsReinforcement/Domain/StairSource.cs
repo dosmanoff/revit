@@ -89,7 +89,10 @@ public static class StairSourceResolver
         double rise = run.Height;
         double slope = Math.Atan2(rise, Math.Max(1e-6, horizRun));
 
-        Bounds3 bounds = RevitGeom.ElemBounds(run);
+        // Per-component solid bbox — get_BoundingBox(null) returns the whole-stair box for
+        // monolithic runs, which puts the upper run of a switchback at the wrong elevation.
+        Bounds3 bounds = RevitGeom.SolidBounds(run);
+        if (bounds.IsEmpty) bounds = RevitGeom.ElemBounds(run);
         double soffitZ = bounds.IsEmpty ? start.Z : bounds.Min.Z;
         var frame = FlightFrame.Create(new Pt3(start.X, start.Y, soffitZ), runDir, slope);
 
@@ -123,7 +126,8 @@ public static class StairSourceResolver
         StairsLanding landing, Stairs stairs, bool hostOk, int index)
     {
         var loop = RevitGeom.ToPlanLoop(landing.GetFootprintBoundary());
-        Bounds3 bounds = RevitGeom.ElemBounds(landing);
+        Bounds3 bounds = RevitGeom.SolidBounds(landing);   // true landing level, not the whole-stair box
+        if (bounds.IsEmpty) bounds = RevitGeom.ElemBounds(landing);
 
         return new LandingComponent
         {
