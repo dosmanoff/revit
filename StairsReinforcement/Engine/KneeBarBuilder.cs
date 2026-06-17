@@ -68,10 +68,13 @@ public sealed class KneeBarBuilder
         XYZ foldBot = BuildUtil.XYZof(f.Frame.At(uEnd, w0, nBot));
         XYZ foldTop = BuildUtil.XYZof(f.Frame.At(uEnd, w0, nTop));
 
-        Pt3 lc = l.Bounds.Center;
-        var intoP = new Pt2(lc.X - foldBot.X, lc.Y - foldBot.Y).Normalized();
-        if (intoP.Length < 1e-9) intoP = new Pt2(f.Frame.U.X, f.Frame.U.Y).Normalized() * sgn;
-        var into = new XYZ(intoP.X, intoP.Y, 0);
+        // The landing leg continues in the flight's HORIZONTAL run direction, away from the flight
+        // interior. That direction is ⟂ W, so the (multi-segment) knee bar stays planar — which
+        // CreateFromCurves requires. Aiming at the landing centre instead tilts it out of plane and
+        // throws "internal error" (the bar's curves must all lie in the plane ⟂ the normal).
+        Pt2 runH = new Pt2(f.Frame.U.X, f.Frame.U.Y).Normalized();
+        double awaySign = atUpper ? 1.0 : -1.0;            // away from the flight interior
+        var into = new XYZ(runH.X * awaySign, runH.Y * awaySign, 0);
 
         double landBotZ = (l.ElevationFt - l.ThicknessFt) + cfg.Ft(cfg.Cover.Bottom) + db / 2;
         double landTopZ = l.ElevationFt - cfg.Ft(cfg.Cover.Top) - db / 2;
