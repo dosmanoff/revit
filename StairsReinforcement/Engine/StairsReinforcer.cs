@@ -34,6 +34,7 @@ public sealed class StairsReinforcer
             FailureHandlingOptions fo = tx.GetFailureHandlingOptions();
             fo.SetForcedModalHandling(false);
             fo.SetClearAfterRollback(true);
+            fo.SetFailuresPreprocessor(new WarningSwallower());
             tx.SetFailureHandlingOptions(fo);
             try
             {
@@ -122,6 +123,22 @@ public sealed class StairsReinforcer
 
     private static string Append(string? reason, string add) =>
         string.IsNullOrEmpty(reason) ? add : $"{reason}; {add}";
+
+    /// <summary>
+    /// Swallow every non-fatal Revit warning during a stair transaction (rebar partially/completely
+    /// outside its host, duplicate marks, benign joins) so a batch run can NEVER stop on a modal dialog
+    /// — which otherwise wedges the whole Revit session. Geometry is verified by measurement, not warnings.
+    /// </summary>
+    private sealed class WarningSwallower : IFailuresPreprocessor
+    {
+        public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
+        {
+            foreach (FailureMessageAccessor m in a.GetFailureMessages())
+                if (m.GetSeverity() == FailureSeverity.Warning)
+                    a.DeleteWarning(m);
+            return FailureProcessingResult.Continue;
+        }
+    }
 
     /// <summary>Warn (non-fatal) when the live geometry differs from the CSV Expected* values.</summary>
     private static void Validate(StairAssembly asm, StairsReinforcementConfig cfg, ExpectedGeom exp, RunResult result)
