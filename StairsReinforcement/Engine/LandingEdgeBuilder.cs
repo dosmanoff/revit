@@ -65,7 +65,8 @@ public sealed class LandingEdgeBuilder
                 Line.CreateBound(midBot, legBot),
             };
             var normal = new XYZ(dx, dy, 0);                            // set marches along the edge
-            created += RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, l.Host, normal, curves, tag, count, spacing);
+            // reuseShape:false — hold the legs exactly horizontal/vertical (no shape-fit snapping).
+            created += RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, l.Host, normal, curves, tag, count, spacing, reuseShape: false);
         }
         return created;
     }

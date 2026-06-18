@@ -71,7 +71,9 @@ public sealed class ConnectionDowelBuilder
                 : new XYZ(bend.X + supDir.X * shortLeg, bend.Y + supDir.Y * shortLeg, zSupport);
             XYZ flEnd = BuildUtil.XYZof(fr.At(bu + sign * flightLen, w0, nPlane));
             var curves = new List<Curve> { Line.CreateBound(supEnd, bend), Line.CreateBound(bend, flEnd) };
-            return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing);
+            // reuseShape:false — keep the flight leg EXACTLY parallel to the soffit; fitting a pre-existing
+            // shape snaps the bend ~0.4° off, lifting the leg off the flight's cover plane (the user's note).
+            return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing, reuseShape: false);
         }
 
         // ONLY a real foundation gets the turn-DOWN detail (there is no slab to lap into below it).

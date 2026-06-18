@@ -68,12 +68,19 @@ public static class RebarFactory
         Create(doc, style, barTypeId, host, normal, curves, tag, null, null,
             RebarHookOrientation.Right, RebarHookOrientation.Right);
 
-    /// <summary>Create a Rebar from curves with optional hooks, tagged for idempotent re-runs.</summary>
+    /// <summary>
+    /// Create a Rebar from curves with optional hooks, tagged for idempotent re-runs.
+    /// <paramref name="reuseShape"/> = false forces a new shape from the exact curves — bent bars whose
+    /// legs must stay parallel to a real face (connection dowels, пэшки) get their angle SNAPPED ~0.4°
+    /// when Revit fits a pre-existing RebarShape (often a stale one from an earlier path+height run),
+    /// so they pass false; straight bars (mains/mats) keep true for tidy shared shapes in schedules.
+    /// </summary>
     public static Rebar Create(
         Document doc, RebarStyle style, ElementId barTypeId, Element host,
         XYZ normal, IList<Curve> curves, string tag,
         RebarHookType? startHook, RebarHookType? endHook,
-        RebarHookOrientation startOrient, RebarHookOrientation endOrient)
+        RebarHookOrientation startOrient, RebarHookOrientation endOrient,
+        bool reuseShape = true)
     {
         Rebar rebar = Rebar.CreateFromCurves(
             doc, style,
@@ -81,7 +88,7 @@ public static class RebarFactory
             startHook, endHook,
             host, normal, curves,
             startOrient, endOrient,
-            useExistingShapeIfPossible: true,
+            useExistingShapeIfPossible: reuseShape,
             createNewShape: true);
 
         ExistingRebarCleaner.Tag(rebar, tag);
@@ -97,10 +104,10 @@ public static class RebarFactory
     public static int CreateSet(
         Document doc, RebarStyle style, ElementId barTypeId, Element host,
         XYZ normal, IList<Curve> curves, string tag, int count, double spacingFt,
-        RebarHookType? startHook = null, RebarHookType? endHook = null)
+        RebarHookType? startHook = null, RebarHookType? endHook = null, bool reuseShape = true)
     {
         Rebar set = Create(doc, style, barTypeId, host, normal, curves, tag,
-            startHook, endHook, RebarHookOrientation.Right, RebarHookOrientation.Right);
+            startHook, endHook, RebarHookOrientation.Right, RebarHookOrientation.Right, reuseShape);
 
         if (count > 1 && spacingFt > 1e-6)
         {
