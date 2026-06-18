@@ -102,7 +102,9 @@ public static class StairContext
         {
             if (exclude.Contains(e.Id.Value)) continue;
             string? kind = ClassifyKind(e);
-            if (kind is null or "stairs") continue;
+            // A flight tops out ON a horizontal floor — never on a wall/beam beside it. A tall wall's
+            // SlabExtents spans to the foundation, which would fling the lap dowel far below the flight.
+            if (kind != "slab" && kind != "foundation") continue;
 
             BoundingBoxXYZ? bb = e.get_BoundingBox(null);
             // The flight tops INTO this floor: its TOP surface is at the flight top (the slab may be thin,
