@@ -59,6 +59,7 @@ public sealed class StairViewsEngine
         NameView(section, mark);
         ApplyAppearance(section);
         ApplyTemplate(section);
+        IsolateRebar(section, asm.Id.Value);
         result.ViewsCreated++;
 
         var views = new List<View> { section };
@@ -180,6 +181,32 @@ public sealed class StairViewsEngine
         string name = _cfg.ViewNameTemplate.Replace("{Mark}", mark).Trim();
         if (string.IsNullOrEmpty(name)) name = $"View {view.Id.Value}";
         view.Name = UniqueName(name);
+    }
+
+    /// <summary>
+    /// Keep ONLY this stair's rebar visible (the user's rule for these sheets): hide every rebar in the
+    /// view whose <c>Comments</c> tag isn't <c>STR:{config}:{stairId}:…</c>, and draw the stair's own
+    /// bars unobscured so the cage reads through the concrete. Element-level hide also wins over any view
+    /// template filters. Foreign structure stays as context (only its rebar is dropped).
+    /// </summary>
+    private void IsolateRebar(View view, long stairId)
+    {
+        string id = stairId.ToString();
+        var hide = new List<ElementId>();
+        foreach (Element e in new FilteredElementCollector(_doc, view.Id)
+                     .OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType())
+        {
+            string[] p = (e.LookupParameter("Comments")?.AsString() ?? "").Split(':');
+            bool mine = p.Length >= 3 && p[0] == "STR" && p[2] == id;
+            if (mine)
+            {
+                if (e is Autodesk.Revit.DB.Structure.Rebar rb)
+                    try { rb.SetUnobscuredInView(view, true); } catch { }
+            }
+            else hide.Add(e.Id);
+        }
+        if (hide.Count > 0)
+            try { view.HideElements(hide); } catch { }
     }
 
     private void ApplyAppearance(View view)
