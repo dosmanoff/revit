@@ -105,9 +105,10 @@ public static class StairContext
             if (kind is null or "stairs") continue;
 
             BoundingBoxXYZ? bb = e.get_BoundingBox(null);
-            if (bb is null || bb.Min.Z < pt.Z - SearchUpFt) continue;   // must sit at/above the end
-
-            double gap = bb.Min.Z - pt.Z;                               // closest underside above the end
+            // The flight tops INTO this floor: its TOP surface is at the flight top (the slab may be thin,
+            // so its underside sits below pt — don't gate on Min.Z). Pick the floor whose top is nearest.
+            if (bb is null || bb.Max.Z < pt.Z - SearchUpFt) continue;
+            double gap = Math.Abs(bb.Max.Z - pt.Z);
             if (gap < bestGap) { bestGap = gap; best = new SupportInfo { Kind = kind, ElementId = e.Id.Value, ElevationFt = bb.Max.Z }; }
         }
         return best;
@@ -155,9 +156,22 @@ public static class StairContext
         if (cat is null) return null;
         if (cat == (long)BuiltInCategory.OST_StructuralFraming) return "beam";
         if (cat == (long)BuiltInCategory.OST_Walls) return "wall";
-        if (cat == (long)BuiltInCategory.OST_Floors) return "slab";
+        if (cat == (long)BuiltInCategory.OST_Floors) return IsFoundationFloor(e) ? "foundation" : "slab";
         if (cat == (long)BuiltInCategory.OST_StructuralFoundation) return "foundation";
         if (cat == (long)BuiltInCategory.OST_Stairs) return "stairs";
         return null;
+    }
+
+    /// <summary>
+    /// A structural <see cref="Floor"/> modelled as a foundation mat — its type is named for it
+    /// (e.g. 435E's <c>TH 20" (Foundation)</c>). The lowest flight bears on this, and the etalon wants
+    /// the connection dowels to turn DOWN into it (foundation embed), not lap horizontally like a slab.
+    /// </summary>
+    private static bool IsFoundationFloor(Element e)
+    {
+        string? tn = e.Document.GetElement(e.GetTypeId())?.Name;
+        return tn is not null
+            && (tn.Contains("Foundation", StringComparison.OrdinalIgnoreCase)
+                || tn.Contains("Footing", StringComparison.OrdinalIgnoreCase));
     }
 }
