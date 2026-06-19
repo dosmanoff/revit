@@ -34,8 +34,29 @@ public sealed class StairScheduleBuilder
         AddGroup(def, typeField);
         AddGroup(def, shapeField);
         AddGroup(def, lengthField);
+        RoundLengthToHalfInch(lengthField);
 
         return schedule;
+    }
+
+    /// <summary>
+    /// Round the bar-length column to the nearest 1/2" so near-equal cut lengths read as one clean value
+    /// (the 435E etalon convention). <see cref="FormatOptions.Accuracy"/> is in internal units (feet), so
+    /// 1/2" = <c>ConvertToInternalUnits(0.5, Inches)</c>; the display unit/symbol follow the project's
+    /// length format. Best-effort — skipped if the field rejects a format override.
+    /// </summary>
+    private void RoundLengthToHalfInch(ScheduleField? lengthField)
+    {
+        if (lengthField is null) return;
+        try
+        {
+            FormatOptions proj = _doc.GetUnits().GetFormatOptions(SpecTypeId.Length);
+            var fo = new FormatOptions(proj.GetUnitTypeId());
+            try { fo.SetSymbolTypeId(proj.GetSymbolTypeId()); } catch { }
+            fo.Accuracy = UnitUtils.ConvertToInternalUnits(0.5, UnitTypeId.Inches);
+            lengthField.SetFormatOptions(fo);
+        }
+        catch (Autodesk.Revit.Exceptions.ApplicationException) { }
     }
 
     private static void AddGroup(ScheduleDefinition def, ScheduleField? field)

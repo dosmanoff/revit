@@ -64,16 +64,22 @@ public sealed class ConnectionDowelBuilder
 
         int Dowel(double nPlane, double zSupport, double flightLen, double downEmbed)
         {
-            double bu = (zSupport - fr.Origin.Z - fr.N.Z * nPlane) / (Math.Abs(fr.U.Z) < 1e-6 ? 1e-6 : fr.U.Z);
+            // Solve bu so the bend sits at zSupport — INCLUDING the width term fr.W.Z*w0: omitting it left
+            // the bend a hair off zSupport, tilting the support leg ~1° off horizontal (the leg must lie flat
+            // on the support mesh). With it, supEnd.Z == bend.Z exactly, so the support leg is truly level.
+            double bu = (zSupport - fr.Origin.Z - fr.W.Z * w0 - fr.N.Z * nPlane) / (Math.Abs(fr.U.Z) < 1e-6 ? 1e-6 : fr.U.Z);
             XYZ bend = BuildUtil.XYZof(fr.At(bu, w0, nPlane));
             XYZ supEnd = downEmbed > 0
                 ? new XYZ(bend.X, bend.Y, bend.Z - downEmbed)                 // foundation: turn down
                 : new XYZ(bend.X + supDir.X * shortLeg, bend.Y + supDir.Y * shortLeg, zSupport);
             XYZ flEnd = BuildUtil.XYZof(fr.At(bu + sign * flightLen, w0, nPlane));
             var curves = new List<Curve> { Line.CreateBound(supEnd, bend), Line.CreateBound(bend, flEnd) };
-            // reuseShape:false — keep the flight leg EXACTLY parallel to the soffit; fitting a pre-existing
-            // shape snaps the bend ~0.4° off, lifting the leg off the flight's cover plane (the user's note).
-            return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing, reuseShape: false);
+            // Author a clean A/B shape for this bend angle FIRST, then reuseShape:true matches it — so the
+            // schedule gets standard A/B dimensions and one shape per bend angle, not Revit's auto per-bar
+            // shape (whose 2nd leg lands on a stray ADSK_ param). The match keeps the angle EXACT (no snap),
+            // so the flight leg stays parallel to the soffit.
+            StairDowelShape.Ensure(_doc, curves, normalW);
+            return RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, f.Host, normalW, curves, tag, count, spacing, reuseShape: true);
         }
 
         // ONLY a real foundation gets the turn-DOWN detail (there is no slab to lap into below it).
@@ -103,7 +109,13 @@ public sealed class ConnectionDowelBuilder
         // A landing (above or below): both lap the flight BOTTOM plane — green sits on the landing bottom
         // mesh, red under its top mesh (each +1 mesh dia off the face cover), so both stay inside the slab.
         double mTop = sTop - coverTop - db / 2 - mdb, mBot = sBot + cover + db / 2 + mdb;
-        return Dowel(nBot, mBot, greenLen, 0)
-             + Dowel(nBot, mTop, shortLeg, 0);
+        int dowels = Dowel(nBot, mBot, greenLen, 0)
+                   + Dowel(nBot, mTop, shortLeg, 0);
+        // The flight's UPPER end is a support, so its top fibre carries negative moment — exactly like the
+        // upper flight where it meets the slab. The lower flight at the mid-landing needs that same TOP
+        // reinforcement, so add a top-plane green dowel lapping the landing top mesh (mirrors the slab case).
+        if (!atLowEnd)
+            dowels += Dowel(nTop, mTop, greenLen, 0);
+        return dowels;
     }
 }

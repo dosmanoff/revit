@@ -65,8 +65,9 @@ public sealed class LandingEdgeBuilder
                 Line.CreateBound(midBot, legBot),
             };
             var normal = new XYZ(dx, dy, 0);                            // set marches along the edge
-            // reuseShape:false — hold the legs exactly horizontal/vertical (no shape-fit snapping).
-            created += RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, l.Host, normal, curves, tag, count, spacing, reuseShape: false);
+            // reuseShape:true — a 90° U-bar matches the standard U-shape (shape 17) with no snap, so every
+            // пэшка shares one shape in the bending schedule instead of a throwaway shape each.
+            created += RebarFactory.CreateSet(_doc, RebarStyle.Standard, bt.Id, l.Host, normal, curves, tag, count, spacing, reuseShape: true);
         }
         return created;
     }

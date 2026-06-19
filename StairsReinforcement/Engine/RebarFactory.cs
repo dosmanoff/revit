@@ -70,10 +70,10 @@ public static class RebarFactory
 
     /// <summary>
     /// Create a Rebar from curves with optional hooks, tagged for idempotent re-runs.
-    /// <paramref name="reuseShape"/> = false forces a new shape from the exact curves — bent bars whose
-    /// legs must stay parallel to a real face (connection dowels, пэшки) get their angle SNAPPED ~0.4°
-    /// when Revit fits a pre-existing RebarShape (often a stale one from an earlier path+height run),
-    /// so they pass false; straight bars (mains/mats) keep true for tidy shared shapes in schedules.
+    /// <paramref name="reuseShape"/> = true (default) matches an existing parametric RebarShape so bars
+    /// share a shape in the bending schedule — every 90° пэшка → shape 17; dowels → a couple of 2-segment
+    /// shapes by bend angle (legs free). Verified the match keeps the bend angle EXACT (no snap), so bent
+    /// bars use it too; = false only forces a fresh per-bar shape, which proliferates shapes — avoid it.
     /// </summary>
     public static Rebar Create(
         Document doc, RebarStyle style, ElementId barTypeId, Element host,

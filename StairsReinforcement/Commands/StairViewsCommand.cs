@@ -41,7 +41,11 @@ public class StairViewsCommand : IExternalCommand
         }
 
         StairViewsConfig cfg = StairViewsConfigStore.Load(doc);
-        var dlg = new StairViewsDialog(cfg);
+        List<string> sectionTypeNames = new FilteredElementCollector(doc)
+            .OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>()
+            .Where(t => t.ViewFamily == ViewFamily.Section)
+            .Select(t => t.Name).Distinct().OrderBy(n => n).ToList();
+        var dlg = new StairViewsDialog(cfg, sectionTypeNames);
         if (dlg.ShowDialog() != true) return Result.Cancelled;
 
         try { StairViewsConfigStore.Save(doc, cfg); } catch { /* best-effort */ }
@@ -63,9 +67,10 @@ public class StairViewsCommand : IExternalCommand
     private static void ShowResults(ViewRunResult result)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"Section views created: {result.ViewsCreated}");
+        sb.AppendLine($"Views created: {result.ViewsCreated}");
         if (result.SchedulesCreated > 0) sb.AppendLine($"Schedules: {result.SchedulesCreated}");
         if (result.SheetsCreated > 0) sb.AppendLine($"Sheets: {result.SheetsCreated}");
+        if (result.AnnotationsCreated > 0) sb.AppendLine($"Annotations: {result.AnnotationsCreated}");
         if (result.Errors.Count > 0)
         {
             sb.AppendLine();
