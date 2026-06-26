@@ -21,7 +21,10 @@ public class App : IExternalApplication
         try { application.CreateRibbonTab(tabName); }
         catch (Autodesk.Revit.Exceptions.ArgumentException) { }
 
-        RibbonPanel panel = application.CreateRibbonPanel(tabName, "Reinforcement");
+        // Own panel, per the sibling convention ("Slab Reinforcement", "Stairs Reinforcement").
+        // Get-or-create: ColumnReinforcement also lives on this tab and claims the bare
+        // "Reinforcement" name, so a plain CreateRibbonPanel of a duplicate name throws.
+        RibbonPanel panel = GetOrCreatePanel(application, tabName, "Wall Reinforcement");
         string assemblyPath = Assembly.GetExecutingAssembly().Location;
 
         var exportButtonData = new PushButtonData(
@@ -77,5 +80,14 @@ public class App : IExternalApplication
             "for every ASTM bar size — the same numbers used when Anchorage → Use ACI is on.";
 
         panel.AddItem(aciButtonData);
+    }
+
+    /// <summary>Return the existing panel of this name on the tab, or create it. Avoids the
+    /// "panel already exists" crash when another plugin on the shared tab made it first.</summary>
+    private static RibbonPanel GetOrCreatePanel(UIControlledApplication application, string tabName, string panelName)
+    {
+        foreach (RibbonPanel existing in application.GetRibbonPanels(tabName))
+            if (existing.Name == panelName) return existing;
+        return application.CreateRibbonPanel(tabName, panelName);
     }
 }
