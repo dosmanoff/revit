@@ -29,6 +29,13 @@ public class TransverseTieBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, ties.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
+        // A crosstie ("шпилька") is a StirrupTie-style bar with a 135° tie hook at each end engaging
+        // both face mats. The hook type MUST match the bar style — a Standard bar + a Stirrup/Tie
+        // hook throws an internal error. If the model has no tie hook, fall back to a straight
+        // Standard bar (no hook).
+        ElementId hookId = RebarFactory.LookupHookType(_doc, "Stirrup/Tie - 135", "Stirrup/Tie - 90", "Stirrup/Tie");
+        RebarStyle tieStyle = hookId != ElementId.InvalidElementId ? RebarStyle.StirrupTie : RebarStyle.Standard;
+
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
         double topCover    = cfg.Ft(cfg.Cover.Top);
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);
@@ -48,12 +55,10 @@ public class TransverseTieBuilder
             XYZ pExt = axes.At(uFirst, v, extOffset);
             XYZ pInt = axes.At(uFirst, v, intOffset);
 
-            // A transverse crosstie is a single straight bar across the thickness. Use Standard
-            // style (a 1-segment StirrupTie is rejected at regeneration — it expects a closed/
-            // hooked shape).
-            RebarFactory.CreateSet(_doc, RebarStyle.Standard, barTypeId, axes.Wall,
+            // A transverse crosstie across the thickness, hooked at each end (see above).
+            RebarFactory.CreateSet(_doc, tieStyle, barTypeId, axes.Wall,
                                    axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) },
-                                   uCount, uSpacing, tag);
+                                   uCount, uSpacing, tag, hookId, hookId);
             count += uCount;
         }
 

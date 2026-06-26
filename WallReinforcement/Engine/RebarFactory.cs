@@ -72,11 +72,14 @@ public static class RebarFactory
         IList<Curve> curves,
         int count,
         double spacing,
-        string tag)
+        string tag,
+        ElementId? startHookId = null,
+        ElementId? endHookId = null)
     {
         Rebar rebar = Rebar.CreateFromCurves(
             doc, style, (RebarBarType)doc.GetElement(barTypeId),
-            startHook: null, endHook: null, host: host, norm: distributionDir, curves: curves,
+            startHook: HookOrNull(doc, startHookId), endHook: HookOrNull(doc, endHookId),
+            host: host, norm: distributionDir, curves: curves,
             startHookOrient: RebarHookOrientation.Right, endHookOrient: RebarHookOrientation.Right,
             useExistingShapeIfPossible: true, createNewShape: true);
 
@@ -98,4 +101,24 @@ public static class RebarFactory
     /// </summary>
     public static (int count, double spacing, double first) UniformLayout(double from, double to, double desiredStep)
         => WallReinforcement.Geometry.BarLayout.UniformLayout(from, to, desiredStep);
+
+    private static RebarHookType? HookOrNull(Document doc, ElementId? id) =>
+        id is not null && id != ElementId.InvalidElementId ? doc.GetElement(id) as RebarHookType : null;
+
+    /// <summary>
+    /// Find a <see cref="RebarHookType"/> by name fragment (first match), e.g. "135" for a 135°
+    /// tie hook. Returns <see cref="ElementId.InvalidElementId"/> if none is found, in which case
+    /// callers place a straight bar with no hook.
+    /// </summary>
+    public static ElementId LookupHookType(Document doc, params string[] nameFragments)
+    {
+        var hooks = new FilteredElementCollector(doc)
+            .OfClass(typeof(RebarHookType)).Cast<RebarHookType>().ToList();
+        foreach (string frag in nameFragments)
+        {
+            RebarHookType? hit = hooks.FirstOrDefault(h => h.Name.IndexOf(frag, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (hit is not null) return hit.Id;
+        }
+        return ElementId.InvalidElementId;
+    }
 }
