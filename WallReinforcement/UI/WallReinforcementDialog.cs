@@ -258,6 +258,7 @@ public class WallReinforcementDialog : Window
         _tabs.Items.Add(MakeSectionTab("Ties",       BuildTiesSection));
         _tabs.Items.Add(MakeSectionTab("Corners",    BuildCornersSection));
         _tabs.Items.Add(MakeSectionTab("T-Junctions",BuildTJunctionsSection));
+        _tabs.Items.Add(MakeSectionTab("Anchorage",  BuildAnchorageSection));
         return _tabs;
     }
 
@@ -408,6 +409,30 @@ public class WallReinforcementDialog : Window
         AddTextRow  (panel, "Bar type",   () => Config!.TJunctions.BarType,   s => Config!.TJunctions.BarType = s);
         AddLengthRow(panel, "Lap length", () => Config!.TJunctions.LapLength, v => Config!.TJunctions.LapLength = v);
         AddLengthRow(panel, "Spacing",    () => Config!.TJunctions.Spacing,   v => Config!.TJunctions.Spacing = v);
+        return panel;
+    }
+
+    private UIElement BuildAnchorageSection()
+    {
+        var panel = NewSectionPanel();
+        AddNote(panel, "ACI 318-19 length governor");
+        panel.Children.Add(new TextBlock
+        {
+            Text = "When ON: edge legs & opening-trim extensions use the development length ℓd, and "
+                 + "corner / T laps use the Class B tension lap ℓst — sized per bar. Needs Imperial "
+                 + "units + ASTM #-bars; otherwise the typed lengths are kept as a fallback.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            Foreground = System.Windows.Media.Brushes.Gray,
+            Margin = new Thickness(0, 0, 0, 6),
+        });
+        AddCheckRow (panel, "Use ACI 318-19",          () => Config!.Anchorage.Mode == AnchorMode.Aci,
+                                                        b  => Config!.Anchorage.Mode = b ? AnchorMode.Aci : AnchorMode.Explicit);
+        AddDoubleRow(panel, "f'c (psi)",               () => Config!.Anchorage.FcPsi,           v => Config!.Anchorage.FcPsi = v);
+        AddDoubleRow(panel, "fy (psi)",                () => Config!.Anchorage.FyPsi,           v => Config!.Anchorage.FyPsi = v);
+        AddCheckRow (panel, "Epoxy-coated",            () => Config!.Anchorage.Epoxy,           b => Config!.Anchorage.Epoxy = b);
+        AddCheckRow (panel, "Lightweight concrete",    () => Config!.Anchorage.Lightweight,     b => Config!.Anchorage.Lightweight = b);
+        AddCheckRow (panel, "Adequate spacing/cover",  () => Config!.Anchorage.AdequateSpacing, b => Config!.Anchorage.AdequateSpacing = b);
         return panel;
     }
 

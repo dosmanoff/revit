@@ -27,7 +27,9 @@ public class CornerBarBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, cfg.Corners.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double lap         = cfg.Ft(cfg.Corners.LapLength);
+        // Corner L-bars lap the two walls' mats: ACI mode sizes each leg as the Class B tension
+        // lap splice ℓst for the bar; otherwise the configured lap length.
+        double lap         = cfg.LapFeet(cfg.Corners.BarType, cfg.Ft(cfg.Corners.LapLength));
         double spacing     = cfg.Ft(cfg.Corners.Spacing);
         double topCover    = cfg.Ft(cfg.Cover.Top);
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);

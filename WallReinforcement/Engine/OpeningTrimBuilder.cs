@@ -54,7 +54,9 @@ public class OpeningTrimBuilder
     private int PlaceTrimsForOpening(WallAxes axes, OpeningRect rect, ReinforcementConfig cfg,
                                      ElementId barTypeId, string tag)
     {
-        double ext = cfg.Ft(cfg.Openings.Extension);
+        // The trim bar must develop past the opening corner: in ACI mode the extension is the
+        // tension development length ℓd for the trim bar; otherwise the configured value.
+        double ext = cfg.DevLengthFeet(cfg.Openings.BarType, cfg.Ft(cfg.Openings.Extension));
         int n = 0;
 
         // Each face gets its own set of trims, offset from the wall centerplane.

@@ -44,7 +44,9 @@ public class EdgeBarBuilder
 
         double endsCover = cfg.Ft(cfg.Cover.Ends);
         double spacing   = cfg.Ft(edge.Spacing);
-        double legLen    = cfg.Ft(edge.LegLength);
+        // The U-bar leg anchors the bar into the wall: ACI mode sizes it as the tension
+        // development length ℓd for the bar; otherwise the configured leg length.
+        double legLen    = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
         double extOffset =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
         double intOffset = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
@@ -75,7 +77,7 @@ public class EdgeBarBuilder
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
         double spacing     = cfg.Ft(edge.Spacing);
-        double legLen      = cfg.Ft(edge.LegLength);
+        double legLen      = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
         double extOffset   =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
         double intOffset   = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 

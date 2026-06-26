@@ -25,7 +25,9 @@ public class TJunctionBarBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, cfg.TJunctions.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        double lap         = cfg.Ft(cfg.TJunctions.LapLength);
+        // The stem laps into the through wall: ACI mode sizes each leg as the Class B tension lap
+        // splice ℓst for the bar; otherwise the configured lap length.
+        double lap         = cfg.LapFeet(cfg.TJunctions.BarType, cfg.Ft(cfg.TJunctions.LapLength));
         double spacing     = cfg.Ft(cfg.TJunctions.Spacing);
         double topCover    = cfg.Ft(cfg.Cover.Top);
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);

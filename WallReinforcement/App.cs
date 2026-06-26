@@ -64,5 +64,18 @@ public class App : IExternalApplication
             "optional 3D cage, a rebar schedule and a sheet — each isolated to that wall's rebar.";
 
         panel.AddItem(viewsButtonData);
+
+        var aciButtonData = new PushButtonData(
+            name: "AciLengths",
+            text: "ACI\nLengths",
+            assemblyName: assemblyPath,
+            className: typeof(AciLengthsCommand).FullName!);
+
+        aciButtonData.ToolTip = "ACI 318-19 development & lap lengths reference calculator.";
+        aciButtonData.LongDescription =
+            "Enter f'c / fy and read the tension development length ℓd and Class B lap splice ℓst " +
+            "for every ASTM bar size — the same numbers used when Anchorage → Use ACI is on.";
+
+        panel.AddItem(aciButtonData);
     }
 }
