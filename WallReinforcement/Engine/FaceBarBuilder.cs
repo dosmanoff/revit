@@ -85,15 +85,16 @@ public class FaceBarBuilder
             foreach (Interval seg in IntervalMath.Subtract(run.From, run.To, openingU))
                 n += PlaceVerticals(axes, barTypeId, offV, seg, vSpacing, vBotFull, vTopFull, bot, top, tag);
 
-            // Split verticals above & below each opening.
+            // Split verticals above & below each opening — the piece above still carries the top
+            // projection (выпуск), the piece below the bottom projection.
             foreach (OpeningRect o in openings)
             {
                 double a = Math.Max(run.From, o.UMin), b = Math.Min(run.To, o.UMax);
                 if (b - a <= vSpacing) continue;
                 n += PlaceVerticals(axes, barTypeId, offV, new Interval(a, b), vSpacing,
-                                    bottomCover, o.VMin - margin, EdgeProjection.Off, EdgeProjection.Off, tag);
+                                    vBotFull, o.VMin - margin, bot, EdgeProjection.Off, tag);
                 n += PlaceVerticals(axes, barTypeId, offV, new Interval(a, b), vSpacing,
-                                    o.VMax + margin, axes.Height - topCover, EdgeProjection.Off, EdgeProjection.Off, tag);
+                                    o.VMax + margin, vTopFull, EdgeProjection.Off, top, tag);
             }
         }
         return n;
