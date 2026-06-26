@@ -11,29 +11,30 @@ remaining functional work (#5 Dump+brief, #6 ACI, #7 finalize).
 
 ## Prompt (paste as the first message)
 
-> Продолжаем доводить **WallReinforcement** до паритета со SlabReinforcement. Сначала прочитай
-> memory `proj-wall-reinforcement-parity` и `revit-wall-areareinforcement-gotchas`, и
-> `revit-mcp-api-cookbook.md`. Уже сделано и закоммичено на ветке
-> `claude/wall-reinforcement-slab-parity` (3 коммита): надёжность (rebar-сеты +
-> failures-preprocessor + `WallReinforcement.Geometry`/`.Tests`, 21 тест), WallViews (движок +
-> кнопка «Wall Views»), крюковые шпильки (135°) — всё провалидировано вживую на 6 тестовых стенах.
+> Продолжаем **WallReinforcement** → паритет со SlabReinforcement, ветка
+> `claude/wall-reinforcement-slab-parity`. Прочитай этот файл целиком
+> (`WallReinforcement/HANDOFF-next-session.md`) и memory `proj-wall-reinforcement-parity` +
+> `revit-wall-areareinforcement-gotchas` — там параметры, файлы-эталоны Slab, ALC-рецепт живого
+> теста, сниппет подавления диалогов со сбором ошибок и список гоч.
 >
-> Сделать оставшееся (валидируя каждый блок вживую через ALC в открытой тестовой модели,
-> коммитя по ходу, в конце — PR и self-merge по `merge-authorization`):
-> 1. **#5 WallDump + JSON-brief** — экспорт геометрии стены в JSON (грани, проёмы, кромки,
->    соседи/стыки) + структурированный brief-конфиг с loader/mapper. Зеркалить
->    SlabDump/SlabDumpBuilder/SlabBrief/BriefLoader/BriefMapper. Добавить `wall-dump-schema.md`
->    и `wall-brief-schema.md`.
-> 2. **#6 ACI-калькулятор** анкеровки/нахлёста (ACI 318-19) — зеркалить AciAnchorageCalculator;
->    подставить в extension проёмов, legLength кромок, lapLength углов/Т + панель/команда в UI.
-> 3. **#7 Финал** — диалог + ExtensibleStorage-хранилище для `WallViewsConfig` (сейчас
->    `Default()`); проверка `tx.Commit()==RolledBack` в `WallReinforcer.Run` (латентный баг:
->    упавшая по regen стена помечается Success); обновить README/CLAUDE.md/
->    wall-reinforcement-dev-plan.md; deploy-скрипт (копировать ОБЕ DLL); прибрать тестовые
->    виды/стены; PR.
+> Готово и закоммичено (4 коммита): надёжность (rebar-сеты + failures-preprocessor +
+> `Geometry`/`Tests`, 21 тест), WallViews (движок + кнопка «Wall Views»), крюковые шпильки 135° —
+> всё провалидировано вживую на 6 стенах `WRTEST`.
 >
-> Тестовая модель `Empty_project_ArtDreamTJ4X9_detached` открыта в Revit; 6 стен `WRTEST`
-> id 6318852–6318857 заармированы. Не трогать продакшн-файл «7-15 Terrace View Avenue».
+> Сделай оставшееся, валидируя каждый блок вживую через ALC и коммитя по ходу (в конце — PR +
+> self-merge по `merge-authorization`):
+> - **#5 WallDump + JSON-brief** — экспорт геометрии стены в JSON (грани/проёмы/кромки/стыки) +
+>   структурированный brief с loader/mapper; зеркалить SlabDump/SlabDumpBuilder/SlabBrief/
+>   BriefLoader/BriefMapper; добавить `wall-dump-schema.md` + `wall-brief-schema.md`.
+> - **#6 ACI-калькулятор** анкеровки/нахлёста (ACI 318-19) — зеркалить AciAnchorageCalculator;
+>   подставить в extension проёмов, legLength кромок, lapLength углов/Т + панель/команда в UI.
+> - **#7 Финал** — диалог + ExtensibleStorage для `WallViewsConfig` (сейчас `Default()`); фикс
+>   `tx.Commit()==RolledBack` в `WallReinforcer.Run` (упавшая по regen стена помечается Success);
+>   README/CLAUDE.md/wall-reinforcement-dev-plan.md; deploy обеих DLL; уборка тестовых видов; PR.
+>
+> Тестовая модель `Empty_project_ArtDreamTJ4X9_detached` открыта; стены `WRTEST`
+> id 6318852–6318857; продакшн «7-15 Terrace View Avenue» НЕ трогать; запись —
+> `transactionMode:"none"` + своя транзакция.
 
 ---
 
