@@ -164,12 +164,29 @@ WallReinforcement/
 - `CornerBarBuilder` + `WallJunctions` detection: L-bars at wall-wall L-junctions, owner-by-min-ElementId to avoid double placement when both corner walls are in the run.
 - `TJunctionBarBuilder`: lap bars from stem wall into through wall; alternating direction per height step.
 
-### Phase 4 — Documentation hooks (separate plugin or shared lib)
-- Hand-off to a future *SmartDocumentation* plugin for views/sheets/schedules of the rebar produced here. **Not built in this repo yet** — listed only so the JSON tag convention (`WR:*`) is designed to be queryable from elsewhere.
+### Phase 4 — Wall Views (documentation) ✅
+- `WallViewsEngine`: per wall, exterior/interior face elevations + a horizontal section through the
+  thickness + optional 3D cage + a rebar schedule + a sheet, each isolated to that wall's `WR:`
+  rebar (`WallScheduleBuilder`, `WallSheetBuilder`). **Wall Views** ribbon button.
+- `WallViewsConfig` options in a code-only WPF dialog (`WallViewsDialog`), persisted on the document
+  via `WallViewsConfigStore` (ExtensibleStorage). Mirrors Slab Views.
 
-### Phase 5 — Niceties (deferred)
+### Phase 5 — Agent pipeline + ACI (SlabReinforcement parity) ✅
+- **Reliability:** spaced builders place Revit rebar **sets** (`SetLayoutAsNumberWithSpacing`), not
+  N loose bars; `WarningSwallower` `IFailuresPreprocessor` rolls back a wall whose rebar is rejected
+  (reported Failed). Revit-free `WallReinforcement.Geometry` + xUnit `WallReinforcement.Tests`.
+- **Export Walls → brief:** `WallDump`/`WallDumpBuilder` emit a JSON dump
+  ([`wall-dump-schema.md`](wall-dump-schema.md)); the agent returns a per-wall `WallBrief`
+  ([`wall-brief-schema.md`](wall-brief-schema.md)) which `BriefLoader`/`BriefMapper` resolve to a
+  per-wall config (dialog *Use per-wall JSON brief*).
+- **ACI 318-19:** `AciAnchorageCalculator` (development length ℓd, Class B tension lap ℓst) +
+  `AnchorageConfig`. In ACI mode edge legs / opening extensions use ℓd, corner / T laps use ℓst, per
+  bar size; non-ASTM names keep the typed length. Anchorage dialog tab + standalone **ACI Lengths**
+  reference calculator.
+
+### Phase 6 — Niceties (deferred)
 - Auto-load missing rebar families from a templates folder.
-- Arc walls (sweep area-reinforcement along arc) — currently skipped.
+- Arc walls (sweep area-reinforcement along arc) — currently chord-approximated.
 - Bar-bending schedule export.
 
 ---

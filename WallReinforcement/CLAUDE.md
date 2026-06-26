@@ -14,17 +14,26 @@ Reference product (precast equivalent): https://docs.besmart.software/3d-modelin
 - UI: WPF dialog **built in code** (no XAML), same Linux-CI constraint as AutoNumbering
 - Units: JSON stores millimetres; convert at API boundary via `UnitUtils.ConvertToInternalUnits`
 
-## Phase 1 scope (current)
-- Ribbon button on tab `Smart Tools`, panel `Reinforcement` (shares tab with AutoNumbering)
-- JSON config load/save + folder picker
-- Selection filter for structural walls (Bearing/Shear, straight or single-arc)
-- Face mesh on exterior + interior face with per-face cover, spacing, bar type
-- Idempotent re-run (delete existing `WR:*`-tagged rebar before placing new)
-- WPF results dialog with per-wall success/skip summary
+## Implemented (at SlabReinforcement parity)
+Ribbon tab `Smart Tools`, panel `Reinforcement`, four buttons: **Export Walls**, **Wall
+Reinforcement**, **Wall Views**, **ACI Lengths**.
+- **Reinforce:** structural-wall selection filter (Bearing/Shear/Combined basic walls); face mesh
+  (native `AreaReinforcement`, exterior + interior, per-face cover/spacing/bar); opening trim +
+  diagonals; perimeter U-bars (top/bottom/ends); transverse 135°-hooked crossties; L-corner and
+  T-junction continuity laps. Spaced builders emit Revit rebar **sets**, not loose bars. Idempotent
+  re-run via `WR:{config}:{wallId}` Comments tag. `WarningSwallower` rolls back a wall whose rebar
+  is rejected (reported Failed, not Success).
+- **Agent pipeline:** `Export Walls` → `WallDump` JSON (geometry/openings/junctions/cover/hints,
+  `wall-dump-schema.md`); agent → per-wall `WallBrief` (`wall-brief-schema.md`); dialog *Use per-wall
+  JSON brief* matches each wall by Mark/Id and reinforces from it.
+- **ACI 318-19:** Anchorage tab + `ACI Lengths` reference calc. ACI mode sizes edge legs / opening
+  extensions to ℓd and corner/T laps to Class B ℓst, per bar (non-ASTM bars keep the typed length).
+- **Wall Views:** per-wall face elevations + thickness section + optional 3D cage + rebar schedule +
+  sheet, each isolated to that wall's rebar; options dialog persisted via ExtensibleStorage.
+- **Code split:** Revit-free `WallReinforcement.Geometry` (bar-layout math, feet-inches parser, ACI
+  calculator) + `WallReinforcement.Tests` (xUnit, runs without Revit).
 
-## Out of scope (Phase 1)
-- Opening trim bars, U-bars (Phase 2)
-- Corners, T-junctions, transverse ties (Phase 3)
+## Out of scope
 - Stacked / curtain / in-place walls, sloped walls, linked models
 - Fabric sheets (precast-only)
 
