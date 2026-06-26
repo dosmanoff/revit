@@ -32,17 +32,61 @@ public class EdgeBarBuilder
 
     public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
                      IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
-                     ISet<long> mergeOpeningIds, string tag)
+                     ISet<long> mergeOpeningIds, ElevationProfile? profile, string tag)
     {
         int n = 0;
-        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Top,    isTop: true,  openings, mergeOpeningIds, tag);
-        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Bottom, isTop: false, openings, mergeOpeningIds, tag);
-        n += BuildEnds(axes, cfg, lay, cfg.Edges.Ends, junctions, tag);
+        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Top,    isTop: true,  openings, mergeOpeningIds, profile, tag);
+        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Bottom, isTop: false, openings, mergeOpeningIds, profile, tag);
+        // A slanted end needs the U-bars to follow the inclined edge per height row.
+        if (cfg.Edges.Ends.Enabled && profile is not null && !profile.IsAxisAlignedRect())
+            n += BuildEndsClipped(axes, cfg, lay, cfg.Edges.Ends, junctions, profile, tag);
+        else
+            n += BuildEnds(axes, cfg, lay, cfg.Edges.Ends, junctions, tag);
         return n;
     }
 
+    private int BuildEndsClipped(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge,
+                                 IReadOnlyList<WallJunction> junctions, ElevationProfile profile, string tag)
+    {
+        ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
+        if (barTypeId == ElementId.InvalidElementId) return 0;
+        double topCover = cfg.Ft(cfg.Cover.Top), bottomCover = cfg.Ft(cfg.Cover.Bottom), endsCover = cfg.Ft(cfg.Cover.Ends);
+        double legLen = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
+        double extOff = lay.FieldFaceH(true), intOff = lay.FieldFaceH(false);
+        bool leftJoined  = junctions.Any(j => j.OurU < axes.Length * 0.5);
+        bool rightJoined = junctions.Any(j => j.OurU >= axes.Length * 0.5);
+
+        int count = 0;
+        foreach (bool isLeft in new[] { true, false })
+        {
+            if (isLeft ? leftJoined : rightJoined) continue;
+            double sign = isLeft ? +1 : -1;
+            foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, cfg.Ft(edge.Spacing)))
+            {
+                var spans = profile.HorizontalSpansAt(v);
+                if (spans.Count == 0) continue;
+                double spanLo = spans[0].From, spanHi = spans[^1].To;
+                double uEdge = isLeft ? spanLo : spanHi;
+                double backU = uEdge + sign * endsCover;
+                double deepU = Math.Max(spanLo + endsCover, Math.Min(spanHi - endsCover, backU + sign * legLen));
+                if (Math.Abs(deepU - backU) < 0.1) continue;   // no room for a leg here
+
+                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall, axes.HeightDir,
+                    new List<Curve>
+                    {
+                        Line.CreateBound(axes.At(deepU, v, extOff), axes.At(backU, v, extOff)),
+                        Line.CreateBound(axes.At(backU, v, extOff), axes.At(backU, v, intOff)),
+                        Line.CreateBound(axes.At(backU, v, intOff), axes.At(deepU, v, intOff)),
+                    }, tag);
+                count++;
+            }
+        }
+        return count;
+    }
+
     private int BuildTopOrBottom(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge,
-                                 bool isTop, IReadOnlyList<OpeningRect> openings, ISet<long> mergeOpeningIds, string tag)
+                                 bool isTop, IReadOnlyList<OpeningRect> openings, ISet<long> mergeOpeningIds,
+                                 ElevationProfile? profile, string tag)
     {
         if (!edge.Enabled) return 0;
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
@@ -62,12 +106,18 @@ public class EdgeBarBuilder
         double legV = isTop ? crossV - legLen : crossV + legLen;
 
         // The TOP edge is interrupted over a merge opening (a closed stirrup spans that strip).
-        var blocked = isTop
+        var blocked = (isTop
             ? openings.Where(o => mergeOpeningIds.Contains(o.InsertId.Value)).Select(o => new Interval(o.UMin, o.UMax))
-            : Enumerable.Empty<Interval>();
+            : Enumerable.Empty<Interval>()).ToList();
+
+        // On a non-rectangular wall keep the edge run inside the real outline at this height.
+        var baseSpans = profile is not null && !profile.IsAxisAlignedRect()
+            ? profile.HorizontalSpansAt(crossV).Select(s => new Interval(s.From + endsCover, s.To - endsCover))
+            : new[] { new Interval(endsCover, axes.Length - endsCover) }.AsEnumerable();
 
         int count = 0;
-        foreach (Interval run in IntervalMath.Subtract(endsCover, axes.Length - endsCover, blocked))
+        foreach (Interval baseRun in baseSpans)
+        foreach (Interval run in IntervalMath.Subtract(baseRun.From, baseRun.To, blocked))
         {
             var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(run.From, run.To, spacing);
             if (uCount == 0) continue;

@@ -22,7 +22,7 @@ public class TransverseTieBuilder
     public TransverseTieBuilder(Document doc) => _doc = doc;
 
     public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
-                     IReadOnlyList<OpeningRect> openings, string tag)
+                     IReadOnlyList<OpeningRect> openings, ElevationProfile? profile, string tag)
     {
         TiesConfig ties = cfg.Ties;
         if (!ties.Enabled) return 0;
@@ -51,13 +51,21 @@ public class TransverseTieBuilder
         int count = 0;
         // One or more SETS per height row: each row distributed along the wall length, split into the
         // clear runs that avoid openings.
+        bool clip = profile is not null && !profile.IsAxisAlignedRect();
         foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, sy))
         {
             var blocked = openings
                 .Where(o => v >= o.VMin - margin && v <= o.VMax + margin)
-                .Select(o => new Interval(o.UMin - margin, o.UMax + margin));
+                .Select(o => new Interval(o.UMin - margin, o.UMax + margin))
+                .ToList();
 
-            foreach (Interval run in IntervalMath.Subtract(endsCover, axes.Length - endsCover, blocked))
+            // On a non-rectangular wall keep ties inside the real outline at this height.
+            var rowSpans = clip
+                ? profile!.HorizontalSpansAt(v).Select(s => new Interval(s.From + endsCover, s.To - endsCover))
+                : new[] { new Interval(endsCover, axes.Length - endsCover) }.AsEnumerable();
+
+            foreach (Interval rowSpan in rowSpans)
+            foreach (Interval run in IntervalMath.Subtract(rowSpan.From, rowSpan.To, blocked))
             {
                 if (run.Length < sx) continue;   // sliver next to an opening — leave to the trim bars
 

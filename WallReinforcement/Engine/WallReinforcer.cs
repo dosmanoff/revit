@@ -131,12 +131,12 @@ public class WallReinforcer
         created += new OpeningTrimBuilder(_doc).Build(axes, cfg, tag);
         created += new OpeningEdgeBarBuilder(_doc).Build(axes, cfg, lay, mergeIds, tag);
         // Corner / T continuity is the extended end U-bar (пэшка) — see EdgeBarBuilder.BuildEnds.
-        created += new EdgeBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, mergeIds, tag);
+        created += new EdgeBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, mergeIds, profile, tag);
         // The four vertical bars of the L-corner "column" inside the пэшка loop.
         created += new CornerColumnBuilder(_doc).Build(axes, cfg, junctions, tag);
         // One closed stirrup over each short opening-top strip (replaces the merged U-bars + vertical).
         created += new OpeningTopStirrupBuilder(_doc).Build(axes, cfg, lay, mergeIds, tag);
-        created += new TransverseTieBuilder(_doc).Build(axes, cfg, lay, openings, tag);
+        created += new TransverseTieBuilder(_doc).Build(axes, cfg, lay, openings, profile, tag);
         return created;
     }
 
