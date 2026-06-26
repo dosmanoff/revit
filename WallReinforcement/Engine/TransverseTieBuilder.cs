@@ -2,17 +2,18 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using WallReinforcement.Config;
 using WallReinforcement.Domain;
+using WallReinforcement.Geometry;
 
 namespace WallReinforcement.Engine;
 
 /// <summary>
-/// Places transverse ties (stirrups across the wall thickness) at a grid spacing.
+/// Places transverse ties (crossties across the wall thickness) at a grid spacing.
 /// Skipped for walls thinner than <see cref="TiesConfig.MinThickness"/>.
 ///
-/// A tie is a single straight bar in the section plane (perpendicular to the wall length)
-/// running from the exterior-face cover line to the interior-face cover line. For monolithic
-/// walls a simple "open tie" is the common detail and what we emit here; closed loops belong
-/// to Phase 5 if the bend geometry is needed.
+/// A tie is a single straight bar in the section plane (perpendicular to the wall length) running
+/// from the exterior-face cover line to the interior-face cover line, hooked at each end. Each
+/// height row is laid as one or more uniform SETS that SKIP the wall openings (a tie must not pass
+/// through an opening), splitting the row into clear runs around each opening.
 /// </summary>
 public class TransverseTieBuilder
 {
@@ -20,7 +21,8 @@ public class TransverseTieBuilder
 
     public TransverseTieBuilder(Document doc) => _doc = doc;
 
-    public int Build(WallAxes axes, ReinforcementConfig cfg, string tag)
+    public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
+                     IReadOnlyList<OpeningRect> openings, string tag)
     {
         TiesConfig ties = cfg.Ties;
         if (!ties.Enabled) return 0;
@@ -39,27 +41,36 @@ public class TransverseTieBuilder
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
         double topCover    = cfg.Ft(cfg.Cover.Top);
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);
-        double extOffset   =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
-        double intOffset   = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
+        double extOffset   = lay.TieFace(true);   // tie wraps at the cover, outside the H/V layers
+        double intOffset   = lay.TieFace(false);
         double sx          = cfg.Ft(ties.SpacingX);
         double sy          = cfg.Ft(ties.SpacingY);
-
-        var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(endsCover, axes.Length - endsCover, sx);
-        if (uCount == 0) return 0;
+        double margin      = cfg.Ft(ties.OpeningMargin);
+        if (margin <= 1e-9) margin = sx;   // default clearance = one X-spacing
 
         int count = 0;
-        // One rebar SET per height row, each distributed along the wall length — turns an
-        // N×M grid of loose bars into M set elements (orders of magnitude fewer API calls).
+        // One or more SETS per height row: each row distributed along the wall length, split into the
+        // clear runs that avoid openings.
         foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, sy))
         {
-            XYZ pExt = axes.At(uFirst, v, extOffset);
-            XYZ pInt = axes.At(uFirst, v, intOffset);
+            var blocked = openings
+                .Where(o => v >= o.VMin - margin && v <= o.VMax + margin)
+                .Select(o => new Interval(o.UMin - margin, o.UMax + margin));
 
-            // A transverse crosstie across the thickness, hooked at each end (see above).
-            RebarFactory.CreateSet(_doc, tieStyle, barTypeId, axes.Wall,
-                                   axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) },
-                                   uCount, uSpacing, tag, hookId, hookId);
-            count += uCount;
+            foreach (Interval run in IntervalMath.Subtract(endsCover, axes.Length - endsCover, blocked))
+            {
+                if (run.Length < sx) continue;   // sliver next to an opening — leave to the trim bars
+
+                var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(run.From, run.To, sx);
+                if (uCount == 0) continue;
+
+                XYZ pExt = axes.At(uFirst, v, extOffset);
+                XYZ pInt = axes.At(uFirst, v, intOffset);
+                RebarFactory.CreateSet(_doc, tieStyle, barTypeId, axes.Wall,
+                                       axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) },
+                                       uCount, uSpacing, tag, hookId, hookId);
+                count += uCount;
+            }
         }
 
         return count;

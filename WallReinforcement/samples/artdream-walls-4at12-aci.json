@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "name": "artdream-walls-4at12-aci",
+  "units": "Imperial",
+  "_comment": "Cast-in-place walls for Empty_project_ArtDreamTJ4X9 (WRTEST set). #4@12 each-face each-way, #4 crossties @24x24, 1-1/2in cover to tie face. ACI 318-19 anchorage with f'c=5000psi (CONCR_5), Grade-60. Lengths in inches; feet-inches strings also accepted. NOTE: the face-mesh vertical-bar 1.3*ld TOP PROJECTION requested cannot be expressed here — see chat. Corner/T laps DO use Class B = 1.3*ld in ACI mode.",
+  "cover": {
+    "exterior": 1.5,
+    "interior": 1.5,
+    "top":      1.5,
+    "bottom":   1.5,
+    "ends":     1.5
+  },
+  "faceMesh": {
+    "exterior": {
+      "vertical":   { "barType": "#4", "spacing": 12 },
+      "horizontal": { "barType": "#4", "spacing": 12 }
+    },
+    "interior": {
+      "vertical":   { "barType": "#4", "spacing": 12 },
+      "horizontal": { "barType": "#4", "spacing": 12 }
+    }
+  },
+  "openings": {
+    "enabled":   true,
+    "barType":   "#4",
+    "extension": 24,
+    "minWidth":  12,
+    "diagonals": { "enabled": false, "barType": "#4", "length": "2'-0\"", "angleDeg": 45 }
+  },
+  "edges": {
+    "top":    { "enabled": false, "barType": "#4", "legLength": 12, "spacing": 12 },
+    "bottom": { "enabled": false, "barType": "#4", "legLength": 12, "spacing": 12 },
+    "ends":   { "enabled": true,  "barType": "#4", "legLength": 12, "spacing": 12 }
+  },
+  "ties": {
+    "enabled":      true,
+    "barType":      "#4",
+    "spacingX":     24,
+    "spacingY":     24,
+    "minThickness": 10
+  },
+  "_corners_note": "Corner/T continuity is now the extended end U-bar (пэшка) from the edges.ends builder; the old L-bar corner/tJunction builders were removed.",
+  "corners":    { "enabled": false, "barType": "#4", "lapLength": "2'-0\"", "spacing": 12 },
+  "tJunctions": { "enabled": false, "barType": "#4", "lapLength": "2'-0\"", "spacing": 12 },
+  "anchorage": {
+    "mode":            "Aci",
+    "fcPsi":           5000,
+    "fyPsi":           60000,
+    "epoxy":           false,
+    "lightweight":     false,
+    "adequateSpacing": true
+  },
+  "_projections_help": "Out-of-wall dowels of the main field bars. top/bottom continue the verticals; ends continue the horizontals (skipped where a corner/T continues the wall). length/bendLength 0 = ACI ld. bendDir: Interior|Exterior|Alternate. All disabled here.",
+  "projections": {
+    "top":    { "enabled": false, "length": 0, "bend90": false, "bendLength": 0, "bendDir": "Interior" },
+    "bottom": { "enabled": false, "length": 0, "bend90": true,  "bendLength": 0, "bendDir": "Interior" },
+    "ends":   { "enabled": false, "length": 0, "bend90": false, "bendLength": 0, "bendDir": "Interior" }
+  }
+}

@@ -119,14 +119,19 @@ public class WallReinforcer
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, wall.Id);
         WallAxes axes = WallAxes.For(wall);
         IReadOnlyList<WallJunction> junctions = WallJunctions.Detect(axes);
+        IReadOnlyList<OpeningRect> openings = WallGeometry.GetOpenings(axes);
+        WallLayering lay = WallLayering.For(_doc, axes, cfg);
 
         int created = 0;
-        created += new FaceMeshBuilder(_doc).Build(wall, cfg, tag);
+        // Field bars skip the L-corner column zone and split around openings.
+        created += new FaceBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, tag);
         created += new OpeningTrimBuilder(_doc).Build(axes, cfg, tag);
-        created += new EdgeBarBuilder(_doc).Build(axes, cfg, tag);
-        created += new TransverseTieBuilder(_doc).Build(axes, cfg, tag);
-        created += new CornerBarBuilder(_doc).Build(axes, cfg, junctions, tag);
-        created += new TJunctionBarBuilder(_doc).Build(axes, cfg, junctions, tag);
+        created += new OpeningEdgeBarBuilder(_doc).Build(axes, cfg, lay, tag);
+        // Corner / T continuity is the extended end U-bar (пэшка) — see EdgeBarBuilder.BuildEnds.
+        created += new EdgeBarBuilder(_doc).Build(axes, cfg, lay, junctions, tag);
+        // The four vertical bars of the L-corner "column" inside the пэшка loop.
+        created += new CornerColumnBuilder(_doc).Build(axes, cfg, junctions, tag);
+        created += new TransverseTieBuilder(_doc).Build(axes, cfg, lay, openings, tag);
         return created;
     }
 }

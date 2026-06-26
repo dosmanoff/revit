@@ -55,6 +55,9 @@ public class ReinforcementConfig
     [JsonPropertyName("anchorage")]
     public AnchorageConfig Anchorage { get; set; } = new();
 
+    [JsonPropertyName("projections")]
+    public ProjectionsConfig Projections { get; set; } = new();
+
     /// <summary>Convert a config length to Revit internal feet using this config's <see cref="Units"/>.</summary>
     public double Ft(Length len) => len.ToFeet(Units);
 
@@ -184,6 +187,10 @@ public class TiesConfig
     [JsonPropertyName("spacingX")]     public Length SpacingX     { get; set; } = new(400);
     [JsonPropertyName("spacingY")]     public Length SpacingY     { get; set; } = new(400);
     [JsonPropertyName("minThickness")] public Length MinThickness { get; set; } = new(250);
+
+    /// <summary>How far (each side) a tie must clear an opening's edge — keeps ties off the opening
+    /// and its trim bars. Defaults to one X-spacing if left at 0.</summary>
+    [JsonPropertyName("openingMargin")] public Length OpeningMargin { get; set; } = new(0);
 }
 
 public class CornersConfig
@@ -200,4 +207,45 @@ public class TJunctionsConfig
     [JsonPropertyName("barType")]   public string BarType   { get; set; } = "Ø12";
     [JsonPropertyName("lapLength")] public Length LapLength { get; set; } = new(400);
     [JsonPropertyName("spacing")]   public Length Spacing   { get; set; } = new(200);
+}
+
+/// <summary>Which way a 90° projection bend turns, relative to the wall thickness.</summary>
+public enum BendDir
+{
+    /// <summary>Bend toward the wall's interior face (default — e.g. lapping into a one-sided slab).</summary>
+    Interior,
+    /// <summary>Bend toward the wall's exterior face.</summary>
+    Exterior,
+    /// <summary>Adjacent bars bend opposite ways (balanced foundation/footing detail).</summary>
+    Alternate,
+}
+
+/// <summary>
+/// Out-of-wall projections (dowels) of the main field bars past a wall edge, optionally finishing
+/// in a 90° bend (e.g. to lap into a floor slab). Verticals project at top/bottom; horizontals
+/// project at the ends. Disabled by default.
+/// </summary>
+public class ProjectionsConfig
+{
+    [JsonPropertyName("top")]    public EdgeProjectionConfig Top    { get; set; } = new();
+    [JsonPropertyName("bottom")] public EdgeProjectionConfig Bottom { get; set; } = new();
+    [JsonPropertyName("ends")]   public EdgeProjectionConfig Ends   { get; set; } = new();
+}
+
+public class EdgeProjectionConfig
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; set; } = false;
+
+    /// <summary>Straight projection length past the wall face. 0 ⇒ ACI tension development length ℓd.</summary>
+    [JsonPropertyName("length")] public Length Length { get; set; } = new(0);
+
+    /// <summary>Add a 90° bent leg at the free end of the projection.</summary>
+    [JsonPropertyName("bend90")] public bool Bend90 { get; set; } = false;
+
+    /// <summary>Length of the 90° bent leg. 0 ⇒ ACI tension development length ℓd.</summary>
+    [JsonPropertyName("bendLength")] public Length BendLength { get; set; } = new(0);
+
+    [JsonPropertyName("bendDir")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public BendDir BendDir { get; set; } = BendDir.Interior;
 }

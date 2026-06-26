@@ -6,8 +6,8 @@ using WallReinforcement.Domain;
 namespace WallReinforcement.Engine;
 
 /// <summary>
-/// Places U-shaped bars along the top, bottom, and ends of a wall to tie the two face meshes
-/// together at the perimeter (standard practice for monolithic walls).
+/// Places U-shaped bars ("пэшки") along the top, bottom, and ends of a wall to tie the two face
+/// mats together at the perimeter (standard practice for monolithic walls).
 ///
 /// Cross-section of the U at a TOP edge (wall length axis goes into the page):
 ///
@@ -18,8 +18,10 @@ namespace WallReinforcement.Engine;
 ///         │  │  leg                 │  │  leg
 ///         │  ▼ (legLength)          │  ▼ (legLength)
 ///
-/// Bars are spaced along the edge by <see cref="EdgeConfig.Spacing"/>, leaving the
-/// end-cover at each end of the edge.
+/// At an END that meets another wall (L-corner or T-junction), the end U-bar is the continuity
+/// detail: its middle (back) segment is pushed past the joint to the adjoining wall's far-cover
+/// line, so the two walls' U-bars interlock and the main bars develop into the joint. Free ends keep
+/// the back at end-cover. Bars are spaced along the edge by <see cref="EdgeConfig.Spacing"/>.
 /// </summary>
 public class EdgeBarBuilder
 {
@@ -27,16 +29,17 @@ public class EdgeBarBuilder
 
     public EdgeBarBuilder(Document doc) => _doc = doc;
 
-    public int Build(WallAxes axes, ReinforcementConfig cfg, string tag)
+    public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
+                     IReadOnlyList<WallJunction> junctions, string tag)
     {
         int n = 0;
-        n += BuildTopOrBottom(axes, cfg, cfg.Edges.Top,    isTop: true,  tag);
-        n += BuildTopOrBottom(axes, cfg, cfg.Edges.Bottom, isTop: false, tag);
-        n += BuildEnds(axes, cfg, cfg.Edges.Ends, tag);
+        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Top,    isTop: true,  tag);
+        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Bottom, isTop: false, tag);
+        n += BuildEnds(axes, cfg, lay, cfg.Edges.Ends, junctions, tag);
         return n;
     }
 
-    private int BuildTopOrBottom(WallAxes axes, ReinforcementConfig cfg, EdgeConfig edge, bool isTop, string tag)
+    private int BuildTopOrBottom(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge, bool isTop, string tag)
     {
         if (!edge.Enabled) return 0;
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
@@ -47,8 +50,8 @@ public class EdgeBarBuilder
         // The U-bar leg anchors the bar into the wall: ACI mode sizes it as the tension
         // development length ℓd for the bar; otherwise the configured leg length.
         double legLen    = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
-        double extOffset =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
-        double intOffset = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
+        double extOffset = lay.FieldFaceH(true);
+        double intOffset = lay.FieldFaceH(false);
 
         double crossV = isTop
             ? axes.Height - cfg.Ft(cfg.Cover.Top)
@@ -67,7 +70,8 @@ public class EdgeBarBuilder
         return uCount;
     }
 
-    private int BuildEnds(WallAxes axes, ReinforcementConfig cfg, EdgeConfig edge, string tag)
+    private int BuildEnds(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge,
+                          IReadOnlyList<WallJunction> junctions, string tag)
     {
         if (!edge.Enabled) return 0;
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
@@ -76,24 +80,34 @@ public class EdgeBarBuilder
         double topCover    = cfg.Ft(cfg.Cover.Top);
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
+        double adjCover    = cfg.Ft(cfg.Cover.Exterior);   // cover at the adjoining wall's far face
         double spacing     = cfg.Ft(edge.Spacing);
         double legLen      = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
-        double extOffset   =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
-        double intOffset   = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
+        double extOffset   = lay.FieldFaceH(true);
+        double intOffset   = lay.FieldFaceH(false);
+        // The back lands a full bar diameter inside the adjoining wall's far-cover line so the bar
+        // SURFACE (not centerline) keeps cover — without this the bar sits in the cover zone.
+        double barRadius   = _doc.GetElement(barTypeId) is RebarBarType bt ? bt.BarNominalDiameter / 2 : 0;
 
         var (vCount, vSpacing, vFirst) = RebarFactory.UniformLayout(bottomCover, axes.Height - topCover, spacing);
         if (vCount == 0) return 0;
 
         int count = 0;
-        // One U-bar SET per end, distributed up the wall height.
-        foreach (var (uEdge, legSign) in new[] { (endsCover, +1.0), (axes.Length - endsCover, -1.0) })
+        // One U-bar SET per physical end (u=0 and u=Length), distributed up the wall height.
+        foreach (var (endU, outwardSign) in new[] { (0.0, -1.0), (axes.Length, +1.0) })
         {
-            double uLeg = uEdge + legSign * legLen;
+            // If this end meets another wall, drive the U-bar's back past the joint to the adjoining
+            // wall's far-cover line (kept inside by the bar radius); otherwise keep it at end-cover.
+            WallJunction? j = junctions.FirstOrDefault(x => Math.Abs(x.OurU - endU) < 1e-3);
+            double backU = j is not null
+                ? endU + outwardSign * (WallAxes.For(j.OtherWall).HalfThickness - adjCover - barRadius)
+                : endU - outwardSign * endsCover;
+            double deepU = backU - outwardSign * legLen;   // legs run inward from the back
 
-            XYZ p1 = axes.At(uLeg,  vFirst, extOffset);
-            XYZ p2 = axes.At(uEdge, vFirst, extOffset);
-            XYZ p3 = axes.At(uEdge, vFirst, intOffset);
-            XYZ p4 = axes.At(uLeg,  vFirst, intOffset);
+            XYZ p1 = axes.At(deepU, vFirst, extOffset);
+            XYZ p2 = axes.At(backU, vFirst, extOffset);
+            XYZ p3 = axes.At(backU, vFirst, intOffset);
+            XYZ p4 = axes.At(deepU, vFirst, intOffset);
 
             PlaceUSet(axes, barTypeId, tag, axes.HeightDir, vCount, vSpacing, p1, p2, p3, p4);
             count += vCount;
