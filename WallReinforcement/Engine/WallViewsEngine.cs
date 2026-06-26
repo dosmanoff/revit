@@ -203,6 +203,15 @@ public sealed class WallViewsEngine
         List<Element> areas = new FilteredElementCollector(_doc, view.Id)
             .OfCategory(BuiltInCategory.OST_AreaRein).WhereElementIsNotElementType().ToList();
 
+        // The AreaReinforcement face mesh's child bars (RebarInSystem) are OST_Rebar but carry NO
+        // Comments tag — only the parent AR does. Collect this wall's mesh-bar ids by ownership so
+        // the isolate below KEEPS them; otherwise the whole face mesh gets hidden as "untagged".
+        var keepMeshBarIds = new HashSet<ElementId>();
+        foreach (Element e in areas)
+            if (HasWallTag(e, marker) && e is AreaReinforcement ka)
+                foreach (ElementId rid in ka.GetRebarInSystemIds())
+                    keepMeshBarIds.Add(rid);
+
         // This wall's bars: unobscured (else bars behind concrete don't draw), middle-bar presentation.
         foreach (Element e in rebar)
             if (HasWallTag(e, marker) && e is Rebar bar)
@@ -220,7 +229,7 @@ public sealed class WallViewsEngine
 
         if (_cfg.Isolation == RebarIsolation.Show) return;
 
-        List<Element> others = rebar.Where(e => !HasWallTag(e, marker))
+        List<Element> others = rebar.Where(e => !HasWallTag(e, marker) && !keepMeshBarIds.Contains(e.Id))
             .Concat(areas.Where(e => !HasWallTag(e, marker))).ToList();
         if (others.Count == 0) return;
 

@@ -37,5 +37,18 @@ public class App : IExternalApplication
             "Re-running the same config on a wall replaces the prior result.";
 
         panel.AddItem(buttonData);
+
+        var viewsButtonData = new PushButtonData(
+            name: "WallViews",
+            text: "Wall\nViews",
+            assemblyName: assemblyPath,
+            className: typeof(WallViewsCommand).FullName!);
+
+        viewsButtonData.ToolTip = "Create reinforcement views, schedules and sheets for selected walls.";
+        viewsButtonData.LongDescription =
+            "For each selected wall: exterior/interior face elevations, a horizontal section, an " +
+            "optional 3D cage, a rebar schedule and a sheet — each isolated to that wall's rebar.";
+
+        panel.AddItem(viewsButtonData);
     }
 }
