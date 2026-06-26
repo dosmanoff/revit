@@ -31,12 +31,14 @@ public class TransverseTieBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, ties.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
-        // A crosstie ("шпилька") is a StirrupTie-style bar with a 135° tie hook at each end engaging
-        // both face mats. The hook type MUST match the bar style — a Standard bar + a Stirrup/Tie
-        // hook throws an internal error. If the model has no tie hook, fall back to a straight
-        // Standard bar (no hook).
-        ElementId hookId = RebarFactory.LookupHookType(_doc, "Stirrup/Tie - 135", "Stirrup/Tie - 90", "Stirrup/Tie");
-        RebarStyle tieStyle = hookId != ElementId.InvalidElementId ? RebarStyle.StirrupTie : RebarStyle.Standard;
+        // A crosstie ("шпилька") is a StirrupTie-style bar with a 135° seismic hook one end and a 90°
+        // hook the other — the standard ACI crosstie, which also matches a standard rebar shape (T9)
+        // instead of spawning a new one. The hook type MUST match the bar style. If the model has no
+        // tie hooks, fall back to a straight Standard bar (no hook).
+        ElementId hook135 = RebarFactory.LookupHookType(_doc, "Stirrup/Tie - 135", "Stirrup/Tie");
+        ElementId hook90  = RebarFactory.LookupHookType(_doc, "Stirrup/Tie - 90");
+        if (hook90 == ElementId.InvalidElementId) hook90 = hook135;   // fall back to 135/135
+        RebarStyle tieStyle = hook135 != ElementId.InvalidElementId ? RebarStyle.StirrupTie : RebarStyle.Standard;
 
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
         double topCover    = cfg.Ft(cfg.Cover.Top);
@@ -76,7 +78,7 @@ public class TransverseTieBuilder
                 XYZ pInt = axes.At(uFirst, v, intOffset);
                 RebarFactory.CreateSet(_doc, tieStyle, barTypeId, axes.Wall,
                                        axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) },
-                                       uCount, uSpacing, tag, hookId, hookId);
+                                       uCount, uSpacing, tag, hook135, hook90);
                 count += uCount;
             }
         }
