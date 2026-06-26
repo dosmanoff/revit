@@ -122,10 +122,12 @@ public class WallReinforcer
         IReadOnlyList<OpeningRect> openings = WallGeometry.GetOpenings(axes);
         WallLayering lay = WallLayering.For(_doc, axes, cfg);
         ISet<long> mergeIds = ComputeMergeOpenings(axes, cfg, openings);
+        WallReinforcement.Geometry.ElevationProfile? profile = WallProfile.For(axes, _doc);
 
         int created = 0;
-        // Field bars skip the L-corner column zone and split around openings.
-        created += new FaceBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, mergeIds, tag);
+        // Field bars skip the L-corner column zone, split around openings, and clip to a non-
+        // rectangular outline (slanted end/top).
+        created += new FaceBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, mergeIds, profile, tag);
         created += new OpeningTrimBuilder(_doc).Build(axes, cfg, tag);
         created += new OpeningEdgeBarBuilder(_doc).Build(axes, cfg, lay, mergeIds, tag);
         // Corner / T continuity is the extended end U-bar (пэшка) — see EdgeBarBuilder.BuildEnds.

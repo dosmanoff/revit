@@ -25,25 +25,100 @@ public class FaceBarBuilder
 {
     private readonly Document _doc;
 
+    /// <summary>Clipped field bars shorter than this (feet) are dropped — a sliver at a slope tip is
+    /// useless and Revit rejects a too-short bar.</summary>
+    private const double MinClippedBarFt = 0.5;
+
     public FaceBarBuilder(Document doc) => _doc = doc;
 
     public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
                      IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
-                     ISet<long> mergeOpeningIds, string tag)
+                     ISet<long> mergeOpeningIds, ElevationProfile? profile, string tag)
     {
         int n = 0;
-        if (cfg.FaceMesh.Exterior is { } ext)  n += BuildFace(axes, cfg, lay, junctions, openings, mergeOpeningIds, ext,  exterior: true,  tag);
-        if (cfg.FaceMesh.Interior is { } intr) n += BuildFace(axes, cfg, lay, junctions, openings, mergeOpeningIds, intr, exterior: false, tag);
+        if (cfg.FaceMesh.Exterior is { } ext)  n += BuildFace(axes, cfg, lay, junctions, openings, mergeOpeningIds, profile, ext,  exterior: true,  tag);
+        if (cfg.FaceMesh.Interior is { } intr) n += BuildFace(axes, cfg, lay, junctions, openings, mergeOpeningIds, profile, intr, exterior: false, tag);
         return n;
     }
 
     private int BuildFace(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
                           IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
-                          ISet<long> mergeOpeningIds, FaceConfig face, bool exterior, string tag)
+                          ISet<long> mergeOpeningIds, ElevationProfile? profile, FaceConfig face, bool exterior, string tag)
     {
+        // A non-rectangular outline (slanted end/top) needs per-bar clipping to the profile; a
+        // plumb rectangular wall keeps the efficient uniform-set path.
+        bool clipped = profile is not null && !profile.IsAxisAlignedRect();
         int n = 0;
-        n += BuildVerticals(axes, cfg, lay, junctions, openings, mergeOpeningIds, face, exterior, tag);
-        n += BuildHorizontals(axes, cfg, lay, junctions, openings, face, exterior, tag);
+        if (clipped)
+        {
+            n += BuildVerticalsClipped(axes, cfg, lay, openings, mergeOpeningIds, profile!, face, exterior, tag);
+            n += BuildHorizontalsClipped(axes, cfg, lay, openings, profile!, face, exterior, tag);
+        }
+        else
+        {
+            n += BuildVerticals(axes, cfg, lay, junctions, openings, mergeOpeningIds, face, exterior, tag);
+            n += BuildHorizontals(axes, cfg, lay, junctions, openings, face, exterior, tag);
+        }
+        return n;
+    }
+
+    // ── Profile-clipped field bars (non-rectangular walls): one bar per position, trimmed to the
+    //    real outline (inset by cover) and split around openings. No edge projections in this path.
+
+    private int BuildVerticalsClipped(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
+                                      IReadOnlyList<OpeningRect> openings, ISet<long> mergeOpeningIds,
+                                      ElevationProfile profile, FaceConfig face, bool exterior, string tag)
+    {
+        ElementId barTypeId = RebarFactory.LookupBarType(_doc, face.Vertical.BarType);
+        if (barTypeId == ElementId.InvalidElementId) return 0;
+        double endsCover = cfg.Ft(cfg.Cover.Ends), topCover = cfg.Ft(cfg.Cover.Top), bottomCover = cfg.Ft(cfg.Cover.Bottom);
+        double offV = lay.FieldFaceV(exterior), margin = endsCover;
+        int n = 0;
+        foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, cfg.Ft(face.Vertical.Spacing)))
+        foreach (Interval span in profile.VerticalSpansAt(u))
+        {
+            double vb = span.From + bottomCover, vt = span.To - topCover;
+            if (vt - vb <= 1e-3) continue;
+            // Over a merge opening nothing goes above it (the closed stirrup covers the strip), so
+            // block right up to the top; otherwise just block the opening band.
+            var blocks = openings.Where(o => u >= o.UMin && u <= o.UMax).Select(o =>
+                mergeOpeningIds.Contains(o.InsertId.Value)
+                    ? new Interval(o.VMin - margin, vt + 1)
+                    : new Interval(o.VMin - margin, o.VMax + margin));
+            foreach (Interval clear in IntervalMath.Subtract(vb, vt, blocks))
+            {
+                if (clear.Length < MinClippedBarFt) continue;   // skip slivers at a slope tip
+                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall, axes.LengthDir,
+                    new List<Curve> { Line.CreateBound(axes.At(u, clear.From, offV), axes.At(u, clear.To, offV)) }, tag);
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private int BuildHorizontalsClipped(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
+                                        IReadOnlyList<OpeningRect> openings, ElevationProfile profile,
+                                        FaceConfig face, bool exterior, string tag)
+    {
+        ElementId barTypeId = RebarFactory.LookupBarType(_doc, face.Horizontal.BarType);
+        if (barTypeId == ElementId.InvalidElementId) return 0;
+        double endsCover = cfg.Ft(cfg.Cover.Ends), topCover = cfg.Ft(cfg.Cover.Top), bottomCover = cfg.Ft(cfg.Cover.Bottom);
+        double offH = lay.FieldFaceH(exterior), margin = endsCover;
+        int n = 0;
+        foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, cfg.Ft(face.Horizontal.Spacing)))
+        foreach (Interval span in profile.HorizontalSpansAt(v))
+        {
+            double ua = span.From + endsCover, ub = span.To - endsCover;
+            if (ub - ua <= 1e-3) continue;
+            var blocks = openings.Where(o => v >= o.VMin && v <= o.VMax).Select(o => new Interval(o.UMin - margin, o.UMax + margin));
+            foreach (Interval clear in IntervalMath.Subtract(ua, ub, blocks))
+            {
+                if (clear.Length < MinClippedBarFt) continue;   // skip slivers at a slope tip
+                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall, axes.HeightDir,
+                    new List<Curve> { Line.CreateBound(axes.At(clear.From, v, offH), axes.At(clear.To, v, offH)) }, tag);
+                n++;
+            }
+        }
         return n;
     }
 
