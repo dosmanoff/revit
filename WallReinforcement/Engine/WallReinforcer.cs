@@ -117,6 +117,7 @@ public class WallReinforcer
     public int ReinforceOne(Wall wall, ReinforcementConfig cfg)
     {
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, wall.Id);
+        RebarFactory.ReuseStandardShapes = cfg.ReuseStandardShapes;
         WallAxes axes = WallAxes.For(wall);
         IReadOnlyList<WallJunction> junctions = WallJunctions.Detect(axes);
         IReadOnlyList<OpeningRect> openings = WallGeometry.GetOpenings(axes);

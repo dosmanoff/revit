@@ -41,15 +41,16 @@ public class OpeningTopStirrupBuilder
             var (n, step, first) = RebarFactory.UniformLayout(o.UMin, o.UMax, spacing);
             if (n == 0) continue;
 
-            // Closed rectangular loop at each u: opening-top → wall-top, across the thickness.
+            // Three sides of the rectangle (opening-top → wall-top, across the thickness); the 135°
+            // tie hooks close the fourth side INWARD. An OPEN polyline maps to a standard stirrup
+            // shape (S1) — a fully-closed loop would spawn a new auto-shape with the hooks flipped out.
             XYZ p1 = axes.At(first, o.VMax, extOff);
             XYZ p2 = axes.At(first, topV,   extOff);
             XYZ p3 = axes.At(first, topV,   intOff);
             XYZ p4 = axes.At(first, o.VMax, intOff);
             var curves = new List<Curve>
             {
-                Line.CreateBound(p1, p2), Line.CreateBound(p2, p3),
-                Line.CreateBound(p3, p4), Line.CreateBound(p4, p1),
+                Line.CreateBound(p1, p2), Line.CreateBound(p2, p3), Line.CreateBound(p3, p4),
             };
             RebarFactory.CreateSet(_doc, style, barTypeId, axes.Wall, axes.LengthDir,
                                    curves, n, step, tag, hookId, hookId);

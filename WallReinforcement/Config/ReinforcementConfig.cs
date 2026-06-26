@@ -58,6 +58,11 @@ public class ReinforcementConfig
     [JsonPropertyName("projections")]
     public ProjectionsConfig Projections { get; set; } = new();
 
+    /// <summary>Prefer matching bent bars to the project's existing (standard) rebar shapes, only
+    /// creating a new shape for unique geometry. Default true.</summary>
+    [JsonPropertyName("reuseStandardShapes")]
+    public bool ReuseStandardShapes { get; set; } = true;
+
     /// <summary>Convert a config length to Revit internal feet using this config's <see cref="Units"/>.</summary>
     public double Ft(Length len) => len.ToFeet(Units);
 
