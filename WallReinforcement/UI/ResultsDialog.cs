@@ -6,7 +6,7 @@ namespace WallReinforcement.UI;
 
 public static class ResultsDialog
 {
-    public static void Show(RunResult result)
+    public static void Show(RunResult result, IReadOnlyList<string>? skipped = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine(result.DryRun
@@ -30,6 +30,14 @@ public static class ResultsDialog
             sb.AppendLine("Issues (first 10):");
             foreach (var p in problems)
                 sb.AppendLine($"  · Wall {p.WallId.Value}: {p.Reason}");
+        }
+
+        if (skipped is { Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("Unmatched (brief):");
+            foreach (string s in skipped.Take(10))
+                sb.AppendLine($"  · {s}");
         }
 
         var td = new TaskDialog("Wall Reinforcement")

@@ -44,7 +44,9 @@ public class EdgeBarBuilder
 
         double endsCover = cfg.Ft(cfg.Cover.Ends);
         double spacing   = cfg.Ft(edge.Spacing);
-        double legLen    = cfg.Ft(edge.LegLength);
+        // The U-bar leg anchors the bar into the wall: ACI mode sizes it as the tension
+        // development length ℓd for the bar; otherwise the configured leg length.
+        double legLen    = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
         double extOffset =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
         double intOffset = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
@@ -53,18 +55,16 @@ public class EdgeBarBuilder
             : cfg.Ft(cfg.Cover.Bottom);
         double legV = isTop ? crossV - legLen : crossV + legLen;
 
-        int count = 0;
-        foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, spacing))
-        {
-            XYZ p1 = axes.At(u, legV,   extOffset);
-            XYZ p2 = axes.At(u, crossV, extOffset);
-            XYZ p3 = axes.At(u, crossV, intOffset);
-            XYZ p4 = axes.At(u, legV,   intOffset);
+        var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(endsCover, axes.Length - endsCover, spacing);
+        if (uCount == 0) return 0;
 
-            count += PlaceU(axes, barTypeId, tag, normal: axes.LengthDir, p1, p2, p3, p4);
-        }
-
-        return count;
+        // One U-bar SET distributed along the wall length.
+        XYZ p1 = axes.At(uFirst, legV,   extOffset);
+        XYZ p2 = axes.At(uFirst, crossV, extOffset);
+        XYZ p3 = axes.At(uFirst, crossV, intOffset);
+        XYZ p4 = axes.At(uFirst, legV,   intOffset);
+        PlaceUSet(axes, barTypeId, tag, axes.LengthDir, uCount, uSpacing, p1, p2, p3, p4);
+        return uCount;
     }
 
     private int BuildEnds(WallAxes axes, ReinforcementConfig cfg, EdgeConfig edge, string tag)
@@ -77,31 +77,33 @@ public class EdgeBarBuilder
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
         double spacing     = cfg.Ft(edge.Spacing);
-        double legLen      = cfg.Ft(edge.LegLength);
+        double legLen      = cfg.DevLengthFeet(edge.BarType, cfg.Ft(edge.LegLength));
         double extOffset   =  axes.HalfThickness - cfg.Ft(cfg.Cover.Exterior);
         double intOffset   = -axes.HalfThickness + cfg.Ft(cfg.Cover.Interior);
 
+        var (vCount, vSpacing, vFirst) = RebarFactory.UniformLayout(bottomCover, axes.Height - topCover, spacing);
+        if (vCount == 0) return 0;
+
         int count = 0;
+        // One U-bar SET per end, distributed up the wall height.
         foreach (var (uEdge, legSign) in new[] { (endsCover, +1.0), (axes.Length - endsCover, -1.0) })
         {
             double uLeg = uEdge + legSign * legLen;
 
-            foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, spacing))
-            {
-                XYZ p1 = axes.At(uLeg,  v, extOffset);
-                XYZ p2 = axes.At(uEdge, v, extOffset);
-                XYZ p3 = axes.At(uEdge, v, intOffset);
-                XYZ p4 = axes.At(uLeg,  v, intOffset);
+            XYZ p1 = axes.At(uLeg,  vFirst, extOffset);
+            XYZ p2 = axes.At(uEdge, vFirst, extOffset);
+            XYZ p3 = axes.At(uEdge, vFirst, intOffset);
+            XYZ p4 = axes.At(uLeg,  vFirst, intOffset);
 
-                count += PlaceU(axes, barTypeId, tag, normal: axes.HeightDir, p1, p2, p3, p4);
-            }
+            PlaceUSet(axes, barTypeId, tag, axes.HeightDir, vCount, vSpacing, p1, p2, p3, p4);
+            count += vCount;
         }
 
         return count;
     }
 
-    private int PlaceU(WallAxes axes, ElementId barTypeId, string tag, XYZ normal,
-                       XYZ p1, XYZ p2, XYZ p3, XYZ p4)
+    private void PlaceUSet(WallAxes axes, ElementId barTypeId, string tag, XYZ distributionDir,
+                           int count, double spacing, XYZ p1, XYZ p2, XYZ p3, XYZ p4)
     {
         var curves = new List<Curve>
         {
@@ -109,7 +111,7 @@ public class EdgeBarBuilder
             Line.CreateBound(p2, p3),
             Line.CreateBound(p3, p4),
         };
-        RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall, normal, curves, tag);
-        return 1;
+        RebarFactory.CreateSet(_doc, RebarStyle.Standard, barTypeId, axes.Wall, distributionDir,
+                               curves, count, spacing, tag);
     }
 }

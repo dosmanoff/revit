@@ -50,7 +50,10 @@ public class WallAxes
     {
         ElementId baseLevelId = wall.LevelId;
         if (baseLevelId == ElementId.InvalidElementId) return 0;
-        return wall.Document.GetElement(baseLevelId) is Level level ? level.Elevation : 0;
+        // ProjectElevation (internal), NOT Elevation: the latter is relative to the project base
+        // point, so in a model with a base-point Z offset it places every bar that height off the
+        // wall. ProjectElevation matches the wall's LocationCurve Z.
+        return wall.Document.GetElement(baseLevelId) is Level level ? level.ProjectElevation : 0;
     }
 
     /// <summary>Point at (u along length, v along height), on the wall's centerplane (offset = 0 from normal).</summary>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure (Revit-free) helpers for the rebar builders, kept in their own assembly so the
+    bar-distribution math and the feet-inches parser are unit-testable without a Revit install
+    (mirrors SlabReinforcement.Geometry). The plugin references this project and delegates to it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+</Project>

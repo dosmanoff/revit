@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Autodesk.Revit.DB;
 
 namespace WallReinforcement.Config;
@@ -43,31 +42,11 @@ public readonly struct Length
         return UnitUtils.ConvertToInternalUnits(n, unit);
     }
 
-    private static readonly Regex FeetInchesRx = new(
-        @"^\s*(?:(?<ft>\d+(?:\.\d+)?)\s*['′])?\s*[-\s]*\s*" +
-        @"(?:(?<inWhole>\d+(?:\.\d+)?)?\s*(?:(?<inNum>\d+)\s*/\s*(?<inDen>\d+))?\s*[""″])?\s*$",
-        RegexOptions.Compiled);
-
-    /// <summary>Parses a feet-inches string and returns total inches.</summary>
-    public static double ParseFeetInches(string s)
-    {
-        var m = FeetInchesRx.Match(s);
-        if (!m.Success || (!m.Groups["ft"].Success && !m.Groups["inWhole"].Success && !m.Groups["inNum"].Success))
-            throw new FormatException($"Cannot parse '{s}' as feet-inches (expected forms like \"1'-3\\\"\" or \"3 1/2\\\"\").");
-
-        double ft = m.Groups["ft"].Success ? double.Parse(m.Groups["ft"].Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
-        double inWhole = m.Groups["inWhole"].Success ? double.Parse(m.Groups["inWhole"].Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
-        double inFrac = 0;
-        if (m.Groups["inNum"].Success && m.Groups["inDen"].Success)
-        {
-            double num = double.Parse(m.Groups["inNum"].Value, System.Globalization.CultureInfo.InvariantCulture);
-            double den = double.Parse(m.Groups["inDen"].Value, System.Globalization.CultureInfo.InvariantCulture);
-            if (den == 0) throw new FormatException($"Cannot parse '{s}' — fraction denominator is zero.");
-            inFrac = num / den;
-        }
-
-        return ft * 12.0 + inWhole + inFrac;
-    }
+    /// <summary>
+    /// Parses a feet-inches string and returns total inches. Delegates to the Revit-free
+    /// <see cref="WallReinforcement.Geometry.FeetInches"/> parser, which is unit-tested.
+    /// </summary>
+    public static double ParseFeetInches(string s) => WallReinforcement.Geometry.FeetInches.ParseToInches(s);
 
     public override string ToString() => Text ?? (Number?.ToString("G", System.Globalization.CultureInfo.InvariantCulture) ?? "0");
 }

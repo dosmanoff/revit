@@ -25,6 +25,8 @@ public class WallReinforcementDialog : Window
     private ComboBox _cmbConfig    = null!;
     private ComboBox _cmbUnits     = null!;
     private CheckBox _chkDryRun    = null!;
+    private CheckBox _chkBrief     = null!;
+    private TextBox  _txtBrief     = null!;
     private TextBlock _txtStatus   = null!;
     private TabControl _tabs       = null!;
 
@@ -36,6 +38,10 @@ public class WallReinforcementDialog : Window
     public string? ConfigPath { get; private set; }
     public ReinforcementConfig? Config { get; private set; }
     public bool DryRun => _chkDryRun.IsChecked == true;
+
+    /// <summary>When true, ignore the single config below and drive each wall from <see cref="BriefPath"/>.</summary>
+    public bool UseBrief => _chkBrief.IsChecked == true;
+    public string? BriefPath { get; private set; }
 
     public WallReinforcementDialog(string? initialFolder, int selectedWallCount)
     {
@@ -61,17 +67,19 @@ public class WallReinforcementDialog : Window
     private void BuildUI(int wallCount)
     {
         var root = new WpfGrid { Margin = new Thickness(10) };
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // 0 header
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // 1 folder
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // 2 config picker
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // 3 brief
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 4 tabs
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // 5 status
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // 6 buttons
 
         AddRow(root, 0, BuildHeaderRow(wallCount));
         AddRow(root, 1, BuildFolderRow());
         AddRow(root, 2, BuildConfigPickerRow());
-        AddRow(root, 3, BuildEditorTabs());
+        AddRow(root, 3, BuildBriefRow());
+        AddRow(root, 4, BuildEditorTabs());
 
         _txtStatus = new TextBlock
         {
@@ -80,9 +88,9 @@ public class WallReinforcementDialog : Window
             FontStyle = FontStyles.Italic,
             TextWrapping = TextWrapping.Wrap,
         };
-        AddRow(root, 4, _txtStatus);
+        AddRow(root, 5, _txtStatus);
 
-        AddRow(root, 5, BuildButtonRow());
+        AddRow(root, 6, BuildButtonRow());
 
         Content = root;
     }
@@ -180,6 +188,66 @@ public class WallReinforcementDialog : Window
         };
     }
 
+    private UIElement BuildBriefRow()
+    {
+        _chkBrief = new CheckBox
+        {
+            Content = "Use per-wall JSON brief (overrides the config below; matches each wall by Mark / Id)",
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        _chkBrief.Checked   += (_, _) => OnBriefToggled();
+        _chkBrief.Unchecked += (_, _) => OnBriefToggled();
+
+        _txtBrief = new TextBox { Padding = new Thickness(4, 2, 4, 2), IsEnabled = false };
+        var browse = new Button { Content = "Browse…", Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
+        browse.Click += BrowseBrief_Click;
+
+        var pathDock = new DockPanel { Margin = new Thickness(0, 4, 0, 0) };
+        DockPanel.SetDock(browse, Dock.Right);
+        pathDock.Children.Add(browse);
+        pathDock.Children.Add(_txtBrief);
+
+        // Keep the path controls' enabled-state synced with the checkbox.
+        _chkBrief.Checked   += (_, _) => { _txtBrief.IsEnabled = true;  browse.IsEnabled = true; };
+        _chkBrief.Unchecked += (_, _) => { _txtBrief.IsEnabled = false; browse.IsEnabled = false; };
+
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        stack.Children.Add(_chkBrief);
+        stack.Children.Add(pathDock);
+
+        return new GroupBox
+        {
+            Header = "Agent brief",
+            Content = stack,
+            Padding = new Thickness(8, 4, 8, 6),
+            Margin = new Thickness(0, 0, 0, 4),
+        };
+    }
+
+    private void OnBriefToggled()
+    {
+        bool on = _chkBrief.IsChecked == true;
+        if (_tabs is not null) _tabs.IsEnabled = !on;
+        _txtStatus.Text = on
+            ? "Brief mode: each wall is matched by Mark / Id and reinforced from the brief. The config tabs are ignored."
+            : "";
+    }
+
+    private void BrowseBrief_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Choose wall reinforcement brief (JSON)",
+            Filter = "JSON brief (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = Directory.Exists(_txtFolder.Text) ? _txtFolder.Text : "",
+        };
+        if (dlg.ShowDialog(this) == true)
+        {
+            _txtBrief.Text = dlg.FileName;
+            BriefPath = dlg.FileName;
+        }
+    }
+
     private UIElement BuildEditorTabs()
     {
         _tabs = new TabControl { Margin = new Thickness(0, 4, 0, 4) };
@@ -190,6 +258,7 @@ public class WallReinforcementDialog : Window
         _tabs.Items.Add(MakeSectionTab("Ties",       BuildTiesSection));
         _tabs.Items.Add(MakeSectionTab("Corners",    BuildCornersSection));
         _tabs.Items.Add(MakeSectionTab("T-Junctions",BuildTJunctionsSection));
+        _tabs.Items.Add(MakeSectionTab("Anchorage",  BuildAnchorageSection));
         return _tabs;
     }
 
@@ -340,6 +409,30 @@ public class WallReinforcementDialog : Window
         AddTextRow  (panel, "Bar type",   () => Config!.TJunctions.BarType,   s => Config!.TJunctions.BarType = s);
         AddLengthRow(panel, "Lap length", () => Config!.TJunctions.LapLength, v => Config!.TJunctions.LapLength = v);
         AddLengthRow(panel, "Spacing",    () => Config!.TJunctions.Spacing,   v => Config!.TJunctions.Spacing = v);
+        return panel;
+    }
+
+    private UIElement BuildAnchorageSection()
+    {
+        var panel = NewSectionPanel();
+        AddNote(panel, "ACI 318-19 length governor");
+        panel.Children.Add(new TextBlock
+        {
+            Text = "When ON: edge legs & opening-trim extensions use the development length ℓd, and "
+                 + "corner / T laps use the Class B tension lap ℓst — sized per bar. Needs Imperial "
+                 + "units + ASTM #-bars; otherwise the typed lengths are kept as a fallback.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            Foreground = System.Windows.Media.Brushes.Gray,
+            Margin = new Thickness(0, 0, 0, 6),
+        });
+        AddCheckRow (panel, "Use ACI 318-19",          () => Config!.Anchorage.Mode == AnchorMode.Aci,
+                                                        b  => Config!.Anchorage.Mode = b ? AnchorMode.Aci : AnchorMode.Explicit);
+        AddDoubleRow(panel, "f'c (psi)",               () => Config!.Anchorage.FcPsi,           v => Config!.Anchorage.FcPsi = v);
+        AddDoubleRow(panel, "fy (psi)",                () => Config!.Anchorage.FyPsi,           v => Config!.Anchorage.FyPsi = v);
+        AddCheckRow (panel, "Epoxy-coated",            () => Config!.Anchorage.Epoxy,           b => Config!.Anchorage.Epoxy = b);
+        AddCheckRow (panel, "Lightweight concrete",    () => Config!.Anchorage.Lightweight,     b => Config!.Anchorage.Lightweight = b);
+        AddCheckRow (panel, "Adequate spacing/cover",  () => Config!.Anchorage.AdequateSpacing, b => Config!.Anchorage.AdequateSpacing = b);
         return panel;
     }
 
@@ -657,6 +750,20 @@ public class WallReinforcementDialog : Window
 
     private void Run_Click(object sender, RoutedEventArgs e)
     {
+        if (UseBrief)
+        {
+            BriefPath = (_txtBrief.Text ?? "").Trim();
+            if (string.IsNullOrEmpty(BriefPath) || !File.Exists(BriefPath))
+            {
+                MessageBox.Show("Browse to a valid JSON brief file, or uncheck 'Use per-wall JSON brief'.",
+                    "Wall Reinforcement", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            FolderPath = _txtFolder.Text;
+            DialogResult = true;
+            return;
+        }
+
         if (Config is null)
         {
             MessageBox.Show("Pick or create a configuration first, then Run.", "Wall Reinforcement", MessageBoxButton.OK, MessageBoxImage.Warning);

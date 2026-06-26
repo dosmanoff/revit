@@ -10,4 +10,7 @@ public static class UnitConv
 
     public static double FtToMm(double ft) =>
         UnitUtils.ConvertFromInternalUnits(ft, UnitTypeId.Millimeters);
+
+    public static double FtToIn(double ft) =>
+        UnitUtils.ConvertFromInternalUnits(ft, UnitTypeId.Inches);
 }

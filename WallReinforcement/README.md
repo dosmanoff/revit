@@ -12,9 +12,20 @@ Copy-Item "WallReinforcement\bin\Release\net8.0-windows\WallReinforcement.*" `
           -Destination "$env:APPDATA\Autodesk\Revit\Addins\2025\"
 ```
 
-Restart Revit. A new tab **Smart Tools** → panel **Reinforcement** → button **Wall Reinforcement** appears.
+Restart Revit. A new tab **Smart Tools** → panel **Reinforcement** with four buttons:
+**Export Walls**, **Wall Reinforcement**, **Wall Views**, **ACI Lengths**.
 
 The build also copies the `samples/` folder next to the DLL so the in-dialog **New…** picker can find them.
+
+## Two ways to drive it
+
+- **Single config** — pick one `*.json` config and apply it to every selected wall (the dialog tabs).
+- **Agent pipeline** — **Export Walls** dumps the selected walls to JSON
+  ([`wall-dump-schema.md`](wall-dump-schema.md)); an agent turns that + the project's
+  reinforcement task into a per-wall **brief** ([`wall-brief-schema.md`](wall-brief-schema.md),
+  example [`samples/wall-brief-example.json`](samples/wall-brief-example.json)); then in the dialog
+  tick **Use per-wall JSON brief** and browse to it — each wall is matched by Mark / Id and
+  reinforced from its own entry.
 
 ## Using the dialog
 
@@ -22,10 +33,26 @@ The build also copies the `samples/` folder next to the DLL so the in-dialog **N
 2. **Configuration** dropdown lists every `*.json` in that folder.
 3. **New…** copies one of the bundled templates (metric or ACI) into your folder.
 4. **Edit raw** opens the selected file in your default JSON editor (so you can comment, reformat, or use editor tooling).
-5. The tabs **Cover / Face Mesh / Openings / Edges / Ties / Corners / T-Junctions** let you edit every parameter in place. **Save** writes back to the same file; **Save As…** to a new one.
+5. The tabs **Cover / Face Mesh / Openings / Edges / Ties / Corners / T-Junctions / Anchorage** let you edit every parameter in place. **Save** writes back to the same file; **Save As…** to a new one.
 6. **Units** dropdown switches the interpretation of plain numbers: `Metric` = millimetres, `Imperial` = inches.
 7. **Dry run** previews counts in the summary dialog without committing rebar.
 8. **Run** does the work inside one `TransactionGroup` per execution.
+
+### Anchorage (ACI 318-19)
+
+On the **Anchorage** tab, tick **Use ACI 318-19** and set `f'c` / `fy`: the edge U-bar legs and
+opening-trim extensions are then sized to the tension development length ℓd (§25.4.2.3), and the
+corner / T-junction laps to the Class B tension lap ℓst = 1.3·ℓd (§25.5.2.1), per bar size. With it
+off (or for a non-ASTM bar name like `Ø12`), the lengths you typed are used verbatim. The standalone
+**ACI Lengths** ribbon button is a live reference calculator for the same ℓd / ℓst per bar.
+
+## Wall Views
+
+**Wall Views** documents the reinforced walls: per wall it creates exterior/interior face
+elevations, a horizontal section through the thickness, an optional 3D cage, a rebar schedule and a
+sheet — each isolated to that wall's `WR:`-tagged rebar. Its options (naming templates, scales,
+detail level, isolation, title block / view template, per-view toggles) live in a dialog and persist
+on the document via ExtensibleStorage.
 
 ## JSON schema
 
@@ -84,6 +111,8 @@ public class XxxBuilder
 }
 ```
 
-- Lengths come out of the config via `cfg.Ft(length)` which respects `cfg.Units`.
-- Shared helpers (`LookupBarType`, `EvenlySpaced`, `Create`) live in [`Engine/RebarFactory.cs`](Engine/RebarFactory.cs).
+- Lengths come out of the config via `cfg.Ft(length)` which respects `cfg.Units`. For an
+  anchorage-governed length, use `cfg.DevLengthFeet(barType, explicitFt)` (legs / extensions) or
+  `cfg.LapFeet(barType, explicitFt)` (laps) so the **Anchorage → ACI** mode applies.
+- Shared helpers (`LookupBarType`, `EvenlySpaced`, `Create`, `CreateSet`) live in [`Engine/RebarFactory.cs`](Engine/RebarFactory.cs).
 - Wire your new builder into [`Engine/WallReinforcer.cs`](Engine/WallReinforcer.cs) and tag every placed rebar with the supplied `tag` so re-runs clean up correctly.

@@ -53,21 +53,82 @@ public class WallReinforcementCommand : IExternalCommand
             settingsTx.Commit();
         }
 
-        ReinforcementConfig cfg = dialog.Config!;
-
-        using var group = new TransactionGroup(doc, $"Wall Reinforcement: {cfg.Name}");
-        group.Start();
-
         var reinforcer = new WallReinforcer(doc);
-        Domain.RunResult result = reinforcer.Run(wallIds, cfg, dialog.DryRun);
+        var skipped = new List<string>();
+        Domain.RunResult result;
 
-        if (dialog.DryRun)
-            group.RollBack();
-        else
-            group.Assimilate();
+        string groupName = dialog.UseBrief ? "Wall Reinforcement: brief" : $"Wall Reinforcement: {dialog.Config!.Name}";
+        using (var group = new TransactionGroup(doc, groupName))
+        {
+            group.Start();
 
-        ResultsDialog.Show(result);
+            if (dialog.UseBrief)
+            {
+                Dictionary<ElementId, ReinforcementConfig>? perWall = ResolveBrief(doc, wallIds, dialog.BriefPath!, skipped, out string? err);
+                if (perWall is null)
+                {
+                    group.RollBack();
+                    TaskDialog.Show("Wall Reinforcement", err!);
+                    return Result.Failed;
+                }
+                if (perWall.Count == 0)
+                {
+                    group.RollBack();
+                    TaskDialog.Show("Wall Reinforcement",
+                        "No selected wall matched a brief entry.\n\n" + string.Join("\n", skipped));
+                    return Result.Cancelled;
+                }
+                result = reinforcer.Run(perWall, dialog.DryRun);
+            }
+            else
+            {
+                result = reinforcer.Run(wallIds, dialog.Config!, dialog.DryRun);
+            }
+
+            if (dialog.DryRun)
+                group.RollBack();
+            else
+                group.Assimilate();
+        }
+
+        ResultsDialog.Show(result, skipped);
         return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// Load the brief and match each selected wall to an entry by Mark / Id, mapping it to a
+    /// per-wall config. Returns null (with <paramref name="error"/> set) if the brief can't be read.
+    /// </summary>
+    private static Dictionary<ElementId, ReinforcementConfig>? ResolveBrief(
+        Document doc, IList<ElementId> wallIds, string briefPath, List<string> skipped, out string? error)
+    {
+        error = null;
+        WallBrief brief;
+        try
+        {
+            brief = BriefLoader.Load(briefPath);
+        }
+        catch (Exception ex)
+        {
+            error = $"Could not load brief:\n{ex.Message}";
+            return null;
+        }
+
+        var perWall = new Dictionary<ElementId, ReinforcementConfig>();
+        foreach (ElementId id in wallIds)
+        {
+            if (doc.GetElement(id) is not Wall w) continue;
+            string? mark = w.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
+            mark = string.IsNullOrWhiteSpace(mark) ? null : mark;
+            BriefWall? bw = BriefLoader.Match(brief, mark, id.Value);
+            if (bw is null)
+            {
+                skipped.Add($"Wall {id.Value} (Mark '{mark ?? "(none)"}'): no brief entry.");
+                continue;
+            }
+            perWall[id] = BriefMapper.ToConfig(brief, bw);
+        }
+        return perWall;
     }
 
     private static IList<ElementId> GetSelectedWallIds(UIDocument uidoc)

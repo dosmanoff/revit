@@ -29,6 +29,13 @@ public class TransverseTieBuilder
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, ties.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
 
+        // A crosstie ("шпилька") is a StirrupTie-style bar with a 135° tie hook at each end engaging
+        // both face mats. The hook type MUST match the bar style — a Standard bar + a Stirrup/Tie
+        // hook throws an internal error. If the model has no tie hook, fall back to a straight
+        // Standard bar (no hook).
+        ElementId hookId = RebarFactory.LookupHookType(_doc, "Stirrup/Tie - 135", "Stirrup/Tie - 90", "Stirrup/Tie");
+        RebarStyle tieStyle = hookId != ElementId.InvalidElementId ? RebarStyle.StirrupTie : RebarStyle.Standard;
+
         double endsCover   = cfg.Ft(cfg.Cover.Ends);
         double topCover    = cfg.Ft(cfg.Cover.Top);
         double bottomCover = cfg.Ft(cfg.Cover.Bottom);
@@ -37,16 +44,22 @@ public class TransverseTieBuilder
         double sx          = cfg.Ft(ties.SpacingX);
         double sy          = cfg.Ft(ties.SpacingY);
 
+        var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(endsCover, axes.Length - endsCover, sx);
+        if (uCount == 0) return 0;
+
         int count = 0;
-        foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, sx))
+        // One rebar SET per height row, each distributed along the wall length — turns an
+        // N×M grid of loose bars into M set elements (orders of magnitude fewer API calls).
         foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, sy))
         {
-            XYZ pExt = axes.At(u, v, extOffset);
-            XYZ pInt = axes.At(u, v, intOffset);
+            XYZ pExt = axes.At(uFirst, v, extOffset);
+            XYZ pInt = axes.At(uFirst, v, intOffset);
 
-            RebarFactory.Create(_doc, RebarStyle.StirrupTie, barTypeId, axes.Wall,
-                                axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) }, tag);
-            count++;
+            // A transverse crosstie across the thickness, hooked at each end (see above).
+            RebarFactory.CreateSet(_doc, tieStyle, barTypeId, axes.Wall,
+                                   axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) },
+                                   uCount, uSpacing, tag, hookId, hookId);
+            count += uCount;
         }
 
         return count;

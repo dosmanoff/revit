@@ -27,4 +27,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Revit-free helpers (bar-layout math, feet-inches parser) — unit-tested separately. -->
+    <ProjectReference Include="..\WallReinforcement.Geometry\WallReinforcement.Geometry.csproj" />
+  </ItemGroup>
+
 </Project>
