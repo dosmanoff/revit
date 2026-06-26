@@ -16,13 +16,7 @@ public class WallReinforcer
 
     public RunResult Run(IEnumerable<ElementId> wallIds, ReinforcementConfig cfg, bool dryRun)
     {
-        var result      = new RunResult { DryRun = dryRun };
-        var meshBuilder = new FaceMeshBuilder(_doc);
-        var trimBuilder = new OpeningTrimBuilder(_doc);
-        var edgeBuilder = new EdgeBarBuilder(_doc);
-        var tieBuilder  = new TransverseTieBuilder(_doc);
-        var cornerBuilder = new CornerBarBuilder(_doc);
-        var tBuilder      = new TJunctionBarBuilder(_doc);
+        var result = new RunResult { DryRun = dryRun };
 
         foreach (ElementId id in wallIds)
         {
@@ -35,24 +29,19 @@ public class WallReinforcer
                 continue;
             }
 
-            string tag = ExistingRebarCleaner.MakeTag(cfg.Name, id);
-
             using var tx = new Transaction(_doc, $"Reinforce wall {id.Value}");
             tx.Start();
+
+            // Swallow warning dialogs so a batch run never modal-blocks on one wall.
+            FailureHandlingOptions failOpts = tx.GetFailureHandlingOptions();
+            failOpts.SetFailuresPreprocessor(new WarningSwallower());
+            failOpts.SetClearAfterRollback(true);
+            tx.SetFailureHandlingOptions(failOpts);
+
             try
             {
                 int replaced = ExistingRebarCleaner.Clean(_doc, id, cfg.Name);
-                WallAxes axes = WallAxes.For(wall);
-
-                IReadOnlyList<WallJunction> junctions = WallJunctions.Detect(axes);
-
-                int created = 0;
-                created += meshBuilder.Build(wall, cfg, tag);
-                created += trimBuilder.Build(axes, cfg, tag);
-                created += edgeBuilder.Build(axes, cfg, tag);
-                created += tieBuilder.Build(axes, cfg, tag);
-                created += cornerBuilder.Build(axes, cfg, junctions, tag);
-                created += tBuilder.Build(axes, cfg, junctions, tag);
+                int created  = ReinforceOne(wall, cfg);
 
                 if (dryRun)
                     tx.RollBack();
@@ -83,5 +72,29 @@ public class WallReinforcer
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Place all configured reinforcement on a single wall, WITHOUT opening a transaction — the
+    /// caller must already have one open. Used by <see cref="Run"/> (inside its per-wall
+    /// transaction) and by hosts that own the transaction themselves (e.g. a live-model test
+    /// harness driving the engine through the MCP bridge). Does NOT clean prior rebar — call
+    /// <see cref="ExistingRebarCleaner.Clean"/> first for an idempotent replace. Returns the number
+    /// of bars/sets created.
+    /// </summary>
+    public int ReinforceOne(Wall wall, ReinforcementConfig cfg)
+    {
+        string tag = ExistingRebarCleaner.MakeTag(cfg.Name, wall.Id);
+        WallAxes axes = WallAxes.For(wall);
+        IReadOnlyList<WallJunction> junctions = WallJunctions.Detect(axes);
+
+        int created = 0;
+        created += new FaceMeshBuilder(_doc).Build(wall, cfg, tag);
+        created += new OpeningTrimBuilder(_doc).Build(axes, cfg, tag);
+        created += new EdgeBarBuilder(_doc).Build(axes, cfg, tag);
+        created += new TransverseTieBuilder(_doc).Build(axes, cfg, tag);
+        created += new CornerBarBuilder(_doc).Build(axes, cfg, junctions, tag);
+        created += new TJunctionBarBuilder(_doc).Build(axes, cfg, junctions, tag);
+        return created;
     }
 }

@@ -105,7 +105,11 @@ public class FaceMeshBuilder
     /// </summary>
     private void ApplyLayoutAndSpacing(AreaReinforcement areaReinf, FaceConfig face, ReinforcementConfig cfg)
     {
-        TrySetInt(areaReinf, BuiltInParameter.REBAR_SYSTEM_LAYOUT_RULE, (int)RebarLayoutRule.MaximumSpacing);
+        // Do NOT set REBAR_SYSTEM_LAYOUT_RULE to MaximumSpacing on a WALL AreaReinforcement: it
+        // triggers a "circular chain of references" regeneration failure (the same rule is fine on a
+        // slab/floor, but not on a vertical side-face system). The default rule is NumberWithSpacing,
+        // whose line count is read-only and auto-fills the face from the spacing set below — verified
+        // in Revit: 12" -> 17x11 lines, 6" -> 33x21 on a 16x10 ft face.
 
         TrySetInt(areaReinf, BuiltInParameter.REBAR_SYSTEM_ACTIVE_FRONT_DIR_1, 1);
         TrySetInt(areaReinf, BuiltInParameter.REBAR_SYSTEM_ACTIVE_FRONT_DIR_2, 1);

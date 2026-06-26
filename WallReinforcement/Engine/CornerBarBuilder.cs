@@ -34,6 +34,9 @@ public class CornerBarBuilder
         double extCover    = cfg.Ft(cfg.Cover.Exterior);
         double intCover    = cfg.Ft(cfg.Cover.Interior);
 
+        var (vCount, vSpacing, vFirst) = RebarFactory.UniformLayout(bottomCover, axes.Height - topCover, spacing);
+        if (vCount == 0) return 0;
+
         int count = 0;
         foreach (WallJunction j in junctions)
         {
@@ -42,18 +45,19 @@ public class CornerBarBuilder
 
             double ourSign = j.OurU < axes.Length * 0.5 ? +1 : -1;
 
-            foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, spacing))
+            // One L-bar SET per face, distributed up the wall height.
             foreach (double faceOffset in new[] {  axes.HalfThickness - extCover,
                                                   -axes.HalfThickness + intCover })
             {
-                XYZ p0 = axes.At(j.OurU, v, faceOffset);
-                XYZ p1 = axes.At(j.OurU + ourSign * lap, v, faceOffset);
-                XYZ jointAtHeight = new(j.Point.X, j.Point.Y, axes.Origin.Z + v);
+                XYZ p0 = axes.At(j.OurU, vFirst, faceOffset);
+                XYZ p1 = axes.At(j.OurU + ourSign * lap, vFirst, faceOffset);
+                XYZ jointAtHeight = new(j.Point.X, j.Point.Y, axes.Origin.Z + vFirst);
                 XYZ p2 = jointAtHeight + j.OtherDir * lap;
 
-                RebarFactory.Create(_doc, RebarStyle.Standard, barTypeId, axes.Wall, axes.HeightDir,
-                    new List<Curve> { Line.CreateBound(p1, p0), Line.CreateBound(p0, p2) }, tag);
-                count++;
+                RebarFactory.CreateSet(_doc, RebarStyle.Standard, barTypeId, axes.Wall, axes.HeightDir,
+                    new List<Curve> { Line.CreateBound(p1, p0), Line.CreateBound(p0, p2) },
+                    vCount, vSpacing, tag);
+                count += vCount;
             }
         }
 

@@ -37,16 +37,24 @@ public class TransverseTieBuilder
         double sx          = cfg.Ft(ties.SpacingX);
         double sy          = cfg.Ft(ties.SpacingY);
 
+        var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(endsCover, axes.Length - endsCover, sx);
+        if (uCount == 0) return 0;
+
         int count = 0;
-        foreach (double u in RebarFactory.EvenlySpaced(endsCover, axes.Length - endsCover, sx))
+        // One rebar SET per height row, each distributed along the wall length — turns an
+        // N×M grid of loose bars into M set elements (orders of magnitude fewer API calls).
         foreach (double v in RebarFactory.EvenlySpaced(bottomCover, axes.Height - topCover, sy))
         {
-            XYZ pExt = axes.At(u, v, extOffset);
-            XYZ pInt = axes.At(u, v, intOffset);
+            XYZ pExt = axes.At(uFirst, v, extOffset);
+            XYZ pInt = axes.At(uFirst, v, intOffset);
 
-            RebarFactory.Create(_doc, RebarStyle.StirrupTie, barTypeId, axes.Wall,
-                                axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) }, tag);
-            count++;
+            // A transverse crosstie is a single straight bar across the thickness. Use Standard
+            // style (a 1-segment StirrupTie is rejected at regeneration — it expects a closed/
+            // hooked shape).
+            RebarFactory.CreateSet(_doc, RebarStyle.Standard, barTypeId, axes.Wall,
+                                   axes.LengthDir, new List<Curve> { Line.CreateBound(pExt, pInt) },
+                                   uCount, uSpacing, tag);
+            count += uCount;
         }
 
         return count;
