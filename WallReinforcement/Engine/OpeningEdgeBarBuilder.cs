@@ -18,7 +18,7 @@ public class OpeningEdgeBarBuilder
 
     public OpeningEdgeBarBuilder(Document doc) => _doc = doc;
 
-    public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, string tag)
+    public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, ISet<long> mergeOpeningIds, string tag)
     {
         OpeningsConfig op = cfg.Openings;
         if (!op.Enabled) return 0;
@@ -36,9 +36,11 @@ public class OpeningEdgeBarBuilder
         {
             if (o.Width < minWidth) continue;
 
-            // Top & bottom edges: legs run vertically away from the opening, distributed along u.
-            count += EdgeU(axes, barTypeId, tag, distAlong: axes.LengthDir, spacing,
-                           o.UMin, o.UMax, fixedV: o.VMax, legV: o.VMax + legLen, extOff, intOff, alongU: true);
+            // Top edge: skipped when a closed merge stirrup spans the strip above this opening.
+            if (!mergeOpeningIds.Contains(o.InsertId.Value))
+                count += EdgeU(axes, barTypeId, tag, distAlong: axes.LengthDir, spacing,
+                               o.UMin, o.UMax, fixedV: o.VMax, legV: o.VMax + legLen, extOff, intOff, alongU: true);
+            // Bottom edge: legs run down away from the opening, distributed along u.
             count += EdgeU(axes, barTypeId, tag, distAlong: axes.LengthDir, spacing,
                            o.UMin, o.UMax, fixedV: o.VMin, legV: o.VMin - legLen, extOff, intOff, alongU: true);
             // Left & right edges: legs run horizontally away from the opening, distributed along v.

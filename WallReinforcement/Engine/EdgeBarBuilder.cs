@@ -2,6 +2,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using WallReinforcement.Config;
 using WallReinforcement.Domain;
+using WallReinforcement.Geometry;
 
 namespace WallReinforcement.Engine;
 
@@ -30,16 +31,18 @@ public class EdgeBarBuilder
     public EdgeBarBuilder(Document doc) => _doc = doc;
 
     public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
-                     IReadOnlyList<WallJunction> junctions, string tag)
+                     IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
+                     ISet<long> mergeOpeningIds, string tag)
     {
         int n = 0;
-        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Top,    isTop: true,  tag);
-        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Bottom, isTop: false, tag);
+        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Top,    isTop: true,  openings, mergeOpeningIds, tag);
+        n += BuildTopOrBottom(axes, cfg, lay, cfg.Edges.Bottom, isTop: false, openings, mergeOpeningIds, tag);
         n += BuildEnds(axes, cfg, lay, cfg.Edges.Ends, junctions, tag);
         return n;
     }
 
-    private int BuildTopOrBottom(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge, bool isTop, string tag)
+    private int BuildTopOrBottom(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge,
+                                 bool isTop, IReadOnlyList<OpeningRect> openings, ISet<long> mergeOpeningIds, string tag)
     {
         if (!edge.Enabled) return 0;
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, edge.BarType);
@@ -58,16 +61,26 @@ public class EdgeBarBuilder
             : cfg.Ft(cfg.Cover.Bottom);
         double legV = isTop ? crossV - legLen : crossV + legLen;
 
-        var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(endsCover, axes.Length - endsCover, spacing);
-        if (uCount == 0) return 0;
+        // The TOP edge is interrupted over a merge opening (a closed stirrup spans that strip).
+        var blocked = isTop
+            ? openings.Where(o => mergeOpeningIds.Contains(o.InsertId.Value)).Select(o => new Interval(o.UMin, o.UMax))
+            : Enumerable.Empty<Interval>();
 
-        // One U-bar SET distributed along the wall length.
-        XYZ p1 = axes.At(uFirst, legV,   extOffset);
-        XYZ p2 = axes.At(uFirst, crossV, extOffset);
-        XYZ p3 = axes.At(uFirst, crossV, intOffset);
-        XYZ p4 = axes.At(uFirst, legV,   intOffset);
-        PlaceUSet(axes, barTypeId, tag, axes.LengthDir, uCount, uSpacing, p1, p2, p3, p4);
-        return uCount;
+        int count = 0;
+        foreach (Interval run in IntervalMath.Subtract(endsCover, axes.Length - endsCover, blocked))
+        {
+            var (uCount, uSpacing, uFirst) = RebarFactory.UniformLayout(run.From, run.To, spacing);
+            if (uCount == 0) continue;
+
+            // One U-bar SET distributed along this clear run of the wall length.
+            XYZ p1 = axes.At(uFirst, legV,   extOffset);
+            XYZ p2 = axes.At(uFirst, crossV, extOffset);
+            XYZ p3 = axes.At(uFirst, crossV, intOffset);
+            XYZ p4 = axes.At(uFirst, legV,   intOffset);
+            PlaceUSet(axes, barTypeId, tag, axes.LengthDir, uCount, uSpacing, p1, p2, p3, p4);
+            count += uCount;
+        }
+        return count;
     }
 
     private int BuildEnds(WallAxes axes, ReinforcementConfig cfg, WallLayering lay, EdgeConfig edge,

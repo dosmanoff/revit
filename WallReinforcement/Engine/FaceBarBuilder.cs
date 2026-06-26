@@ -28,20 +28,21 @@ public class FaceBarBuilder
     public FaceBarBuilder(Document doc) => _doc = doc;
 
     public int Build(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
-                     IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings, string tag)
+                     IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
+                     ISet<long> mergeOpeningIds, string tag)
     {
         int n = 0;
-        if (cfg.FaceMesh.Exterior is { } ext)  n += BuildFace(axes, cfg, lay, junctions, openings, ext,  exterior: true,  tag);
-        if (cfg.FaceMesh.Interior is { } intr) n += BuildFace(axes, cfg, lay, junctions, openings, intr, exterior: false, tag);
+        if (cfg.FaceMesh.Exterior is { } ext)  n += BuildFace(axes, cfg, lay, junctions, openings, mergeOpeningIds, ext,  exterior: true,  tag);
+        if (cfg.FaceMesh.Interior is { } intr) n += BuildFace(axes, cfg, lay, junctions, openings, mergeOpeningIds, intr, exterior: false, tag);
         return n;
     }
 
     private int BuildFace(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
                           IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
-                          FaceConfig face, bool exterior, string tag)
+                          ISet<long> mergeOpeningIds, FaceConfig face, bool exterior, string tag)
     {
         int n = 0;
-        n += BuildVerticals(axes, cfg, lay, junctions, openings, face, exterior, tag);
+        n += BuildVerticals(axes, cfg, lay, junctions, openings, mergeOpeningIds, face, exterior, tag);
         n += BuildHorizontals(axes, cfg, lay, junctions, openings, face, exterior, tag);
         return n;
     }
@@ -50,7 +51,7 @@ public class FaceBarBuilder
 
     private int BuildVerticals(WallAxes axes, ReinforcementConfig cfg, WallLayering lay,
                                IReadOnlyList<WallJunction> junctions, IReadOnlyList<OpeningRect> openings,
-                               FaceConfig face, bool exterior, string tag)
+                               ISet<long> mergeOpeningIds, FaceConfig face, bool exterior, string tag)
     {
         ElementId barTypeId = RebarFactory.LookupBarType(_doc, face.Vertical.BarType);
         if (barTypeId == ElementId.InvalidElementId) return 0;
@@ -93,8 +94,10 @@ public class FaceBarBuilder
                 if (b - a <= vSpacing) continue;
                 n += PlaceVerticals(axes, barTypeId, offV, new Interval(a, b), vSpacing,
                                     vBotFull, o.VMin - margin, bot, EdgeProjection.Off, tag);
-                n += PlaceVerticals(axes, barTypeId, offV, new Interval(a, b), vSpacing,
-                                    o.VMax + margin, vTopFull, EdgeProjection.Off, top, tag);
+                // Above a merge opening the closed stirrup replaces this top piece.
+                if (!mergeOpeningIds.Contains(o.InsertId.Value))
+                    n += PlaceVerticals(axes, barTypeId, offV, new Interval(a, b), vSpacing,
+                                        o.VMax + margin, vTopFull, EdgeProjection.Off, top, tag);
             }
         }
         return n;

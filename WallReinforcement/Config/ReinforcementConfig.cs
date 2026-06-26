@@ -155,6 +155,11 @@ public class OpeningsConfig
     [JsonPropertyName("extension")] public Length Extension { get; set; } = new(500);
     [JsonPropertyName("minWidth")]  public Length MinWidth  { get; set; } = new(300);
     [JsonPropertyName("diagonals")] public DiagonalsConfig Diagonals { get; set; } = new();
+
+    /// <summary>When the strip above an opening is too short for separate opening-top and wall-top
+    /// U-bars, replace them (and the vertical between) with one closed stirrup. Needs
+    /// <see cref="EdgesConfig.Top"/> enabled.</summary>
+    [JsonPropertyName("mergeTopStirrup")] public bool MergeTopStirrup { get; set; } = false;
 }
 
 public class DiagonalsConfig
