@@ -232,14 +232,16 @@ internal readonly struct EdgeProjection
     public static EdgeProjection From(ReinforcementConfig cfg, EdgeProjectionConfig p, string barType)
     {
         if (!p.Enabled) return Off;
-        double len = Resolve(cfg, p.Length, barType);
+        // A projection laps the bar in the next pour, so length 0 ⇒ the Class B tension lap. A 90°
+        // bend anchors into a slab, so bendLength 0 ⇒ the development length ℓd.
+        double len = Resolve(cfg, p.Length, barType, lap: true);
         if (len <= 1e-6) return Off;
         return new EdgeProjection
         {
             On = true,
             Length = len,
             HasBend = p.Bend90,
-            BendLength = p.Bend90 ? Resolve(cfg, p.BendLength, barType) : 0,
+            BendLength = p.Bend90 ? Resolve(cfg, p.BendLength, barType, lap: false) : 0,
             Bend = p.BendDir,
         };
     }
@@ -256,9 +258,10 @@ internal readonly struct EdgeProjection
             _ => null,
         };
 
-    private static double Resolve(ReinforcementConfig cfg, WallReinforcement.Config.Length l, string barType)
+    private static double Resolve(ReinforcementConfig cfg, WallReinforcement.Config.Length l, string barType, bool lap)
     {
         double explicitFt = cfg.Ft(l);
-        return explicitFt > 1e-9 ? explicitFt : cfg.DevLengthFeet(barType, 0);
+        if (explicitFt > 1e-9) return explicitFt;
+        return lap ? cfg.LapFeet(barType, 0) : cfg.DevLengthFeet(barType, 0);
     }
 }

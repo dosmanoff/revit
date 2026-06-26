@@ -50,9 +50,9 @@
     "lightweight":     false,
     "adequateSpacing": true
   },
-  "_projections_help": "Out-of-wall dowels of the main field bars. top/bottom continue the verticals; ends continue the horizontals (skipped where a corner/T continues the wall). length/bendLength 0 = ACI ld. bendDir: Interior|Exterior|Alternate. All disabled here.",
+  "_projections_help": "Out-of-wall dowels of the main field bars. top/bottom continue the verticals; ends continue the horizontals (skipped where a corner/T continues the wall). length 0 = Class B lap (1.3*ld); bendLength 0 = ACI ld. bendDir: Interior|Exterior|Alternate. Top verticals project up by the lap.",
   "projections": {
-    "top":    { "enabled": false, "length": 0, "bend90": false, "bendLength": 0, "bendDir": "Interior" },
+    "top":    { "enabled": true,  "length": 0, "bend90": false, "bendLength": 0, "bendDir": "Interior" },
     "bottom": { "enabled": false, "length": 0, "bend90": true,  "bendLength": 0, "bendDir": "Interior" },
     "ends":   { "enabled": false, "length": 0, "bend90": false, "bendLength": 0, "bendDir": "Interior" }
   }
