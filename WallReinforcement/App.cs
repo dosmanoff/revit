@@ -24,6 +24,20 @@ public class App : IExternalApplication
         RibbonPanel panel = application.CreateRibbonPanel(tabName, "Reinforcement");
         string assemblyPath = Assembly.GetExecutingAssembly().Location;
 
+        var exportButtonData = new PushButtonData(
+            name: "ExportWalls",
+            text: "Export\nWalls",
+            assemblyName: assemblyPath,
+            className: typeof(ExportWallsCommand).FullName!);
+
+        exportButtonData.ToolTip = "Export selected walls to JSON for the reinforcement agent.";
+        exportButtonData.LongDescription =
+            "Writes a JSON dump of the selected walls (geometry, openings, corner/T junctions, " +
+            "cover, available bar/hook types, hints). The agent turns it into a wall brief that " +
+            "Wall Reinforcement consumes per-wall.";
+
+        panel.AddItem(exportButtonData);
+
         var buttonData = new PushButtonData(
             name: "WallReinforcement",
             text: "Wall\nReinforcement",

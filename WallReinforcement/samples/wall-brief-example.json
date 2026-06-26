@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "units": "Imperial",
+  "_comment": "Worked wall brief: one wall matched by Mark, one by elementId. ACI anchorage sizes the edge legs / corner laps. Lengths are inches (per units) or feet-inches strings.",
+  "walls": [
+    {
+      "mark": "W-12",
+      "cleanExisting": true,
+      "cover": { "exterior": 2.0, "interior": 1.5, "top": 2.0, "bottom": 2.0, "ends": 2.0 },
+      "faceMesh": {
+        "exterior": { "vertical": { "barType": "#5", "spacing": 12 }, "horizontal": { "barType": "#4", "spacing": 12 } },
+        "interior": { "vertical": { "barType": "#4", "spacing": 12 }, "horizontal": { "barType": "#4", "spacing": 12 } }
+      },
+      "openings": { "enabled": true, "barType": "#5", "extension": 24, "minWidth": 12,
+                    "diagonals": { "enabled": true, "barType": "#5", "length": "2'-6\"", "angleDeg": 45 } },
+      "edges": {
+        "top":    { "enabled": true, "barType": "#4", "legLength": 12, "spacing": 12 },
+        "bottom": { "enabled": true, "barType": "#4", "legLength": 12, "spacing": 12 },
+        "ends":   { "enabled": true, "barType": "#4", "legLength": 12, "spacing": 12 }
+      },
+      "ties": { "enabled": true, "barType": "#3", "spacingX": 16, "spacingY": 16, "minThickness": 10 },
+      "corners":    { "enabled": true, "barType": "#5", "lapLength": "2'-0\"", "spacing": 12 },
+      "tJunctions": { "enabled": true, "barType": "#5", "lapLength": "2'-0\"", "spacing": 12 },
+      "anchorage": { "mode": "Aci", "fcPsi": 5000, "fyPsi": 60000, "epoxy": false, "lightweight": false, "adequateSpacing": true }
+    },
+    {
+      "elementId": 0,
+      "_comment": "Set elementId to a dump's element_id for a wall with no Mark. 0 = unused.",
+      "cleanExisting": true,
+      "cover": { "exterior": 1.5, "interior": 1.5, "top": 1.5, "bottom": 1.5, "ends": 1.5 },
+      "faceMesh": {
+        "exterior": { "vertical": { "barType": "#4", "spacing": 12 }, "horizontal": { "barType": "#4", "spacing": 12 } },
+        "interior": { "vertical": { "barType": "#4", "spacing": 12 }, "horizontal": { "barType": "#4", "spacing": 12 } }
+      },
+      "ties": { "enabled": true, "barType": "#3", "spacingX": 18, "spacingY": 18, "minThickness": 10 },
+      "anchorage": { "mode": "Explicit" }
+    }
+  ]
+}
