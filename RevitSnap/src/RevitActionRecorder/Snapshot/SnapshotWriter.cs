@@ -16,7 +16,14 @@ internal sealed class SnapshotResult
     public long Instances { get; set; }
     public long Types { get; set; }
     public long Views { get; set; }
+    public long ParamDefs { get; set; }
     public TimeSpan Took { get; set; }
+
+    /// <summary>Время по фазам — чтобы не гадать, где уходит время на большой модели.</summary>
+    public Dictionary<string, double> PhaseSeconds { get; } = new();
+
+    public string PhaseReport() =>
+        string.Join(", ", PhaseSeconds.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {kv.Value:0.0}s"));
 }
 
 /// <summary>
@@ -31,10 +38,13 @@ internal static class SnapshotWriter
         RecorderConfig config,
         ParamCache? cache,
         SessionLog log,
-        IntPtr ownerWindow)
+        IntPtr ownerWindow,
+        ParamDefRegistry? registry = null)
     {
         var started = DateTime.UtcNow;
         var result = new SnapshotResult { Path = filePath };
+        registry ??= new ParamDefRegistry();
+        var context = new ElementContext(doc);
         var progress = new ProgressWindow("RevitActionRecorder — снапшот", ownerWindow);
         progress.Show();
 
@@ -73,36 +83,44 @@ internal static class SnapshotWriter
             long done = 0;
             long total = Math.Max(1, typeCount + instanceCount);
 
-            w.WritePropertyName("types");
-            w.WriteStartArray();
-            foreach (var element in new FilteredElementCollector(doc).WhereElementIsElementType())
+            Section("types", () =>
             {
-                WriteElement(w, doc, element, config.GeometryHash, cache);
-                Tick(ref done, total, progress, "Типы и экземпляры");
-            }
-            w.WriteEndArray();
+                w.WritePropertyName("types");
+                w.WriteStartArray();
+                foreach (var element in new FilteredElementCollector(doc).WhereElementIsElementType())
+                {
+                    WriteElement(w, context, element, config.GeometryHash, cache, registry);
+                    Tick(ref done, total, progress, "Типы и экземпляры");
+                }
+                w.WriteEndArray();
+            });
 
-            w.WritePropertyName("instances");
-            w.WriteStartArray();
-            foreach (var element in new FilteredElementCollector(doc).WhereElementIsNotElementType())
+            Section("instances", () =>
             {
-                WriteElement(w, doc, element, config.GeometryHash, cache);
-                Tick(ref done, total, progress, "Типы и экземпляры");
-            }
-            w.WriteEndArray();
+                w.WritePropertyName("instances");
+                w.WriteStartArray();
+                foreach (var element in new FilteredElementCollector(doc).WhereElementIsNotElementType())
+                {
+                    WriteElement(w, context, element, config.GeometryHash, cache, registry);
+                    Tick(ref done, total, progress, "Типы и экземпляры");
+                }
+                w.WriteEndArray();
+            });
 
             result.Types = typeCount;
             result.Instances = instanceCount;
 
             progress.Report("Оформление: виды, переопределения, листы, спецификации…", null);
-            result.Views = DressingWriter.WriteViews(w, doc, config, progress);
+            Section("views", () => result.Views = DressingWriter.WriteViews(w, doc, config, progress));
             Section("sheets", () => DressingWriter.WriteSheets(w, doc));
             Section("schedules", () => DressingWriter.WriteSchedules(w, doc));
             Section("legends", () => DressingWriter.WriteLegends(w, doc));
             Section("warnings", () => DressingWriter.WriteWarnings(w, doc));
+            Section("paramDefs", () => registry.Write(w));
+            result.ParamDefs = registry.Count;
 
             w.WriteEndObject();
-            w.Flush();
+            Section("flush", () => w.Flush());
         }
         catch (OperationCanceledException)
         {
@@ -127,21 +145,34 @@ internal static class SnapshotWriter
         }
 
         result.Took = DateTime.UtcNow - started;
+        long size = 0;
+        try { size = new FileInfo(filePath).Length; } catch { }
         log.Info($"snapshot {(result.Cancelled ? "CANCELLED" : "ok")}: {System.IO.Path.GetFileName(filePath)}, " +
-                 $"types={result.Types}, instances={result.Instances}, views={result.Views}, took={result.Took.TotalSeconds:0.0}s");
+                 $"types={result.Types}, instances={result.Instances}, views={result.Views}, " +
+                 $"paramDefs={result.ParamDefs}, size={size / 1024 / 1024}MB, took={result.Took.TotalSeconds:0.0}s");
+        log.Info($"snapshot phases: {result.PhaseReport()}");
         return result;
 
         void Section(string name, Action write)
         {
             progress.Report($"Раздел: {name}…", null);
             if (progress.CancelRequested) throw new OperationCanceledException();
+            var phaseStarted = DateTime.UtcNow;
             try
             {
                 write();
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 log.Error($"Snapshot.{name}", ex);
+            }
+            finally
+            {
+                result.PhaseSeconds[name] = (DateTime.UtcNow - phaseStarted).TotalSeconds;
             }
         }
     }
@@ -156,7 +187,9 @@ internal static class SnapshotWriter
             throw new OperationCanceledException();
     }
 
-    internal static void WriteElement(Utf8JsonWriter w, Document doc, Element element, bool geometryHash, ParamCache? cache)
+    internal static void WriteElement(
+        Utf8JsonWriter w, ElementContext context, Element element, bool geometryHash,
+        ParamCache? cache, ParamDefRegistry registry)
     {
         w.WriteStartObject();
         try
@@ -179,10 +212,11 @@ internal static class SnapshotWriter
                 if (typeId != ElementId.InvalidElementId)
                 {
                     w.WriteNumber("typeId", typeId.Value);
-                    if (doc.GetElement(typeId) is ElementType et)
+                    var names = context.TypeNames(typeId);
+                    if (names is not null)
                     {
-                        w.WriteString("family", et.FamilyName);
-                        w.WriteString("type", et.Name);
+                        w.WriteString("family", names.Value.Family);
+                        w.WriteString("type", names.Value.Type);
                     }
                 }
                 else if (element is ElementType ownType)
@@ -194,18 +228,18 @@ internal static class SnapshotWriter
 
             try
             {
-                if (element.LevelId != ElementId.InvalidElementId && doc.GetElement(element.LevelId) is Level level)
-                    w.WriteString("level", level.Name);
+                if (element.LevelId != ElementId.InvalidElementId)
+                {
+                    var level = context.LevelName(element.LevelId);
+                    if (level is not null) w.WriteString("level", level);
+                }
             }
             catch { }
 
             try
             {
-                if (doc.IsWorkshared && element.WorksetId != WorksetId.InvalidWorksetId)
-                {
-                    var workset = doc.GetWorksetTable().GetWorkset(element.WorksetId);
-                    if (workset is not null) w.WriteString("workset", workset.Name);
-                }
+                var workset = context.WorksetName(element.WorksetId);
+                if (workset is not null) w.WriteString("workset", workset);
             }
             catch { }
 
@@ -218,10 +252,16 @@ internal static class SnapshotWriter
 
             try
             {
-                if (element.CreatedPhaseId != ElementId.InvalidElementId && doc.GetElement(element.CreatedPhaseId) is Phase created)
-                    w.WriteString("phaseCreated", created.Name);
-                if (element.DemolishedPhaseId != ElementId.InvalidElementId && doc.GetElement(element.DemolishedPhaseId) is Phase demolished)
-                    w.WriteString("phaseDemolished", demolished.Name);
+                if (element.CreatedPhaseId != ElementId.InvalidElementId)
+                {
+                    var phase = context.PhaseName(element.CreatedPhaseId);
+                    if (phase is not null) w.WriteString("phaseCreated", phase);
+                }
+                if (element.DemolishedPhaseId != ElementId.InvalidElementId)
+                {
+                    var phase = context.PhaseName(element.DemolishedPhaseId);
+                    if (phase is not null) w.WriteString("phaseDemolished", phase);
+                }
             }
             catch { }
 
@@ -239,23 +279,19 @@ internal static class SnapshotWriter
             }
             catch { }
 
-            var records = ParameterExtractor.Extract(element);
-            cache?.Put(element.Id.Value, records);
+            // Метаданные параметра (имя, bip, спецификация) одинаковы для всех элементов и уезжают
+            // в секцию paramDefs; здесь — только идентификатор и значения.
+            var values = ParameterExtractor.Extract(element, registry);
+            cache?.Put(element.Id.Value, values, LocationSignature.Of(element));
             w.WritePropertyName("params");
             w.WriteStartArray();
-            foreach (var r in records)
+            foreach (var v in values)
             {
                 w.WriteStartObject();
-                w.WriteNumber("pid", r.Pid);
-                w.WriteString("name", r.Name);
-                if (r.Bip is not null) w.WriteString("bip", r.Bip);
-                if (r.Guid is not null) w.WriteString("guid", r.Guid);
-                w.WriteString("storage", r.Storage);
-                if (r.DataType is not null) w.WriteString("dataType", r.DataType);
-                if (r.Raw is not null) w.WriteString("raw", r.Raw);
-                if (r.Display is not null) w.WriteString("display", r.Display);
-                if (r.ReadOnly) w.WriteBoolean("ro", true);
-                if (r.Shared) w.WriteBoolean("shared", true);
+                w.WriteNumber("pid", v.Pid);
+                if (v.Raw is not null) w.WriteString("raw", v.Raw);
+                if (v.Display is not null) w.WriteString("display", v.Display);
+                if (v.ReadOnly) w.WriteBoolean("ro", true);
                 w.WriteEndObject();
             }
             w.WriteEndArray();

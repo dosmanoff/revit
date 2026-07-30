@@ -39,6 +39,12 @@ public sealed class RecorderConfig
     /// </summary>
     public bool CollectElementOverrides { get; set; } = false;
 
+    /// <summary>
+    /// Не писать в дельты параметры совместной работы («Edited by»): в модели с воркcетами они
+    /// меняются у каждого тронутого элемента и к методике работы отношения не имеют.
+    /// </summary>
+    public bool SkipWorksharingParams { get; set; } = true;
+
     public string LogLevel { get; set; } = "Info";
 
     public static string ConfigPath => Path.Combine(

@@ -431,6 +431,31 @@ internal static class DressingWriter
 
     public static void WriteSheets(Utf8JsonWriter w, Document doc)
     {
+        // Один общий проход вместо двух коллекторов на каждый лист: коллектор, ограниченный видом,
+        // заставляет Revit вычислить видимость на этом виде, и на модели с сотнями листов раздел
+        // занимал 97 с — больше всех остальных.
+        var viewportsBySheet = new Dictionary<long, List<Viewport>>();
+        foreach (var vp in new FilteredElementCollector(doc).OfClass(typeof(Viewport)).Cast<Viewport>())
+        {
+            try
+            {
+                if (!viewportsBySheet.TryGetValue(vp.SheetId.Value, out var list))
+                    viewportsBySheet[vp.SheetId.Value] = list = [];
+                list.Add(vp);
+            }
+            catch
+            {
+            }
+        }
+
+        var titleBlockBySheet = new Dictionary<long, Element>();
+        foreach (var tb in new FilteredElementCollector(doc)
+                     .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                     .WhereElementIsNotElementType())
+        {
+            try { titleBlockBySheet.TryAdd(tb.OwnerViewId.Value, tb); } catch { }
+        }
+
         w.WritePropertyName("sheets");
         w.WriteStartArray();
         foreach (var sheet in new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>())
@@ -445,11 +470,7 @@ internal static class DressingWriter
 
                 try
                 {
-                    var titleBlock = new FilteredElementCollector(doc, sheet.Id)
-                        .OfCategory(BuiltInCategory.OST_TitleBlocks)
-                        .WhereElementIsNotElementType()
-                        .FirstElement();
-                    if (titleBlock is not null)
+                    if (titleBlockBySheet.TryGetValue(sheet.Id.Value, out var titleBlock))
                     {
                         w.WriteNumber("titleBlockType", titleBlock.GetTypeId().Value);
                         if (doc.GetElement(titleBlock.GetTypeId()) is ElementType tbt)
@@ -481,7 +502,9 @@ internal static class DressingWriter
 
                 w.WritePropertyName("viewports");
                 w.WriteStartArray();
-                foreach (var vp in new FilteredElementCollector(doc, sheet.Id).OfClass(typeof(Viewport)).Cast<Viewport>())
+                foreach (var vp in viewportsBySheet.TryGetValue(sheet.Id.Value, out var sheetViewports)
+                             ? sheetViewports
+                             : Enumerable.Empty<Viewport>())
                 {
                     w.WriteStartObject();
                     try

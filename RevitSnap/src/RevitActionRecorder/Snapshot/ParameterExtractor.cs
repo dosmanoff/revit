@@ -3,24 +3,15 @@ using Autodesk.Revit.DB;
 
 namespace RevitActionRecorder.Snapshot;
 
-internal sealed record ParamRecord(
-    long Pid,
-    string Name,
-    string? Bip,
-    string? Guid,
-    string Storage,
-    string? DataType,
-    string? Raw,
-    string? Display,
-    bool ReadOnly,
-    bool Shared);
+/// <summary>Значение параметра у конкретного элемента; метаданные лежат в <see cref="ParamDefRegistry"/>.</summary>
+internal readonly record struct ParamValue(long Pid, string? Raw, string? Display, bool ReadOnly);
 
 /// <summary>Полное извлечение параметров элемента: GetOrderedParameters + Parameters, дедупликация по Id.</summary>
 internal static class ParameterExtractor
 {
-    public static List<ParamRecord> Extract(Element element)
+    public static List<ParamValue> Extract(Element element, ParamDefRegistry registry)
     {
-        var result = new List<ParamRecord>();
+        var result = new List<ParamValue>();
         var seen = new HashSet<long>();
 
         try
@@ -50,15 +41,7 @@ internal static class ParameterExtractor
                 if (p is null || !seen.Add(p.Id.Value))
                     return;
 
-                string? bip = null;
-                if (p.Definition is InternalDefinition idef && idef.BuiltInParameter != BuiltInParameter.INVALID)
-                    bip = idef.BuiltInParameter.ToString();
-
-                string? guid = null;
-                try { if (p.IsShared) guid = p.GUID.ToString(); } catch { }
-
-                string? dataType = null;
-                try { dataType = p.Definition?.GetDataType()?.TypeId; } catch { }
+                var def = registry.GetOrAdd(p);
 
                 string? raw = null;
                 try
@@ -74,24 +57,23 @@ internal static class ParameterExtractor
                 }
                 catch { }
 
+                // AsValueString — самая дорогая операция обхода (58 с на 144k элементов), а для
+                // строковых параметров она возвращает то же самое, что уже лежит в raw.
                 string? display = null;
-                try { display = p.AsValueString(); } catch { }
+                if (p.StorageType != StorageType.String)
+                {
+                    try { display = p.AsValueString(); } catch { }
+                    if (display == raw) display = null;
+                }
 
-                result.Add(new ParamRecord(
-                    p.Id.Value,
-                    p.Definition?.Name ?? p.Id.Value.ToString(CultureInfo.InvariantCulture),
-                    bip,
-                    guid,
-                    p.StorageType.ToString(),
-                    string.IsNullOrEmpty(dataType) ? null : dataType,
-                    raw,
-                    display,
-                    p.IsReadOnly,
-                    p.IsShared));
+                result.Add(new ParamValue(p.Id.Value, raw, display, p.IsReadOnly));
             }
             catch
             {
             }
         }
     }
+
+    /// <summary>Значение для сравнения в теневом кэше и для показа в дельте.</summary>
+    public static string? ValueOf(in ParamValue value) => value.Display ?? value.Raw;
 }

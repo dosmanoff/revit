@@ -113,6 +113,7 @@ public static class StreamingDiff
                 DiffEngine.DiffNode("", before, after, changes);
                 if (changes.Count == 0)
                     return;
+                AnnotateParamNames(changes, afterOther, beforeOther);
 
                 var entry = Brief(after);
                 entry["changes"] = changes;
@@ -169,6 +170,38 @@ public static class StreamingDiff
 
     private static JsonObject Parse(string json) =>
         JsonNode.Parse(json) as JsonObject ?? new JsonObject();
+
+    /// <summary>
+    /// Путь вида params[pid:-1002067].raw сам по себе нечитаем — подставляем имя параметра
+    /// из словаря paramDefs снапшота (схема 2). Для снапшотов схемы 1 словаря нет, и поле опускается.
+    /// </summary>
+    private static void AnnotateParamNames(
+        JsonArray changes, Dictionary<string, string> afterOther, Dictionary<string, string> beforeOther)
+    {
+        JsonObject? defs = ParamDefs(afterOther) ?? ParamDefs(beforeOther);
+        if (defs is null)
+            return;
+
+        foreach (var change in changes)
+        {
+            if (change is not JsonObject obj || obj["path"]?.GetValue<string>() is not { } path)
+                continue;
+            const string marker = "params[pid:";
+            var start = path.IndexOf(marker, StringComparison.Ordinal);
+            if (start < 0) continue;
+            start += marker.Length;
+            var end = path.IndexOf(']', start);
+            if (end <= start) continue;
+
+            var pid = path[start..end];
+            if (defs[pid] is not JsonObject def) continue;
+            if (def["name"] is { } name) obj["param"] = name.DeepClone();
+            if (def["bip"] is { } bip) obj["bip"] = bip.DeepClone();
+        }
+    }
+
+    private static JsonObject? ParamDefs(Dictionary<string, string> sections) =>
+        sections.TryGetValue("paramDefs", out var json) ? JsonNode.Parse(json) as JsonObject : null;
 
     private static byte[] Hash(string json) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(json));

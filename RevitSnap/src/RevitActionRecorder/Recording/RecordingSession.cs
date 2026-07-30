@@ -40,7 +40,8 @@ internal sealed class RecordingSession
     private readonly Dictionary<string, long> _counts = new();
     private readonly string _eventsPath;
     private readonly DateTimeOffset _startedAt = DateTimeOffset.Now;
-    private readonly ParamCache _paramCache = new();
+    private readonly ParamDefRegistry _paramDefs = new();
+    private readonly ParamCache _paramCache;
     private long _seq;
     private int _midCounter;
     private bool _ribbonHooked;
@@ -60,7 +61,7 @@ internal sealed class RecordingSession
 
         var before = SnapshotWriter.Take(
             doc, session.SnapshotPath("snapshot_before"), config, session._paramCache, session._log,
-            uiapp.MainWindowHandle);
+            uiapp.MainWindowHandle, session._paramDefs);
         if (before.Cancelled)
         {
             session._log.Info("before-snapshot cancelled by user - session aborted");
@@ -92,6 +93,7 @@ internal sealed class RecordingSession
         Directory.CreateDirectory(Folder);
 
         _log = new SessionLog(Path.Combine(Folder, "log.txt"));
+        _paramCache = new ParamCache(_paramDefs, config.SkipWorksharingParams);
         _eventsPath = Path.Combine(Folder, "events.jsonl");
         WriteManifest(finishedAt: null, undoneMarked: null);
         _writer = new JsonlWriter(_eventsPath, _log);
@@ -115,7 +117,8 @@ internal sealed class RecordingSession
         {
             try
             {
-                var after = SnapshotWriter.Take(_doc, afterPath, _config, cache: null, _log, _uiapp.MainWindowHandle);
+                var after = SnapshotWriter.Take(
+                    _doc, afterPath, _config, cache: null, _log, _uiapp.MainWindowHandle, _paramDefs);
                 afterTaken = !after.Cancelled;
             }
             catch (Exception ex)
@@ -169,7 +172,8 @@ internal sealed class RecordingSession
     public string? TakeMidSnapshot()
     {
         var path = SnapshotPath($"snapshot_mid_{++_midCounter:00}");
-        var result = SnapshotWriter.Take(_doc, path, _config, cache: null, _log, _uiapp.MainWindowHandle);
+        var result = SnapshotWriter.Take(
+            _doc, path, _config, cache: null, _log, _uiapp.MainWindowHandle, _paramDefs);
         if (result.Cancelled)
         {
             _midCounter--;
@@ -349,7 +353,10 @@ internal sealed class RecordingSession
                 {
                     var element = doc.GetElement(id);
                     if (element is not null)
-                        _paramCache.Put(id.Value, Snapshot.ParameterExtractor.Extract(element));
+                        _paramCache.Put(
+                            id.Value,
+                            ParameterExtractor.Extract(element, _paramDefs),
+                            LocationSignature.Of(element));
                 }
             }
 
@@ -362,7 +369,12 @@ internal sealed class RecordingSession
                 {
                     var element = doc.GetElement(id);
                     if (element is not null)
-                        brief.Params = _paramCache.DiffAndUpdate(id.Value, Snapshot.ParameterExtractor.Extract(element));
+                    {
+                        brief.Params = _paramCache.DiffParams(
+                            id.Value, ParameterExtractor.Extract(element, _paramDefs));
+                        // Move/Drag не трогают параметры — величину перемещения даёт только положение.
+                        brief.Loc = _paramCache.DiffLocation(id.Value, LocationSignature.Of(element));
+                    }
                 }
                 modified.Add(brief);
             }

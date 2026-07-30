@@ -104,7 +104,10 @@ shots/before|after|marks/*.png
 log.txt                — служебный лог сессии
 ```
 
-Каждый файл начинается с поля `"schema": 1`.
+Каждый файл начинается с поля `"schema"`. Текущая версия — **2**: метаданные параметров вынесены из
+каждого элемента в общий словарь `paramDefs` (они повторялись в каждом из миллионов параметров и
+составляли около половины файла), а у изменённых элементов в событиях появилась дельта положения `loc`.
+Дифф читает и схему 1 — у старых снапшотов просто не будет имён параметров в путях изменений.
 
 ### events.jsonl
 
@@ -117,7 +120,10 @@ log.txt                — служебный лог сессии
 и не возвращена redo), `txn` (имена транзакций), `cmd` (скоррелированная команда + `ageMs` — сколько прошло
 от нажатия кнопки; команда «липкая», т.к. один инструмент Revit порождает серию транзакций), `view`,
 `added[]`/`modified[]` (карточки элементов: id, uid, cat, cls, family, type, level, workset),
-`deleted[]` (id), у modified — `params[]` с дельтами `{name, bip, from, to}` из теневого кэша.
+`deleted[]` (id), у modified — `params[]` с дельтами `{name, bip, from, to}` из теневого кэша и
+`loc` с дельтой положения `{kind, from, to, by}` (Move/Drag не меняют параметров, поэтому без неё
+перемещение видно только как факт). Параметры совместной работы («Edited by») в дельты не попадают —
+они меняются у каждого тронутого элемента; отключается в Settings.
 `undoneSeqs`/`redoneSeqs` — какие события отменил/вернул этот undo/redo-шаг.
 События чужих документов: `doc_changed`/`selection_changed` игнорируются, жизненный цикл документов и
 `view_activated` пишутся с флагом `foreign: true`.
@@ -127,9 +133,11 @@ log.txt                — служебный лог сессии
 Один JSON-объект, потоково записанный (gzip отключается в Settings):
 `model`, `project` (info, units по всем измеримым spec'ам, levels, grids, phases, worksets, designOptions,
 links + linkInstances, position, globalParams, printSettings), `categories` (стили объектов),
-`resources` (linePatterns, fillPatterns, materials, appearanceAssets), `types[]` и `instances[]`
+`resources` (linePatterns, fillPatterns, materials, appearanceAssets), `paramDefs` (словарь
+`pid → {name, bip, guid, storage, dataType, shared}` — метаданные параметров, общие для всех элементов),
+`types[]` и `instances[]`
 (каждый элемент: id/uid/cat/cls/family/type/level/workset/designOption/phase/group/assembly,
-все параметры `{pid, name, bip, guid, storage, dataType, raw, display, ro, shared}`, bbox, loc,
+значения параметров `{pid, raw, display, ro}`, bbox, loc,
 `geomHash` — SHA-256 тесселированной геометрии), `views[]` (свойства вида, cropBox, viewRange,
 orientation3d, категорийные/элементные/фильтровые переопределения — только не-дефолтные),
 `sheets[]` (основная надпись, ревизии, viewports с позициями), `schedules[]` (поля, фильтры,
@@ -146,7 +154,8 @@ orientation3d, категорийные/элементные/фильтровы�
 ### diff.json
 
 `sections.{types|instances|views|sheets|schedules}` → `added[]/removed[]/modified[]`
-(modified: карточка + `changes[{path, from, to}]`, путь вида `params[pid:123].raw`),
+(modified: карточка + `changes[{path, from, to, param, bip}]`, путь вида `params[pid:-1006521].display`,
+а `param`/`bip` подставляются из словаря `paramDefs`, чтобы изменение читалось без расшифровки id),
 `summary` со счётчиками и разбивкой по категориям, `project`/`categories`/`resources` —
 плоские списки `{path, from, to}`, `warnings` — added/removed по описанию+элементам.
 Сопоставление элементов: uid, затем id.

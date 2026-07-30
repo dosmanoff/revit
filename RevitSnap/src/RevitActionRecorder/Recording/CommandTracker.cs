@@ -18,6 +18,12 @@ internal sealed class CommandTracker
 
     public void Record(CommandRef command)
     {
+        // Кнопки самого рекордера инструментами моделирования не являются: иначе «Start recording»
+        // залипала и приписывалась первой же правке пользователя (наблюдалось: Delete Selection
+        // с возрастом привязки 23 с). Событие command при этом всё равно пишется.
+        if (command.Id is { } id && id.Contains("%RAR_", StringComparison.Ordinal))
+            return;
+
         _last = command;
         _lastAtUtc = DateTime.UtcNow;
     }

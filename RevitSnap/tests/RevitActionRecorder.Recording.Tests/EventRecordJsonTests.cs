@@ -27,7 +27,7 @@ public class EventRecordJsonTests
         var line = JsonSerializer.Serialize(record, RarJson.Line);
 
         Assert.DoesNotContain('\n', line);
-        Assert.StartsWith("{\"schema\":1,\"seq\":312,", line);
+        Assert.StartsWith($"{{\"schema\":{Schema.Version},\"seq\":312,", line);
         Assert.Contains("\"kind\":\"doc_changed\"", line);
         Assert.Contains("\"undone\":false", line);
         Assert.Contains("Разместить стену", line);
@@ -44,6 +44,6 @@ public class EventRecordJsonTests
 
         var json = JsonSerializer.Serialize(manifest, RarJson.Line);
 
-        Assert.StartsWith("{\"schema\":1,", json);
+        Assert.StartsWith($"{{\"schema\":{Schema.Version},", json);
     }
 }

@@ -74,8 +74,25 @@ public sealed class ElementBrief
     public string? Level { get; set; }
     public string? Workset { get; set; }
 
-    /// <summary>Дельты параметров изменённого элемента (этап 5).</summary>
+    /// <summary>Дельты параметров изменённого элемента.</summary>
     public IReadOnlyList<ParamDelta>? Params { get; set; }
+
+    /// <summary>
+    /// Изменение положения элемента. Транзакции Move/Drag не меняют параметров,
+    /// поэтому без этого поля перемещение видно только как факт, без величины.
+    /// </summary>
+    public LocDelta? Loc { get; set; }
+}
+
+/// <summary>Положение «до» и «после»: point — [x,y,z(,поворот)], curve — [x1,y1,z1,x2,y2,z2].</summary>
+public sealed class LocDelta
+{
+    public string? Kind { get; set; }
+    public IReadOnlyList<double>? From { get; set; }
+    public IReadOnlyList<double>? To { get; set; }
+
+    /// <summary>Смещение по осям, если тип положения не изменился.</summary>
+    public IReadOnlyList<double>? By { get; set; }
 }
 
 public sealed class ParamDelta
