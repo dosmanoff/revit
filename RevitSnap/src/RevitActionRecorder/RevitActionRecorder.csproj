@@ -7,7 +7,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PlatformTarget>x64</PlatformTarget>
-    <Configurations>Debug R2025;Debug R2026;Release R2025;Release R2026</Configurations>
+    <!-- Плюс обычные Debug/Release: CI собирает каждый проект простым `-c Release`. -->
+    <Configurations>Debug;Release;Debug R2025;Debug R2026;Release R2025;Release R2026</Configurations>
+    <!-- Сборка Windows-таргета (WPF) на Linux-раннере CI — как в соседних плагинах репозитория. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Version>0.1.0</Version>
   </PropertyGroup>
@@ -20,6 +23,12 @@
   <PropertyGroup Condition="$(Configuration.Contains('R2026'))">
     <RevitVersion>2026</RevitVersion>
     <DefineConstants>$(DefineConstants);REVIT2026</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Конфигурация без суффикса версии (CI, IDE по умолчанию) — собираем под 2025. -->
+  <PropertyGroup Condition="'$(RevitVersion)' == ''">
+    <RevitVersion>2025</RevitVersion>
+    <DefineConstants>$(DefineConstants);REVIT2025</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="$(Configuration.Contains('Debug'))">
