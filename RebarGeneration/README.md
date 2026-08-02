@@ -53,12 +53,20 @@ Api.Info()                     // версия, схемы, список ген�
 (`IEnumerable<ElementId>`, `IDictionary<,>`) превращается в возню с маршалингом.
 JSON-строка убирает проблему целиком.
 
-Из `/exec` (после установки — сборка уже в процессе, `clr.AddReference` не нужен):
+Из `/exec` после установки:
 
 ```python
-from RebarGeneration import Api
+import clr
+clr.AddReference("RebarGeneration")      # ПО ИМЕНИ: сборка уже в AppDomain,
+from RebarGeneration import Api          # файловой пробы нет
 out["report"] = Api.Run(doc, r"C:\work\fdn-job.json")
 ```
+
+`clr.AddReference` здесь обязателен: манифест `.addin` загружает сборку в
+процесс, и `System.Type.GetType("RebarGeneration.Api, RebarGeneration")` её
+находит, но синтаксис `from … import` у IronPython работает только по
+зарегистрированной ссылке. Аргумент — **имя сборки, не путь**: она уже
+загружена, поиск идёт по AppDomain.
 
 Тот же фасад бесплатно даёт три транспорта: `/exec` сегодня, команда в
 commandset для MCP-инструмента завтра, кнопки на ленте для человека.
