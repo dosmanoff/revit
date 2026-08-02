@@ -141,6 +141,27 @@ public sealed class GroupSpec
     /// </summary>
     [JsonPropertyName("minBarLength")] public double MinBarLength { get; set; }
 
+    /// <summary>
+    /// Максимальная длина одного стержня: полосы длиннее режутся на куски с
+    /// нахлёстом <see cref="Lap"/>. Ноль = не резать.
+    /// <para>
+    /// Не косметика: арматура поставляется прутками ограниченной длины, и
+    /// стержень на всю длину плиты в 33 м не изготавливается. Полоса без
+    /// разбивки выглядит в модели правдоподобно и попадает в спецификацию как
+    /// невыполнимая позиция.
+    /// </para>
+    /// </summary>
+    [JsonPropertyName("maxBarLength")] public double MaxBarLength { get; set; }
+
+    /// <summary>Нахлёст в стыке, в единицах задания. Учитывается только при
+    /// заданном <see cref="MaxBarLength"/>.</summary>
+    [JsonPropertyName("lap")] public double Lap { get; set; }
+
+    /// <summary>Ограничение длины ПЕРВОГО куска — так стыки соседних стержней
+    /// расходятся в шахматном порядке вместо одной линии по всей полосе.
+    /// Обычно половина <see cref="MaxBarLength"/>. Ноль = без разбежки.</summary>
+    [JsonPropertyName("stagger")] public double Stagger { get; set; }
+
     // ---- generator = slab | wall | column (делегирование готовым движкам) ------
     /// <summary>Путь к конфигу того движка, которому делегируется группа
     /// (`SlabReinforcementConfig`, `ReinforcementConfig`, `ColumnReinforcementConfig`).

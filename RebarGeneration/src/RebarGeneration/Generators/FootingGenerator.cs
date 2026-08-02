@@ -43,6 +43,9 @@ public sealed class FootingGenerator : IRebarGenerator
         if (!hooked) (hookStart, hookEnd) = (null, null);
 
         double minBarLenFt = ctx.U.Ft(g.MinBarLength);
+        double maxBarFt = ctx.U.Ft(g.MaxBarLength);
+        double lapFt = ctx.U.Ft(g.Lap);
+        double staggerFt = ctx.U.Ft(g.Stagger);
         Footprint? fp = g.UseFootprint ? Footprint.TryExtract(ctx.Host) : null;
         if (g.UseFootprint && fp is null) ctx.Notes.Add($"{g.Key}: {FallbackNote}");
         else if (fp is not null) ctx.Notes.Add($"{g.Key}: {fp.Describe()}");
@@ -50,9 +53,9 @@ public sealed class FootingGenerator : IRebarGenerator
         var plan = new List<PlannedSet>();
 
         if (g.Bottom is not null)
-            AddMat(plan, g, ctx, fp, cover, g.Bottom, true, hookStart, hookEnd, minBarLenFt);
+            AddMat(plan, g, ctx, fp, cover, g.Bottom, true, hookStart, hookEnd, minBarLenFt, maxBarFt, lapFt, staggerFt);
         if (g.Top is not null)
-            AddMat(plan, g, ctx, fp, cover, g.Top, false, hookStart, hookEnd, minBarLenFt);
+            AddMat(plan, g, ctx, fp, cover, g.Top, false, hookStart, hookEnd, minBarLenFt, maxBarFt, lapFt, staggerFt);
 
         if (plan.Count == 0)
             throw new JobException("EMPTY_MAT", $"{g.Key}: в bottom/top нет ни x, ни y");
@@ -62,7 +65,8 @@ public sealed class FootingGenerator : IRebarGenerator
 
     private void AddMat(
         List<PlannedSet> plan, GroupSpec g, BuildContext ctx, Footprint? fp, double cover,
-        MatSpec mat, bool fromBottom, string? hookStart, string? hookEnd, double minBarLenFt)
+        MatSpec mat, bool fromBottom, string? hookStart, string? hookEnd, double minBarLenFt,
+        double maxBarFt, double lapFt, double staggerFt)
     {
         DirSpec? first = mat.X ?? mat.Y;
         if (first is null) return;
@@ -80,20 +84,21 @@ public sealed class FootingGenerator : IRebarGenerator
         string zone = fromBottom ? "bot" : "top";
 
         AddLayer(plan, g, ctx, fp, cover, first, firstBar,
-            face + sign * (dFirst / 2.0), firstIsX, zone, hookStart, hookEnd, minBarLenFt);
+            face + sign * (dFirst / 2.0), firstIsX, zone, hookStart, hookEnd, minBarLenFt, maxBarFt, lapFt, staggerFt);
 
         if (second is null) return;
 
         string secondBar = ctx.BarTypeOf(g, second.BarType);
         double dSecond = ctx.Types.DiameterFt(secondBar);
         AddLayer(plan, g, ctx, fp, cover, second, secondBar,
-            face + sign * (dFirst + dSecond / 2.0), false, zone, hookStart, hookEnd, minBarLenFt);
+            face + sign * (dFirst + dSecond / 2.0), false, zone, hookStart, hookEnd, minBarLenFt, maxBarFt, lapFt, staggerFt);
     }
 
     private void AddLayer(
         List<PlannedSet> plan, GroupSpec g, BuildContext ctx, Footprint? fp, double cover,
         DirSpec spec, string barType, double z, bool alongX, string zone,
-        string? hookStart, string? hookEnd, double minBarLenFt)
+        string? hookStart, string? hookEnd, double minBarLenFt,
+        double maxBarFt, double lapFt, double staggerFt)
     {
         double spacing = ctx.U.Ft(spec.Spacing);
         string axis = alongX ? "x" : "y";
@@ -101,7 +106,7 @@ public sealed class FootingGenerator : IRebarGenerator
         if (fp is not null)
         {
             AddByFootprint(plan, g, fp, cover, spacing, barType, z, alongX, zone, axis,
-                hookStart, hookEnd, minBarLenFt, ctx.Notes);
+                hookStart, hookEnd, minBarLenFt, maxBarFt, lapFt, staggerFt, ctx.Notes);
             return;
         }
 
@@ -114,7 +119,8 @@ public sealed class FootingGenerator : IRebarGenerator
     private static void AddByFootprint(
         List<PlannedSet> plan, GroupSpec g, Footprint fp, double cover, double spacing,
         string barType, double z, bool alongX, string zone, string axis,
-        string? hookStart, string? hookEnd, double minBarLenFt, List<string> notes)
+        string? hookStart, string? hookEnd, double minBarLenFt,
+        double maxBarFt, double lapFt, double staggerFt, List<string> notes)
     {
         // Угол задаёт направление стержней «x»; «y» перпендикулярно ему.
         double rad = g.Angle * Math.PI / 180.0 + (alongX ? 0 : Math.PI / 2);
@@ -142,25 +148,58 @@ public sealed class FootingGenerator : IRebarGenerator
                 + $"с защитным слоем {cover:0.###} ft"
                 + (dropped > 0 ? $" (все {dropped} полос(ы) короче минимума)" : string.Empty));
 
+        // Раскладка набора — перпендикулярно стержню, в плоскости подошвы.
+        var distribution = new Vec3(-sin, cos, 0);
+        int split = 0;
+
         for (int i = 0; i < bands.Count; i++)
         {
             Band b = bands[i];
-            Vec3 a = Footprint.ToWorld(b.Start, b.Perp0, cos, sin, z);
-            Vec3 c = Footprint.ToWorld(b.End, b.Perp0, cos, sin, z);
 
-            // Раскладка набора — перпендикулярно стержню, в плоскости подошвы.
-            var distribution = new Vec3(-sin, cos, 0);
+            // Разбивка длинной полосы на прутки с нахлёстом. Арматура поставляется
+            // ограниченной длины: полоса на все 33 м не изготавливается, но в
+            // модели выглядит правдоподобно и уходит в спецификацию невыполнимой
+            // позицией. Резку считает тот же FieldLayout.
+            List<(double Start, double End)> pieces = maxBarFt > 1e-9
+                ? FieldLayout.SplitWithLaps(b.Length, maxBarFt, lapFt, staggerFt)
+                : [(0.0, b.Length)];
+            if (pieces.Count > 1) split++;
 
-            plan.Add(new PlannedSet(
-                Polyline: [a, c],
-                BarType: barType,
-                Count: b.Count,
-                SpacingFt: b.Spacing,
-                Distribution: distribution,
-                HookStart: hookStart,
-                HookEnd: hookEnd,
-                // Каждая полоса — свой набор, значит и свой ключ.
-                Suffix: bands.Count == 1 ? $"{zone}{axis}" : $"{zone}{axis}-{i}"));
+            for (int k = 0; k < pieces.Count; k++)
+            {
+                (double s0, double s1) = pieces[k];
+                double x0 = b.Start + s0, x1 = b.Start + s1;
+                if (x1 - x0 < minLen) continue;      // хвост короче минимума
+
+                Vec3 a = Footprint.ToWorld(x0, b.Perp0, cos, sin, z);
+                Vec3 c = Footprint.ToWorld(x1, b.Perp0, cos, sin, z);
+
+                string suffix = $"{zone}{axis}";
+                if (bands.Count > 1) suffix += $"-{i}";
+                if (pieces.Count > 1) suffix += $"p{k}";
+
+                plan.Add(new PlannedSet(
+                    Polyline: [a, c],
+                    BarType: barType,
+                    Count: b.Count,
+                    SpacingFt: b.Spacing,
+                    Distribution: distribution,
+                    HookStart: hookStart,
+                    HookEnd: hookEnd,
+                    // Каждая полоса (и каждый её кусок) — свой набор, значит и свой ключ.
+                    Suffix: suffix));
+            }
+        }
+
+        if (split > 0)
+            notes.Add($"{g.Key}: слой {zone}.{axis} — {split} полос(ы) разрезано по "
+                      + $"{maxBarFt:0.##} ft с нахлёстом {lapFt:0.##} ft");
+        else if (maxBarFt <= 1e-9)
+        {
+            double longest = bands.Max(b => b.Length);
+            if (longest > 40.0)
+                notes.Add($"{g.Key}: слой {zone}.{axis} — самый длинный стержень {longest:0.#} ft "
+                          + "и maxBarLength не задан: такой пруток не изготавливается");
         }
     }
 
