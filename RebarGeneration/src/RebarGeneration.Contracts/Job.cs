@@ -130,6 +130,17 @@ public sealed class GroupSpec
     /// поведение, если контур снялся неудачно.</summary>
     [JsonPropertyName("useFootprint")] public bool UseFootprint { get; set; } = true;
 
+    /// <summary>
+    /// Минимальная длина стержня: полосы короче отбрасываются, их число уходит в
+    /// отчёт. Ноль = только жёсткий предел Revit (1 дюйм).
+    /// <para>
+    /// Смысл поднимать выше предела: у изрезанного контура сканлайн даёт обрезки
+    /// в углах и вокруг отверстий. Формально они законны, конструктивно
+    /// бесполезны, а стоят по набору каждый.
+    /// </para>
+    /// </summary>
+    [JsonPropertyName("minBarLength")] public double MinBarLength { get; set; }
+
     // ---- generator = slab | wall | column (делегирование готовым движкам) ------
     /// <summary>Путь к конфигу того движка, которому делегируется группа
     /// (`SlabReinforcementConfig`, `ReinforcementConfig`, `ColumnReinforcementConfig`).

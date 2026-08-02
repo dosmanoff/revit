@@ -120,4 +120,30 @@ public class LayoutMathTests
         Assert.Null(LayoutMath.ValidateSet(count: 12, spacingFt: 1.0, barLengthFt: 20));
         Assert.Null(LayoutMath.ValidateSet(count: 1, spacingFt: 0, barLengthFt: 20));
     }
+
+    [Theory]
+    [InlineData(0.5)]    // полдюйма
+    [InlineData(0.9)]    // почти дюйм
+    public void Стержень_короче_дюйма_отбраковывается(double inches)
+    {
+        // Revit считает это ОШИБКОЙ, а не предупреждением: проглотить её нельзя,
+        // она поднимает модальный диалог и останавливает весь пакет. Поэтому
+        // отсев обязан происходить до вызова API.
+        string? why = LayoutMath.ValidateSet(1, 0, inches / 12.0);
+
+        Assert.NotNull(why);
+        Assert.Contains("минимума Revit", why);
+    }
+
+    [Fact]
+    public void Ровно_дюйм_допустим()
+    {
+        Assert.Null(LayoutMath.ValidateSet(1, 0, LayoutMath.MinBarLengthFt));
+    }
+
+    [Fact]
+    public void Минимум_равен_одному_дюйму()
+    {
+        Assert.Equal(1.0 / 12.0, LayoutMath.MinBarLengthFt, 12);
+    }
 }

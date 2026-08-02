@@ -42,6 +42,7 @@ public sealed class FootingGenerator : IRebarGenerator
         (string? hookStart, string? hookEnd) = ctx.HooksOf(g);
         if (!hooked) (hookStart, hookEnd) = (null, null);
 
+        double minBarLenFt = ctx.U.Ft(g.MinBarLength);
         Footprint? fp = g.UseFootprint ? Footprint.TryExtract(ctx.Host) : null;
         if (g.UseFootprint && fp is null) ctx.Notes.Add($"{g.Key}: {FallbackNote}");
         else if (fp is not null) ctx.Notes.Add($"{g.Key}: {fp.Describe()}");
@@ -49,9 +50,9 @@ public sealed class FootingGenerator : IRebarGenerator
         var plan = new List<PlannedSet>();
 
         if (g.Bottom is not null)
-            AddMat(plan, g, ctx, fp, cover, g.Bottom, fromBottom: true, hookStart, hookEnd);
+            AddMat(plan, g, ctx, fp, cover, g.Bottom, true, hookStart, hookEnd, minBarLenFt);
         if (g.Top is not null)
-            AddMat(plan, g, ctx, fp, cover, g.Top, fromBottom: false, hookStart, hookEnd);
+            AddMat(plan, g, ctx, fp, cover, g.Top, false, hookStart, hookEnd, minBarLenFt);
 
         if (plan.Count == 0)
             throw new JobException("EMPTY_MAT", $"{g.Key}: в bottom/top нет ни x, ни y");
@@ -61,7 +62,7 @@ public sealed class FootingGenerator : IRebarGenerator
 
     private void AddMat(
         List<PlannedSet> plan, GroupSpec g, BuildContext ctx, Footprint? fp, double cover,
-        MatSpec mat, bool fromBottom, string? hookStart, string? hookEnd)
+        MatSpec mat, bool fromBottom, string? hookStart, string? hookEnd, double minBarLenFt)
     {
         DirSpec? first = mat.X ?? mat.Y;
         if (first is null) return;
@@ -79,20 +80,20 @@ public sealed class FootingGenerator : IRebarGenerator
         string zone = fromBottom ? "bot" : "top";
 
         AddLayer(plan, g, ctx, fp, cover, first, firstBar,
-            face + sign * (dFirst / 2.0), firstIsX, zone, hookStart, hookEnd);
+            face + sign * (dFirst / 2.0), firstIsX, zone, hookStart, hookEnd, minBarLenFt);
 
         if (second is null) return;
 
         string secondBar = ctx.BarTypeOf(g, second.BarType);
         double dSecond = ctx.Types.DiameterFt(secondBar);
         AddLayer(plan, g, ctx, fp, cover, second, secondBar,
-            face + sign * (dFirst + dSecond / 2.0), alongX: false, zone, hookStart, hookEnd);
+            face + sign * (dFirst + dSecond / 2.0), false, zone, hookStart, hookEnd, minBarLenFt);
     }
 
     private void AddLayer(
         List<PlannedSet> plan, GroupSpec g, BuildContext ctx, Footprint? fp, double cover,
         DirSpec spec, string barType, double z, bool alongX, string zone,
-        string? hookStart, string? hookEnd)
+        string? hookStart, string? hookEnd, double minBarLenFt)
     {
         double spacing = ctx.U.Ft(spec.Spacing);
         string axis = alongX ? "x" : "y";
@@ -100,7 +101,7 @@ public sealed class FootingGenerator : IRebarGenerator
         if (fp is not null)
         {
             AddByFootprint(plan, g, fp, cover, spacing, barType, z, alongX, zone, axis,
-                hookStart, hookEnd);
+                hookStart, hookEnd, minBarLenFt, ctx.Notes);
             return;
         }
 
@@ -113,7 +114,7 @@ public sealed class FootingGenerator : IRebarGenerator
     private static void AddByFootprint(
         List<PlannedSet> plan, GroupSpec g, Footprint fp, double cover, double spacing,
         string barType, double z, bool alongX, string zone, string axis,
-        string? hookStart, string? hookEnd)
+        string? hookStart, string? hookEnd, double minBarLenFt, List<string> notes)
     {
         // Угол задаёт направление стержней «x»; «y» перпендикулярно ему.
         double rad = g.Angle * Math.PI / 180.0 + (alongX ? 0 : Math.PI / 2);
@@ -122,12 +123,24 @@ public sealed class FootingGenerator : IRebarGenerator
 
         List<LocalRail> rails =
             FieldLayout.LocalRails(fp.Outer, fp.Holes, dir, spacing, cover, cover);
-        List<Band> bands = FieldLayout.Bands(rails, spacing);
+        List<Band> all = FieldLayout.Bands(rails, spacing);
+
+        // Отсев огрызков. У изрезанного контура сканлайн даёт в углах и вокруг
+        // отверстий полосы в доли дюйма. Revit стержень короче дюйма считает
+        // ОШИБКОЙ (не предупреждением), то есть проглотить её нельзя — она
+        // поднимает модальный диалог и останавливает весь пакет.
+        double minLen = Math.Max(LayoutMath.MinBarLengthFt, minBarLenFt);
+        var bands = all.Where(b => b.Length >= minLen).ToList();
+        int dropped = all.Count - bands.Count;
+        if (dropped > 0)
+            notes.Add($"{g.Key}: слой {zone}.{axis} — отброшено {dropped} полос(ы) короче "
+                      + $"{minLen * 12:0.##} in из {all.Count}");
 
         if (bands.Count == 0)
             throw new JobException("EMPTY_LAYER",
                 $"{g.Key}: слой {zone}.{axis} пуст — шаг {spacing:0.###} ft не помещается в контур "
-                + $"с защитным слоем {cover:0.###} ft");
+                + $"с защитным слоем {cover:0.###} ft"
+                + (dropped > 0 ? $" (все {dropped} полос(ы) короче минимума)" : string.Empty));
 
         for (int i = 0; i < bands.Count; i++)
         {
