@@ -62,7 +62,8 @@ New-Item -ItemType Directory -Force -Path $target | Out-Null
 $runtime = @(
     'RebarGeneration.dll',
     'RebarGeneration.Contracts.dll',
-    'WallReinforcement.Geometry.dll',
+    'WallReinforcement.Geometry.dll',      # математика раскладки набора
+    'SlabReinforcement.Geometry.dll',      # сканлайн-клиппинг по контуру с отверстиями
     'RebarGeneration.deps.json'
 )
 

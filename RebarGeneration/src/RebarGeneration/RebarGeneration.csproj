@@ -42,6 +42,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RebarGeneration.Contracts\RebarGeneration.Contracts.csproj" />
+    <!--
+      Чистая (Revit-free) раскладка по контуру с отверстиями. Ссылка на проект, а
+      не на плагин SlabReinforcement: эта сборка алгоритмическая и уже покрыта
+      тестами, переписывать сканлайн-клиппинг заново значило бы заводить второй,
+      расходящийся счёт.
+    -->
+    <ProjectReference Include="..\..\..\SlabReinforcement.Geometry\SlabReinforcement.Geometry.csproj" />
   </ItemGroup>
 
   <ItemGroup>

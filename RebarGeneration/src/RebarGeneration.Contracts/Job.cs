@@ -120,6 +120,16 @@ public sealed class GroupSpec
     /// <summary>Обрамление: <c>none</c> (по умолчанию) | <c>hook</c> — загнуть концы крюками.</summary>
     [JsonPropertyName("edge")] public string Edge { get; set; } = "none";
 
+    /// <summary>Угол направления стержней «x» в плане, градусы против часовой от
+    /// оси X модели. Для повёрнутой подошвы задаётся её угол; «y» идёт
+    /// перпендикулярно. По умолчанию 0 — оси модели.</summary>
+    [JsonPropertyName("angle")] public double Angle { get; set; }
+
+    /// <summary>Считать раскладку по реальному контуру хоста (с отверстиями), а не
+    /// по габаритному боксу. По умолчанию да; <c>false</c> возвращает прежнее
+    /// поведение, если контур снялся неудачно.</summary>
+    [JsonPropertyName("useFootprint")] public bool UseFootprint { get; set; } = true;
+
     // ---- generator = slab | wall | column (делегирование готовым движкам) ------
     /// <summary>Путь к конфигу того движка, которому делегируется группа
     /// (`SlabReinforcementConfig`, `ReinforcementConfig`, `ColumnReinforcementConfig`).

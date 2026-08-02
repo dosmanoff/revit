@@ -209,6 +209,7 @@ public sealed class JobRunner(Document doc)
             };
 
             IReadOnlyList<PlannedSet> sets = GeneratorRegistry.Get(g.Generator).Plan(g, ctx);
+            report.Warnings.AddRange(ctx.Notes);
             if (sets.Count == 0)
                 throw new JobException("EMPTY_PLAN", $"{g.Key}: генератор не вернул ни одного набора");
 
