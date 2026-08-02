@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>RebarGeneration</Name>
+    <Assembly>RebarGeneration.dll</Assembly>
+    <AddInId>7C1D9F2A-4B63-4E58-9A11-5D0E2C7B8411</AddInId>
+    <FullClassName>RebarGeneration.Application.RebarGenerationApp</FullClassName>
+    <VendorId>DOSM</VendorId>
+    <VendorDescription>Structural plugins</VendorDescription>
+  </AddIn>
+</RevitAddIns>

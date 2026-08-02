@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Контракт задания и вся чистая математика раскладки — БЕЗ Revit API, поэтому
+    собирается и тестируется на любой машине (в том числе на Linux-раннере CI).
+    Revit-часть плагина ссылается на этот проект и не дублирует ни схему, ни счёт.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Platforms>x64;AnyCPU</Platforms>
+    <AssemblyName>RebarGeneration.Contracts</AssemblyName>
+    <RootNamespace>RebarGeneration.Contracts</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Переиспользуем уже оттестированную математику раскладки, а не копируем её. -->
+    <ProjectReference Include="..\..\..\WallReinforcement.Geometry\WallReinforcement.Geometry.csproj" />
+  </ItemGroup>
+
+</Project>

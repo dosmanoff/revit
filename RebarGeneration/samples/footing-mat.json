@@ -1,0 +1,48 @@
+{
+  "schema": "rebar-job-1.0",
+  "units": "mm",
+  "dryRun": true,
+
+  "policy": {
+    "onExistingKey": "skip",
+    "reuseStandardShapes": true,
+    "suppressWarnings": true,
+    "includeIds": false
+  },
+
+  "defaults": {
+    "barType": "#5",
+    "cover": 75
+  },
+
+  "groups": [
+    {
+      "key": "FDN:F1:MAT",
+      "generator": "footing",
+      "hostId": 0,
+      "note": "hostId подставить из Api.Describe; сетка низа в двух направлениях",
+      "bottom": {
+        "x": { "barType": "#5", "spacing": 300 },
+        "y": { "barType": "#5", "spacing": 300 }
+      },
+      "edge": "none"
+    },
+    {
+      "key": "FDN:F2:MAT",
+      "generator": "footing",
+      "hostId": 0,
+      "note": "низ и верх, концы загнуты крюками",
+      "cover": 75,
+      "hooks": { "start": "90", "end": "90" },
+      "bottom": {
+        "x": { "barType": "#6", "spacing": 250 },
+        "y": { "barType": "#6", "spacing": 250 }
+      },
+      "top": {
+        "x": { "barType": "#5", "spacing": 300 },
+        "y": { "barType": "#5", "spacing": 300 }
+      },
+      "edge": "hook"
+    }
+  ]
+}

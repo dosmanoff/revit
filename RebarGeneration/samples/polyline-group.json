@@ -1,0 +1,49 @@
+{
+  "schema": "rebar-job-1.0",
+  "units": "mm",
+  "dryRun": true,
+
+  "defaults": { "barType": "#4" },
+
+  "groups": [
+    {
+      "key": "PILE:P3:TIES",
+      "generator": "polyline",
+      "hostId": 0,
+      "note": "замкнутый хомут в плане: 14 штук с шагом 250 вверх по Z",
+      "barType": "#4",
+      "hooks": { "start": "135", "end": "135" },
+      "curves": [
+        [
+          [   0,    0, 1000 ],
+          [ 600,    0, 1000 ],
+          [ 600,  600, 1000 ],
+          [   0,  600, 1000 ],
+          [   0,    0, 1000 ]
+        ]
+      ],
+      "count": 14,
+      "spacing": 250,
+      "distribution": [0, 0, 1]
+    },
+    {
+      "key": "FDN:STEP:BOT:X",
+      "generator": "polyline",
+      "hostId": 0,
+      "note": "ступенчатая подошва: набор одинаковых Z-образных стержней, раскладка по Y",
+      "barType": "#6",
+      "curves": [
+        [
+          [    0, 0,  100 ],
+          [ 2400, 0,  100 ],
+          [ 2700, 0,  700 ],
+          [ 5100, 0,  700 ]
+        ]
+      ],
+      "count": 18,
+      "spacing": 300,
+      "distribution": [0, 1, 0],
+      "params": { "Comments": "F-STEP bottom X" }
+    }
+  ]
+}
