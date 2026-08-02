@@ -2,10 +2,10 @@
 <RevitAddIns>
   <AddIn Type="Application">
     <Name>RebarGeneration</Name>
-    <Assembly>RebarGeneration.dll</Assembly>
-    <AddInId>7C1D9F2A-4B63-4E58-9A11-5D0E2C7B8411</AddInId>
+    <Assembly>RebarGeneration\RebarGeneration.dll</Assembly>
     <FullClassName>RebarGeneration.Application.RebarGenerationApp</FullClassName>
+    <ClientId>7C1D9F2A-4B63-4E58-9A11-5D0E2C7B8411</ClientId>
     <VendorId>DOSM</VendorId>
-    <VendorDescription>Structural plugins</VendorDescription>
+    <VendorDescription>Batch rebar generation for Revit 2026</VendorDescription>
   </AddIn>
 </RevitAddIns>
