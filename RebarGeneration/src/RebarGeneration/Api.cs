@@ -97,6 +97,10 @@ public static class Api
         jobSchema = Job.CurrentSchema,
         reportSchema = RunReport.CurrentSchema,
         generators = GeneratorRegistry.Names.OrderBy(n => n).ToArray(),
+        // Делегирующие генераторы работают, только если соответствующий плагин
+        // загружен в этот сеанс. Показываем это сразу, чтобы задание не
+        // составлялось вслепую.
+        engines = GeneratorRegistry.DelegatingAvailability(),
     });
 
     // ------------------------------------------------------------------ обвязка

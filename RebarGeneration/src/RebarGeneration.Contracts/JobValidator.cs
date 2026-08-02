@@ -71,22 +71,35 @@ public static class JobValidator
                 Message = $"ключ '{g.Key}' встречается в задании дважды; ключи должны быть уникальны",
             });
 
-        if (g.HostId is null && string.IsNullOrWhiteSpace(g.HostKey))
+        string gen = (g.Generator ?? string.Empty).ToLowerInvariant();
+        bool delegating = gen is "slab" or "wall" or "column";
+
+        if (g.HostId is null && string.IsNullOrWhiteSpace(g.HostKey)
+            && (g.HostIds is null || g.HostIds.Count == 0))
             errors.Add(new ReportError
             {
                 Code = "NO_HOST", Key = where,
-                Message = $"{where}: не задан ни hostId, ни hostKey",
+                Message = $"{where}: не задан ни hostId, ни hostIds, ни hostKey",
             });
 
+        // Делегирующие генераторы размеры стержней берут из СВОЕГО конфига —
+        // требовать barType у них бессмысленно.
         if (string.IsNullOrWhiteSpace(g.BarType) && string.IsNullOrWhiteSpace(job.Defaults.BarType)
-            && !string.Equals(g.Generator, "footing", StringComparison.OrdinalIgnoreCase))
+            && gen is not ("footing" or "slab" or "wall" or "column"))
             errors.Add(new ReportError
             {
                 Code = "NO_BAR_TYPE", Key = where,
                 Message = $"{where}: не задан barType и нет defaults.barType",
             });
 
-        switch ((g.Generator ?? string.Empty).ToLowerInvariant())
+        if (delegating && string.IsNullOrWhiteSpace(g.ConfigPath))
+            errors.Add(new ReportError
+            {
+                Code = "NO_CONFIG_PATH", Key = where,
+                Message = $"{where}: generator={gen} требует configPath — путь к конфигу движка",
+            });
+
+        switch (gen)
         {
             case "polyline":
                 ValidatePolyline(g, where, errors);
@@ -94,6 +107,10 @@ public static class JobValidator
             case "footing":
                 ValidateFooting(g, where, errors);
                 break;
+            case "slab":
+            case "wall":
+            case "column":
+                break;      // остальное проверяет сам движок по своему конфигу
             case "":
                 errors.Add(new ReportError
                 {

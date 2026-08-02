@@ -120,6 +120,16 @@ public sealed class GroupSpec
     /// <summary>Обрамление: <c>none</c> (по умолчанию) | <c>hook</c> — загнуть концы крюками.</summary>
     [JsonPropertyName("edge")] public string Edge { get; set; } = "none";
 
+    // ---- generator = slab | wall | column (делегирование готовым движкам) ------
+    /// <summary>Путь к конфигу того движка, которому делегируется группа
+    /// (`SlabReinforcementConfig`, `ReinforcementConfig`, `ColumnReinforcementConfig`).
+    /// Формат конфига — свой у каждого движка, плагин его не разбирает.</summary>
+    [JsonPropertyName("configPath")] public string? ConfigPath { get; set; }
+
+    /// <summary>Несколько хостов одной группой — движки умеют брать список.
+    /// Дополняет <see cref="HostId"/>, не заменяет его.</summary>
+    [JsonPropertyName("hostIds")] public List<long>? HostIds { get; set; }
+
     // ---- общее ----------------------------------------------------------------
     /// <summary>Параметры, которые выставить на созданных элементах (Comments, Mark, …).</summary>
     [JsonPropertyName("params")] public Dictionary<string, object>? Params { get; set; }

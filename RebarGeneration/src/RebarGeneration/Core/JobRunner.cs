@@ -66,8 +66,19 @@ public sealed class JobRunner(Document doc)
         var byHost = new List<(Element Host, List<GroupSpec> Groups)>();
         var hostSlot = new Dictionary<long, int>();
 
+        // Делегирующие группы идут отдельным списком: их движки открывают
+        // собственные транзакции, а стартовать транзакцию внутри уже открытой
+        // Revit не позволяет.
+        var delegated = new List<GroupSpec>();
+
         foreach (GroupSpec g in job.Groups)
         {
+            if (GeneratorRegistry.IsDelegating(g.Generator))
+            {
+                delegated.Add(g);
+                continue;
+            }
+
             Element host;
             try
             {
@@ -109,6 +120,10 @@ public sealed class JobRunner(Document doc)
                 tx.Commit();
             }
         }
+
+        // Делегированные группы — уже вне транзакций раннера, но внутри его группы.
+        foreach (GroupSpec g in delegated)
+            RunDelegated(g, job, hosts, report);
 
         // Сухой прогон честно строит всё и откатывает: отчёт настоящий, модель чистая.
         if (job.DryRun) group.RollBack(); else group.Assimilate();
@@ -242,6 +257,72 @@ public sealed class JobRunner(Document doc)
             line.LengthFt = 0;
             report.Counts.Failed++;
             report.Errors.Add(new ReportError { Code = code, Key = g.Key, Message = ex.Message });
+        }
+
+        report.Groups.Add(line);
+    }
+
+    // ------------------------------------------------------- делегированная группа
+
+    /// <summary>
+    /// Передать группу готовому движку. Ключи и политика <c>onExistingKey</c> здесь
+    /// НЕ применяются: движок размечает арматуру своими тегами и сам решает, что
+    /// делать с уже существующей (обычно `CleanExisting`). Делать вид, что это
+    /// один и тот же механизм, было бы враньём в отчёте.
+    /// </summary>
+    private void RunDelegated(GroupSpec g, Job job, HostResolver hosts, RunReport report)
+    {
+        var line = new GroupReport { Key = g.Key, Generator = g.Generator };
+
+        try
+        {
+            var ids = new List<ElementId>();
+            if (g.HostIds is { Count: > 0 })
+                foreach (long id in g.HostIds) ids.Add(new ElementId(id));
+            else
+                ids.Add(hosts.Resolve(g).Id);
+
+            line.HostId = ids[0].Value;
+
+            IDelegatingGenerator gen = GeneratorRegistry.GetDelegating(g.Generator);
+            DelegatedResult res = gen.Build(g, new DelegatedContext
+            {
+                Doc = _doc,
+                Hosts = ids,
+                DryRun = job.DryRun,
+            });
+
+            line.Sets = res.Created;
+            line.Bars = res.Created;          // движок считает элементы, не стержни
+            line.Status = res.Failed > 0 && res.Created == 0 ? "failed"
+                        : res.Created == 0 ? "skipped"
+                        : "created";
+            if (res.Failed > 0)
+                line.Reason = $"движок сообщил об отказах: {res.Failed}";
+
+            report.Counts.Sets += res.Created;
+            report.Counts.Skipped += res.Skipped;
+            report.Counts.Failed += res.Failed;
+            foreach (string n in res.Notes) report.Warnings.Add($"{g.Key}: {n}");
+
+            if (res.Failed > 0)
+                report.Errors.Add(new ReportError
+                {
+                    Code = "ENGINE_REPORTED_FAILURES", Key = g.Key,
+                    Message = $"{g.Key}: движок отчитался об отказах ({res.Failed})",
+                });
+        }
+        catch (Exception ex)
+        {
+            line.Status = "failed";
+            line.Reason = ex.Message;
+            report.Counts.Failed++;
+            report.Errors.Add(new ReportError
+            {
+                Code = ex is JobException je ? je.Code : "GROUP_FAILED",
+                Key = g.Key,
+                Message = ex.Message,
+            });
         }
 
         report.Groups.Add(line);

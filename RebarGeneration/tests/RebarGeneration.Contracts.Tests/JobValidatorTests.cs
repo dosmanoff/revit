@@ -146,6 +146,78 @@ public class JobValidatorTests
         Assert.Contains(JobValidator.Validate(job), e => e.Code == "NO_SPACING");
     }
 
+    [Theory]
+    [InlineData("slab")]
+    [InlineData("wall")]
+    [InlineData("column")]
+    public void Делегирующий_генератор_требует_configPath(string generator)
+    {
+        Job job = Valid();
+        GroupSpec g = job.Groups[0];
+        g.Generator = generator;
+        g.Curves = null;
+
+        Assert.Contains(JobValidator.Validate(job), e => e.Code == "NO_CONFIG_PATH");
+    }
+
+    [Theory]
+    [InlineData("slab")]
+    [InlineData("wall")]
+    [InlineData("column")]
+    public void Делегирующий_генератор_не_требует_barType(string generator)
+    {
+        // Размер стержня живёт в конфиге движка, а не в задании — требовать его
+        // здесь значило бы заставлять дублировать данные в двух местах.
+        var job = new Job
+        {
+            Units = "mm",
+            Groups =
+            [
+                new GroupSpec
+                {
+                    Key = "W1", Generator = generator, HostId = 1,
+                    ConfigPath = @"C:\cfg.json",
+                },
+            ],
+        };
+
+        Assert.Empty(JobValidator.Validate(job));
+    }
+
+    [Fact]
+    public void Делегирующий_генератор_принимает_список_хостов()
+    {
+        var job = new Job
+        {
+            Units = "mm",
+            Groups =
+            [
+                new GroupSpec
+                {
+                    Key = "W1", Generator = "wall", HostIds = [1, 2, 3],
+                    ConfigPath = @"C:\cfg.json",
+                },
+            ],
+        };
+
+        Assert.Empty(JobValidator.Validate(job));
+    }
+
+    [Fact]
+    public void Пустой_hostIds_не_считается_хостом()
+    {
+        var job = new Job
+        {
+            Units = "mm",
+            Groups =
+            [
+                new GroupSpec { Key = "W1", Generator = "wall", HostIds = [], ConfigPath = @"C:\c.json" },
+            ],
+        };
+
+        Assert.Contains(JobValidator.Validate(job), e => e.Code == "NO_HOST");
+    }
+
     [Fact]
     public void Ошибки_возвращаются_списком_а_не_по_одной()
     {
