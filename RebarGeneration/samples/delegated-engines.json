@@ -1,0 +1,40 @@
+{
+  // Делегирование готовым движкам: плагин даёт единую дверь, транзакции и отчёт,
+  // а геометрию считает движок соответствующего плагина по СВОЕМУ конфигу.
+  //
+  // Важно, чем это отличается от polyline/footing:
+  //   • ключи (CTX_Key / [[ctx:KEY]]) к делегированным элементам НЕ применяются —
+  //     движки размечают арматуру своими тегами;
+  //   • политика onExistingKey на них не действует — у движков своя защита от
+  //     повтора (CleanExisting в их конфигах);
+  //   • в карту key→ElementId такие группы не попадают.
+  //
+  // Доступность движков видно в Api.Info() → engines.
+  "schema": "rebar-job-1.0",
+  "units": "mm",
+  "dryRun": true,
+
+  "groups": [
+    {
+      "key": "ENG:WALLS:CORE",
+      "generator": "wall",
+      "hostIds": [ 0, 0 ],
+      "configPath": "C:\\Users\\<user>\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2025\\WallReinforcement\\samples\\aci-full-12in.json",
+      "note": "движок WallReinforcement: транзакция на стену, внешнюю группу даёт плагин"
+    },
+    {
+      "key": "ENG:COLUMNS:C1",
+      "generator": "column",
+      "hostIds": [ 0 ],
+      "configPath": "C:\\Users\\<user>\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2025\\ColumnReinforcement\\samples\\default.json",
+      "note": "движок ColumnReinforcement"
+    },
+    {
+      "key": "ENG:SLAB:F2",
+      "generator": "slab",
+      "hostIds": [ 0 ],
+      "configPath": "C:\\Users\\<user>\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2025\\SlabReinforcement\\samples\\default.json",
+      "note": "движок SlabReinforcement: один конфиг на все хосты группы, зоны и бриф не задаются"
+    }
+  ]
+}

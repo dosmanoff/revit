@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8698A6FD-4A06-495B-9FBB-0B723640208F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RebarGeneration.Contracts", "src\RebarGeneration.Contracts\RebarGeneration.Contracts.csproj", "{63283BBA-6254-4E6C-9720-9973BED05829}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RebarGeneration", "src\RebarGeneration\RebarGeneration.csproj", "{7E77D04E-B29A-48C2-8F86-38621F553E67}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{626FFBBC-62C4-462A-840E-3804D7D1219A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RebarGeneration.Contracts.Tests", "tests\RebarGeneration.Contracts.Tests\RebarGeneration.Contracts.Tests.csproj", "{09CC22BF-F117-4ADF-856F-7A9ACF8E00F3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WallReinforcement.Geometry", "..\WallReinforcement.Geometry\WallReinforcement.Geometry.csproj", "{63F1E392-B522-4B54-93C4-60BADA3C9478}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{63283BBA-6254-4E6C-9720-9973BED05829}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63283BBA-6254-4E6C-9720-9973BED05829}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63283BBA-6254-4E6C-9720-9973BED05829}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63283BBA-6254-4E6C-9720-9973BED05829}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E77D04E-B29A-48C2-8F86-38621F553E67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E77D04E-B29A-48C2-8F86-38621F553E67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E77D04E-B29A-48C2-8F86-38621F553E67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E77D04E-B29A-48C2-8F86-38621F553E67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{09CC22BF-F117-4ADF-856F-7A9ACF8E00F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{09CC22BF-F117-4ADF-856F-7A9ACF8E00F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{09CC22BF-F117-4ADF-856F-7A9ACF8E00F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{09CC22BF-F117-4ADF-856F-7A9ACF8E00F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{63F1E392-B522-4B54-93C4-60BADA3C9478}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{63F1E392-B522-4B54-93C4-60BADA3C9478}.Debug|Any CPU.Build.0 = Debug|x64
+		{63F1E392-B522-4B54-93C4-60BADA3C9478}.Release|Any CPU.ActiveCfg = Release|x64
+		{63F1E392-B522-4B54-93C4-60BADA3C9478}.Release|Any CPU.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{63283BBA-6254-4E6C-9720-9973BED05829} = {8698A6FD-4A06-495B-9FBB-0B723640208F}
+		{7E77D04E-B29A-48C2-8F86-38621F553E67} = {8698A6FD-4A06-495B-9FBB-0B723640208F}
+		{09CC22BF-F117-4ADF-856F-7A9ACF8E00F3} = {626FFBBC-62C4-462A-840E-3804D7D1219A}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <!--
+    Регистрация внешнего приложения нужна не только ради кнопок на ленте: именно
+    она загружает сборку в процесс Revit, благодаря чему агент достаёт
+    RebarGeneration.Api из pyRevit Routes /exec по имени типа, без clr.AddReference.
+
+    Путь к сборке — в подпапке, как у остальных плагинов репозитория
+    (WallReinforcement\WallReinforcement.dll): рядом с DLL лежат её зависимости,
+    и плоская раскладка в общей папке Addins мешала бы соседям.
+  -->
+  <AddIn Type="Application">
+    <Name>RebarGeneration</Name>
+    <Assembly>RebarGeneration\RebarGeneration.dll</Assembly>
+    <FullClassName>RebarGeneration.Application.RebarGenerationApp</FullClassName>
+    <ClientId>7C1D9F2A-4B63-4E58-9A11-5D0E2C7B8410</ClientId>
+    <VendorId>DOSM</VendorId>
+    <VendorDescription>Batch rebar generation for Revit 2025</VendorDescription>
+  </AddIn>
+</RevitAddIns>
