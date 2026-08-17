@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>RevitActionRecorder</Name>
+    <Assembly>RevitActionRecorder\RevitActionRecorder.dll</Assembly>
+    <AddInId>F3D8A6B1-2C94-4E57-8B0D-71A5C39E64F2</AddInId>
+    <FullClassName>RevitActionRecorder.Application.RecorderApplication</FullClassName>
+    <VendorId>RAR</VendorId>
+    <VendorDescription>RevitActionRecorder — session recorder for LLM-driven workflow replay</VendorDescription>
+  </AddIn>
+</RevitAddIns>

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- Плюс обычные Debug/Release: CI собирает каждый проект простым `-c Release`. -->
+    <Configurations>Debug;Release;Debug R2025;Debug R2026;Release R2025;Release R2026</Configurations>
+    <!-- Сборка Windows-таргета (WPF) на Linux-раннере CI — как в соседних плагинах репозитория. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$(Configuration.Contains('R2025'))">
+    <RevitVersion>2025</RevitVersion>
+    <DefineConstants>$(DefineConstants);REVIT2025</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$(Configuration.Contains('R2026'))">
+    <RevitVersion>2026</RevitVersion>
+    <DefineConstants>$(DefineConstants);REVIT2026</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Конфигурация без суффикса версии (CI, IDE по умолчанию) — собираем под 2025. -->
+  <PropertyGroup Condition="'$(RevitVersion)' == ''">
+    <RevitVersion>2025</RevitVersion>
+    <DefineConstants>$(DefineConstants);REVIT2025</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$(Configuration.Contains('Debug'))">
+    <DebugType>portable</DebugType>
+    <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$(Configuration.Contains('Release'))">
+    <Optimize>true</Optimize>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*" ExcludeAssets="runtime" />
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*" ExcludeAssets="runtime" />
+    <PackageReference Include="Nice3point.Revit.Api.AdWindows" Version="$(RevitVersion).*" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RevitActionRecorder.Model\RevitActionRecorder.Model.csproj" />
+    <ProjectReference Include="..\RevitActionRecorder.Diff\RevitActionRecorder.Diff.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RevitActionRecorder.Recording.Tests" />
+  </ItemGroup>
+
+</Project>
