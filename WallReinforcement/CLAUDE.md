@@ -17,12 +17,22 @@ Reference product (precast equivalent): https://docs.besmart.software/3d-modelin
 ## Implemented (at SlabReinforcement parity)
 Ribbon tab `Smart Tools`, panel `Reinforcement`, four buttons: **Export Walls**, **Wall
 Reinforcement**, **Wall Views**, **ACI Lengths**.
-- **Reinforce:** structural-wall selection filter (Bearing/Shear/Combined basic walls); face mesh
-  (native `AreaReinforcement`, exterior + interior, per-face cover/spacing/bar); opening trim +
-  diagonals; perimeter U-bars (top/bottom/ends); transverse 135°-hooked crossties; L-corner and
-  T-junction continuity laps. Spaced builders emit Revit rebar **sets**, not loose bars. Idempotent
-  re-run via `WR:{config}:{wallId}` Comments tag. `WarningSwallower` rolls back a wall whose rebar
-  is rejected (reported Failed, not Success).
+- **Reinforce:** structural-wall selection filter (Bearing/Shear/Combined basic walls); discrete
+  field bar **sets** via `FaceBarBuilder` (vertical + horizontal, exterior + interior — NOT
+  `AreaReinforcement`); layer offsets from `WallLayering` put horizontal bars outboard, verticals
+  one bar-Ø inboard, and (when crossties wrap the wall) nest both a tie-Ø inboard so Revit's
+  commit-time regen does not collapse H onto V; opening trim + diagonals; perimeter U-bars
+  ("пэшки") — at an L-corner / T-junction the end U-bar is the continuity detail, its back segment
+  pushed past the joint to the adjoining wall's far-cover line (kept inside cover by the bar radius)
+  so the two walls' пэшки interlock (the old L-shaped corner/T builders were removed); at an L-corner
+  the field verticals inside the пэшка loop are culled and replaced by `CornerColumnBuilder`'s four
+  corner bars (column-style); field bars **stop at openings** (verticals split top/bottom, horizontals
+  left/right via `IntervalMath`) with `OpeningEdgeBarBuilder` U-bars wrapping the cut ends plus the
+  straight `OpeningTrimBuilder` bars; transverse 135°-hooked crossties that split
+  into runs **skipping openings** (`IntervalMath`); optional **edge projections** (dowels past
+  top/bottom/ends, optional 90° bend into a slab, junction-gated). Spaced builders emit Revit rebar
+  **sets**, not loose bars. Idempotent re-run via `WR:{config}:{wallId}` Comments tag.
+  `WarningSwallower` rolls back a wall whose rebar is rejected (reported Failed, not Success).
 - **Agent pipeline:** `Export Walls` → `WallDump` JSON (geometry/openings/junctions/cover/hints,
   `wall-dump-schema.md`); agent → per-wall `WallBrief` (`wall-brief-schema.md`); dialog *Use per-wall
   JSON brief* matches each wall by Mark/Id and reinforces from it.

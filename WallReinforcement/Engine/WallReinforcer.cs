@@ -117,16 +117,42 @@ public class WallReinforcer
     public int ReinforceOne(Wall wall, ReinforcementConfig cfg)
     {
         string tag = ExistingRebarCleaner.MakeTag(cfg.Name, wall.Id);
+        RebarFactory.ReuseStandardShapes = cfg.ReuseStandardShapes;
         WallAxes axes = WallAxes.For(wall);
         IReadOnlyList<WallJunction> junctions = WallJunctions.Detect(axes);
+        IReadOnlyList<OpeningRect> openings = WallGeometry.GetOpenings(axes);
+        WallLayering lay = WallLayering.For(_doc, axes, cfg);
+        ISet<long> mergeIds = ComputeMergeOpenings(axes, cfg, openings);
+        WallReinforcement.Geometry.ElevationProfile? profile = WallProfile.For(axes, _doc);
 
         int created = 0;
-        created += new FaceMeshBuilder(_doc).Build(wall, cfg, tag);
+        // Field bars skip the L-corner column zone, split around openings, and clip to a non-
+        // rectangular outline (slanted end/top).
+        created += new FaceBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, mergeIds, profile, tag);
         created += new OpeningTrimBuilder(_doc).Build(axes, cfg, tag);
-        created += new EdgeBarBuilder(_doc).Build(axes, cfg, tag);
-        created += new TransverseTieBuilder(_doc).Build(axes, cfg, tag);
-        created += new CornerBarBuilder(_doc).Build(axes, cfg, junctions, tag);
-        created += new TJunctionBarBuilder(_doc).Build(axes, cfg, junctions, tag);
+        created += new OpeningEdgeBarBuilder(_doc).Build(axes, cfg, lay, mergeIds, tag);
+        // Corner / T continuity is the extended end U-bar (пэшка) — see EdgeBarBuilder.BuildEnds.
+        created += new EdgeBarBuilder(_doc).Build(axes, cfg, lay, junctions, openings, mergeIds, profile, tag);
+        // The four vertical bars of the L-corner "column" inside the пэшка loop.
+        created += new CornerColumnBuilder(_doc).Build(axes, cfg, junctions, tag);
+        // One closed stirrup over each short opening-top strip (replaces the merged U-bars + vertical).
+        created += new OpeningTopStirrupBuilder(_doc).Build(axes, cfg, lay, mergeIds, tag);
+        created += new TransverseTieBuilder(_doc).Build(axes, cfg, lay, openings, profile, tag);
         return created;
+    }
+
+    /// <summary>Opening InsertIds whose strip-above is short enough to merge the opening-top and
+    /// wall-top U-bars into one closed stirrup (needs the merge option AND the top edge enabled).</summary>
+    private static ISet<long> ComputeMergeOpenings(WallAxes axes, ReinforcementConfig cfg, IReadOnlyList<OpeningRect> openings)
+    {
+        var ids = new HashSet<long>();
+        if (!cfg.Openings.MergeTopStirrup || !cfg.Edges.Top.Enabled) return ids;
+        double topCover = cfg.Ft(cfg.Cover.Top);
+        double legUp    = cfg.DevLengthFeet(cfg.Openings.BarType, cfg.Ft(cfg.Openings.Extension));
+        double legDown  = cfg.DevLengthFeet(cfg.Edges.Top.BarType, cfg.Ft(cfg.Edges.Top.LegLength));
+        foreach (OpeningRect o in openings)
+            if (WallReinforcement.Geometry.OpeningTopMerge.Fires((axes.Height - topCover) - o.VMax, legUp, legDown))
+                ids.Add(o.InsertId.Value);
+        return ids;
     }
 }

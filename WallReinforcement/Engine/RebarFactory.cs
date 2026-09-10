@@ -9,6 +9,11 @@ namespace WallReinforcement.Engine;
 /// </summary>
 public static class RebarFactory
 {
+    /// <summary>When true (default), bars match an existing (standard) <see cref="RebarShape"/> where
+    /// possible and only create a new shape for unique geometry. Set per run from
+    /// <see cref="Config.ReinforcementConfig.ReuseStandardShapes"/>.</summary>
+    public static bool ReuseStandardShapes = true;
+
     public static ElementId LookupBarType(Document doc, string name)
     {
         var hit = new FilteredElementCollector(doc)
@@ -49,7 +54,7 @@ public static class RebarFactory
             curves:           curves,
             startHookOrient:  RebarHookOrientation.Right,
             endHookOrient:    RebarHookOrientation.Right,
-            useExistingShapeIfPossible: true,
+            useExistingShapeIfPossible: ReuseStandardShapes,
             createNewShape:   true);
 
         ExistingRebarCleaner.Tag(rebar, tag);
@@ -81,7 +86,7 @@ public static class RebarFactory
             startHook: HookOrNull(doc, startHookId), endHook: HookOrNull(doc, endHookId),
             host: host, norm: distributionDir, curves: curves,
             startHookOrient: RebarHookOrientation.Right, endHookOrient: RebarHookOrientation.Right,
-            useExistingShapeIfPossible: true, createNewShape: true);
+            useExistingShapeIfPossible: ReuseStandardShapes, createNewShape: true);
 
         if (count > 1 && spacing > 1e-9)
         {

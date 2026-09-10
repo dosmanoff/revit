@@ -433,6 +433,16 @@ public class WallReinforcementDialog : Window
         AddCheckRow (panel, "Epoxy-coated",            () => Config!.Anchorage.Epoxy,           b => Config!.Anchorage.Epoxy = b);
         AddCheckRow (panel, "Lightweight concrete",    () => Config!.Anchorage.Lightweight,     b => Config!.Anchorage.Lightweight = b);
         AddCheckRow (panel, "Adequate spacing/cover",  () => Config!.Anchorage.AdequateSpacing, b => Config!.Anchorage.AdequateSpacing = b);
+
+        AddNote(panel, "Rebar shapes");
+        panel.Children.Add(new TextBlock
+        {
+            Text = "When ON: bent bars match the project's existing (standard) rebar shapes where "
+                 + "possible, and a new shape is created only for unique geometry.",
+            TextWrapping = TextWrapping.Wrap, FontSize = 11,
+            Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(0, 0, 0, 6),
+        });
+        AddCheckRow (panel, "Reuse standard shapes",   () => Config!.ReuseStandardShapes,       b => Config!.ReuseStandardShapes = b);
         return panel;
     }
 
